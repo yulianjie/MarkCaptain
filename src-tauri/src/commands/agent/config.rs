@@ -104,7 +104,8 @@ fn read(app: &AppHandle) -> AppResult<Settings> {
 }
 
 fn entry(settings: &Settings) -> AppResult<keyring::Entry> {
-    keyring::Entry::new("app.marktext.agent", &settings.base_url).map_err(|_| failure("keychain"))
+    keyring::Entry::new("app.markcaptain.agent", &settings.base_url)
+        .map_err(|_| failure("keychain"))
 }
 
 fn credentials_from_secret(secret: String) -> Credentials {

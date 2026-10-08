@@ -1,7 +1,7 @@
 # IPC migration map: Electron channels → Tauri commands/events
 
-This document is the canonical mapping from the original MarkText IPC surface
-(`ipcMain.on` / `ipcMain.handle` in `marktext/src/main/`, and the matching
+This document is the canonical mapping from the legacy Electron IPC surface
+(`ipcMain.on` / `ipcMain.handle` in `upstream/src/main/`, and the matching
 `ipcRenderer.send/invoke/on` calls in `src/renderer/`) to the new Tauri API.
 
 Three things were unified during the rewrite:

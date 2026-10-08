@@ -190,7 +190,7 @@ mod tests {
     #[test]
     fn atomically_replaces_the_complete_file() {
         let root =
-            std::env::temp_dir().join(format!("marktext-atomic-write-{}", uuid::Uuid::new_v4()));
+            std::env::temp_dir().join(format!("markcaptain-atomic-write-{}", uuid::Uuid::new_v4()));
         fs::create_dir_all(&root).unwrap();
         let path = root.join("data.json");
         fs::write(&path, br#"{"old":true}"#).unwrap();
@@ -209,7 +209,7 @@ mod tests {
     #[test]
     fn creates_missing_parent_directories() {
         let root = std::env::temp_dir().join(format!(
-            "marktext-atomic-write-parent-{}",
+            "markcaptain-atomic-write-parent-{}",
             uuid::Uuid::new_v4()
         ));
         let path = root.join("nested").join("note.md");
@@ -266,12 +266,12 @@ mod tests {
     #[test]
     fn windows_replace_preserves_existing_named_streams() {
         let root = std::env::temp_dir().join(format!(
-            "marktext-atomic-write-stream-{}",
+            "markcaptain-atomic-write-stream-{}",
             uuid::Uuid::new_v4()
         ));
         fs::create_dir_all(&root).unwrap();
         let path = root.join("note.md");
-        let stream = root.join("note.md:marktext-test");
+        let stream = root.join("note.md:markcaptain-test");
         fs::write(&path, b"old").unwrap();
         if let Err(error) = fs::write(&stream, b"metadata") {
             eprintln!("skipping named-stream test on a filesystem without ADS support: {error}");
@@ -292,7 +292,7 @@ mod tests {
         use std::os::unix::fs::{symlink, PermissionsExt};
 
         let root = std::env::temp_dir().join(format!(
-            "marktext-atomic-write-symlink-{}",
+            "markcaptain-atomic-write-symlink-{}",
             uuid::Uuid::new_v4()
         ));
         fs::create_dir_all(&root).unwrap();

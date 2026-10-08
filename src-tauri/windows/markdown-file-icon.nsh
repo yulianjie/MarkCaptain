@@ -3,7 +3,7 @@
 ; Windows can also store a default-app choice as Applications\<exe>, so keep
 ; that ProgID complete and pointed at this installation as well.
 !macro NSIS_HOOK_POSTINSTALL
-  WriteRegStr SHELL_CONTEXT "Software\Classes\Markdown\DefaultIcon" "" "$\"$INSTDIR\icons\md.ico$\",0"
+  WriteRegStr SHELL_CONTEXT "Software\Classes\MarkCaptain.Markdown\DefaultIcon" "" "$\"$INSTDIR\icons\md.ico$\",0"
   WriteRegStr SHELL_CONTEXT "Software\Classes\Applications\${MAINBINARYNAME}.exe" "FriendlyAppName" "${PRODUCTNAME}"
   WriteRegStr SHELL_CONTEXT "Software\Classes\Applications\${MAINBINARYNAME}.exe\DefaultIcon" "" "$\"$INSTDIR\icons\md.ico$\",0"
   WriteRegStr SHELL_CONTEXT "Software\Classes\Applications\${MAINBINARYNAME}.exe\shell\open\command" "" "$\"$INSTDIR\${MAINBINARYNAME}.exe$\" $\"%1$\""

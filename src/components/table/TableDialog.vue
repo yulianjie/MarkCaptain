@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * Insert-table dialog — replaces the original
- * `marktext/src/renderer/components/tableDialog/` Vue 2 dialog.
+ * `upstream/src/renderer/components/tableDialog/` Vue 2 dialog.
  *
  * Opens on `bus.emit('show-table-dialog')` (typically wired to the menu's
  * "Insert Table" action so the user can pick rows × cols before committing).

@@ -95,14 +95,14 @@ pub async fn cmd_upload_image_github(args: GithubUploadArgs) -> AppResult<Github
         args.owner, args.repo, args.path
     );
     let body = serde_json::json!({
-        "message": args.message.unwrap_or_else(|| "upload from marktext".into()),
+        "message": args.message.unwrap_or_else(|| "upload from markcaptain".into()),
         "content": args.content_base64,
         "branch": args.branch,
     });
     let resp = client
         .put(&url)
         .bearer_auth(&args.token)
-        .header("User-Agent", "marktext-rs")
+        .header("User-Agent", "markcaptain")
         .json(&body)
         .send()
         .await?

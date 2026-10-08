@@ -278,7 +278,7 @@ mod tests {
     #[test]
     fn stale_window_writes_and_deleted_record_resurrection_are_rejected() {
         let dir =
-            std::env::temp_dir().join(format!("marktext-history-test-{}", uuid::Uuid::new_v4()));
+            std::env::temp_dir().join(format!("markcaptain-history-test-{}", uuid::Uuid::new_v4()));
         fs::create_dir_all(&dir).unwrap();
         fs::write(dir.join("settings.json"), br#"{"enabled":true}"#).unwrap();
         let initial = Record {

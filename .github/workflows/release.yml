@@ -98,7 +98,7 @@ jobs:
           fi
 
           # Always ship a tarball of the .app as a reliable, Finder-free artifact.
-          tar -czf "$base/macos/MarkText_${RELEASE_TAG}_${{ matrix.platform.name }}.app.tar.gz" \
+          tar -czf "$base/macos/MarkCaptain_${RELEASE_TAG}_${{ matrix.platform.name }}.app.tar.gz" \
             -C "$base/macos" "$(basename "$app")"
 
       # ---- Upload all produced bundles to the GitHub Release ----
@@ -106,8 +106,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.RELEASE_TAG }}
-          name: 'MarkText ${{ env.RELEASE_TAG }}'
-          body: 'See the assets below to download and install MarkText for your platform.'
+          name: 'MarkCaptain ${{ env.RELEASE_TAG }}'
+          body: 'See the assets below to download and install MarkCaptain for your platform.'
           draft: false
           prerelease: false
           fail_on_unmatched_files: false

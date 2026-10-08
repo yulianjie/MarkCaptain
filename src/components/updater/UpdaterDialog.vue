@@ -26,17 +26,17 @@ type Phase =
 
 const localizedCopy = {
   en: {
-    disabled: 'Automatic updates are disabled in this build. Release signing has not been enabled, so MarkText did not contact the update server. Install updates manually from the project releases page.',
+    disabled: 'Automatic updates are disabled in this build. Release signing has not been enabled, so MarkCaptain did not contact the update server. Install updates manually from the project releases page.',
     unconfigured: 'Automatic updates are not configured safely. A signing public key and at least one HTTPS endpoint are required, so no update check was performed.',
     releases: 'Open project releases',
   },
   'zh-CN': {
-    disabled: '此版本已关闭自动更新。发布签名尚未启用，因此 MarkText 未连接更新服务器。请从项目发布页面手动安装更新。',
+    disabled: '此版本已关闭自动更新。发布签名尚未启用，因此 MarkCaptain 未连接更新服务器。请从项目发布页面手动安装更新。',
     unconfigured: '自动更新配置不安全：必须提供签名公钥和至少一个 HTTPS 地址。本次未执行更新检查。',
     releases: '打开项目发布页面',
   },
   ja: {
-    disabled: 'このビルドでは自動更新が無効です。リリース署名が有効になっていないため、MarkText は更新サーバーに接続していません。プロジェクトのリリースページから手動で更新してください。',
+    disabled: 'このビルドでは自動更新が無効です。リリース署名が有効になっていないため、MarkCaptain は更新サーバーに接続していません。プロジェクトのリリースページから手動で更新してください。',
     unconfigured: '自動更新が安全に構成されていません。署名公開鍵と 1 つ以上の HTTPS エンドポイントが必要なため、更新確認は実行されませんでした。',
     releases: 'プロジェクトのリリースを開く',
   },
@@ -44,7 +44,7 @@ const localizedCopy = {
 
 const copy = computed(() => localizedCopy[locale.value] ?? localizedCopy.en)
 const updaterConfig = tauriConfig.plugins.updater
-const releasesUrl = 'https://github.com/yulianjie/marktext-rs/releases'
+const releasesUrl = 'https://github.com/yulianjie/MarkCaptain/releases'
 
 const visible = ref(false)
 const phase = ref<Phase>('idle')
@@ -56,7 +56,7 @@ const total = ref(0)
 let activeUpdate: Update | null = null
 
 function updaterReadiness(): 'ready' | 'disabled' | 'unconfigured' {
-  // `active` is a MarkText renderer gate. The Tauri updater Config ignores
+  // `active` is a MarkCaptain renderer gate. The Tauri updater Config ignores
   // unknown fields, so this check must happen before importing/calling check().
   if (!updaterConfig.active) return 'disabled'
 

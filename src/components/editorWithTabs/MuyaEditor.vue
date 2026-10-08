@@ -2,7 +2,7 @@
 /**
  * Muya host — one Muya instance for the lifetime of this component;
  * tab switches swap content via setMarkdown rather than destroying and
- * rebuilding (mirrors the original Electron marktext editor.vue).
+ * rebuilding (mirrors the legacy Electron editor lifecycle).
  *
  * Having both onMounted and watch(currentFileId) call a destroy/recreate
  * `mount()` produced a microtask race where two Muya instances were
@@ -10,7 +10,7 @@
  * and breaking the first inline conversion (e.g. `## hi` → H2).
  *
  * Layered services this host wires together (Step 1–6 of the
- * "对齐 marktext 编辑效果" plan):
+ * "对齐 markcaptain 编辑效果" plan):
  *
  *   1. Constructor options come straight from `usePreferencesStore` —
  *      no hardcoded defaults; the Muya engine reads what the user has

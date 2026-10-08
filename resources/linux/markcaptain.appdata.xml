@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop">
+  <id>io.github.yulianjie.markcaptain</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>MarkCaptain</name>
+  <summary>Local-first Markdown editor with a writing Agent</summary>
+  <description>
+    <p>
+      MarkCaptain is a local-first Markdown editor with real-time WYSIWYG editing and an integrated writing Agent. The Agent can read explicitly attached context and propose reviewed changes without taking control of your documents.
+    </p>
+    <p>Features:</p>
+    <ul>
+      <li>Real-time WYSIWYG editing with source, typewriter, and focus modes</li>
+      <li>Review-first Agent suggestions with explicit document access</li>
+      <li>CommonMark and GitHub Flavored Markdown, tables, tasks, math, and diagrams</li>
+      <li>Local-first files with optional project storage and sync providers</li>
+      <li>Cross-platform desktop integration, themes, tabs, search, and export</li>
+    </ul>
+  </description>
+  <url type="homepage">https://github.com/yulianjie/MarkCaptain</url>
+  <url type="bugtracker">https://github.com/yulianjie/MarkCaptain/issues</url>
+  <screenshots>
+    <screenshot type="default">
+      <caption>Editor, outline, tabs, and live Markdown preview</caption>
+      <image>https://raw.githubusercontent.com/yulianjie/MarkCaptain/master/img/markcaptain-view-en.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Review Agent suggestions before applying them</caption>
+      <image>https://raw.githubusercontent.com/yulianjie/MarkCaptain/master/img/agent-review-en.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Summarize long documents with visible progress</caption>
+      <image>https://raw.githubusercontent.com/yulianjie/MarkCaptain/master/img/agent-summary-en.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Use images as Agent context</caption>
+      <image>https://raw.githubusercontent.com/yulianjie/MarkCaptain/master/img/agent-images-en.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Manage local Agent conversation history</caption>
+      <image>https://raw.githubusercontent.com/yulianjie/MarkCaptain/master/img/agent-history-en.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Inspect and manage writing skills</caption>
+      <image>https://raw.githubusercontent.com/yulianjie/MarkCaptain/master/img/agent-skills-en.png</image>
+    </screenshot>
+  </screenshots>
+  <categories>
+    <category>Utility</category>
+    <category>TextEditor</category>
+  </categories>
+  <content_rating type="oars-1.1">
+    <content_attribute id="violence-cartoon">none</content_attribute>
+    <content_attribute id="violence-fantasy">none</content_attribute>
+    <content_attribute id="violence-realistic">none</content_attribute>
+    <content_attribute id="violence-bloodshed">none</content_attribute>
+    <content_attribute id="violence-sexual">none</content_attribute>
+    <content_attribute id="violence-desecration">none</content_attribute>
+    <content_attribute id="violence-slavery">none</content_attribute>
+    <content_attribute id="violence-worship">none</content_attribute>
+    <content_attribute id="drugs-alcohol">none</content_attribute>
+    <content_attribute id="drugs-narcotics">none</content_attribute>
+    <content_attribute id="drugs-tobacco">none</content_attribute>
+    <content_attribute id="sex-nudity">none</content_attribute>
+    <content_attribute id="sex-themes">none</content_attribute>
+    <content_attribute id="sex-homosexuality">none</content_attribute>
+    <content_attribute id="sex-prostitution">none</content_attribute>
+    <content_attribute id="sex-adultery">none</content_attribute>
+    <content_attribute id="sex-appearance">none</content_attribute>
+    <content_attribute id="language-profanity">none</content_attribute>
+    <content_attribute id="language-humor">none</content_attribute>
+    <content_attribute id="language-discrimination">none</content_attribute>
+    <content_attribute id="social-chat">none</content_attribute>
+    <content_attribute id="social-info">none</content_attribute>
+    <content_attribute id="social-audio">none</content_attribute>
+    <content_attribute id="social-location">none</content_attribute>
+    <content_attribute id="social-contacts">none</content_attribute>
+    <content_attribute id="money-purchasing">none</content_attribute>
+    <content_attribute id="money-gambling">none</content_attribute>
+  </content_rating>
+</component>

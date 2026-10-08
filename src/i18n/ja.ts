@@ -61,7 +61,7 @@ export default {
     collapseHeading: '{heading} を折りたたむ',
   },
   app: {
-    name: 'MarkText',
+    name: 'MarkCaptain',
     untitled: '無題',
   },
   common: {
@@ -118,7 +118,7 @@ export default {
     preferences: '環境設定',
     docs: 'ドキュメント',
     issues: '問題を報告',
-    about: 'MarkText について',
+    about: 'MarkCaptain について',
   },
   tabs: {
     newTab: '新しいタブ',
@@ -317,7 +317,7 @@ export default {
         fullscreen: 'フルスクリーンを切り替え',
       },
       help: {
-        about: 'MarkText について',
+        about: 'MarkCaptain について',
         openDocs: 'ドキュメントを開く',
         openIssues: '問題を報告',
         checkForUpdates: 'アップデートを確認',
@@ -341,7 +341,7 @@ export default {
   about: {
     version: 'バージョン {version}',
     tagline: 'Markdown エディター — Tauri 書き直し版。',
-    copyright: '© MarkText コントリビューター · MIT ライセンス',
+    copyright: '© MarkCaptain コントリビューター · MIT ライセンス',
   },
   updater: {
     title: 'アップデートを確認',
@@ -390,7 +390,7 @@ export default {
     saveAll: 'すべて保存',
   },
   externalChange: {
-    title: 'MarkText の外部でファイルが変更されました',
+    title: 'MarkCaptain の外部でファイルが変更されました',
     detail: '{filename} はディスク上で変更され、エディターにも未保存の変更があります。',
     reload: 'ディスクから再読み込み',
     keepLocal: '自分の変更を保持',
@@ -399,13 +399,13 @@ export default {
     overwriteTitle: '外部変更を解決',
     overwriteDetail: '{filename} を保存すると、ディスク上の新しい内容が上書きされます。',
     overwrite: 'ディスク上のファイルを上書き',
-    removedTitle: 'MarkText の外部でファイルが削除されました',
+    removedTitle: 'MarkCaptain の外部でファイルが削除されました',
     removed: '{filename} を未保存のタブとして保持しました。保存先を選んでください。',
     savePathChanged: '保存中に {filename} の場所が変更されました。変更は未保存のままです。新しい場所へもう一度保存してください。',
   },
   session: {
     crashTitle: '未保存の下書きを復元しますか？',
-    crashDetail: 'MarkText は前回正常に終了しませんでした。{count} 件の未保存の下書きを復元できます。',
+    crashDetail: 'MarkCaptain は前回正常に終了しませんでした。{count} 件の未保存の下書きを復元できます。',
     recoverDrafts: '下書きを復元',
     discardDrafts: '下書きを破棄',
     conflictTitle: '下書きとディスク上のファイルが両方変更されています',
@@ -463,7 +463,7 @@ export default {
       gitSummary: '{state}: ahead {ahead}、behind {behind}、競合 {conflicts}',
       agentConflict: 'Git 同期はコミット済みの変更だけを転送します。準備したマージは Git で完了または中止してください。競合は手動編集するか、限定された部分を Agent に送ってレビューできます。Agent は自動適用、コミット、プッシュを行いません。',
       provider: {
-        selfHosted: 'セルフホスト MarkText Sync',
+        selfHosted: 'セルフホスト MarkCaptain Sync',
         git: 'Git',
         webdav: 'WebDAV',
         plugin: 'ストレージプラグイン',
@@ -481,7 +481,7 @@ export default {
       appIconDefault: '既定',
       appIconLiquidGlass: 'Liquid Glass',
       appIconLiquidGlassAlt: 'Liquid Glass バリエーション',
-      appIconOriginal: 'オリジナル MarkText',
+      appIconOriginal: 'クラシック',
       appIconChoice: '{label}: {description}',
       openFilesNewWindow: 'ファイルを新しいウィンドウで開く',
       openFolderNewWindow: 'フォルダーを新しいウィンドウで開く',

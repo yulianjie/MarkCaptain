@@ -87,7 +87,7 @@ describe('updater fail-closed contract', () => {
     expect(updaterConfig.plugins.updater).toEqual({
       active: false,
       endpoints: [
-        'https://github.com/yulianjie/marktext-rs/releases/latest/download/latest.json',
+        'https://github.com/yulianjie/MarkCaptain/releases/latest/download/latest.json',
       ],
       pubkey: '',
     })
@@ -117,9 +117,9 @@ describe('updater fail-closed contract', () => {
 
   it('documents the actual registered-plugin and unsigned-release state', () => {
     expect(updaterDocs).toContain('The Rust plugin **is registered**')
-    expect(updaterDocs).toContain('yulianjie/marktext-rs')
+    expect(updaterDocs).toContain('yulianjie/MarkCaptain')
     expect(updaterDocs).toContain('current release workflow does not sign updater artifacts')
-    expect(updaterDocs).toContain('`active` is a MarkText renderer gate')
+    expect(updaterDocs).toContain('`active` is a MarkCaptain renderer gate')
     expect(updaterDocs).not.toContain('uncomment')
   })
 })

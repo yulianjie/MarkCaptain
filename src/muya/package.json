@@ -1,7 +1,7 @@
 {
   "name": "muya",
   "version": "0.1.2",
-  "description": "A browser based markdown editor that powers MarkText",
+  "description": "The browser-based Muya Markdown editor used by MarkCaptain",
   "main": "dist/muya.min.js",
   "scripts": {
     "test": "npm run test"

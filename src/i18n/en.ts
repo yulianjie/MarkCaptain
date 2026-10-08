@@ -63,7 +63,7 @@ export default {
     collapseHeading: 'Collapse {heading}',
   },
   app: {
-    name: 'MarkText',
+    name: 'MarkCaptain',
     untitled: 'Untitled',
   },
   common: {
@@ -120,7 +120,7 @@ export default {
     preferences: 'Preferences',
     docs: 'Documentation',
     issues: 'Report an Issue',
-    about: 'About MarkText',
+    about: 'About MarkCaptain',
   },
   tabs: {
     newTab: 'New tab',
@@ -319,7 +319,7 @@ export default {
         fullscreen: 'Toggle Full Screen',
       },
       help: {
-        about: 'About MarkText',
+        about: 'About MarkCaptain',
         openDocs: 'Open Documentation',
         openIssues: 'Report an Issue',
         checkForUpdates: 'Check for Updates',
@@ -343,7 +343,7 @@ export default {
   about: {
     version: 'Version {version}',
     tagline: 'Markdown editor — Tauri rewrite.',
-    copyright: '© MarkText contributors · MIT License',
+    copyright: '© MarkCaptain contributors · MIT License',
   },
   updater: {
     title: 'Check for Updates',
@@ -392,7 +392,7 @@ export default {
     saveAll: 'Save All',
   },
   externalChange: {
-    title: 'File changed outside MarkText',
+    title: 'File changed outside MarkCaptain',
     detail: '{filename} has changed on disk while you have unsaved edits.',
     reload: 'Reload from Disk',
     keepLocal: 'Keep My Changes',
@@ -401,13 +401,13 @@ export default {
     overwriteTitle: 'Resolve external changes',
     overwriteDetail: 'Saving {filename} now will overwrite newer content on disk.',
     overwrite: 'Overwrite Disk File',
-    removedTitle: 'File removed outside MarkText',
+    removedTitle: 'File removed outside MarkCaptain',
     removed: '{filename} was kept as an unsaved tab. Use Save to choose a new location.',
     savePathChanged: '{filename} moved while it was being saved. Your changes remain unsaved; save again to write them to the new location.',
   },
   session: {
     crashTitle: 'Recover unsaved drafts?',
-    crashDetail: 'MarkText did not close normally. {count} unsaved draft(s) are available for recovery.',
+    crashDetail: 'MarkCaptain did not close normally. {count} unsaved draft(s) are available for recovery.',
     recoverDrafts: 'Recover Drafts',
     discardDrafts: 'Discard Drafts',
     conflictTitle: 'Draft and disk file both changed',
@@ -465,7 +465,7 @@ export default {
       gitSummary: '{state}: {ahead} ahead, {behind} behind, {conflicts} conflicts',
       agentConflict: 'Git sync transfers committed changes only. A prepared merge is left for Git to finish or abort. Conflicts can be edited manually or sent as bounded hunks to the writing Agent for review; the Agent never applies, commits, or pushes automatically.',
       provider: {
-        selfHosted: 'Self-hosted MarkText Sync',
+        selfHosted: 'Self-hosted MarkCaptain Sync',
         git: 'Git',
         webdav: 'WebDAV',
         plugin: 'Storage plugin',
@@ -483,7 +483,7 @@ export default {
       appIconDefault: 'Default',
       appIconLiquidGlass: 'Liquid Glass',
       appIconLiquidGlassAlt: 'Liquid Glass variant',
-      appIconOriginal: 'Original MarkText',
+      appIconOriginal: 'Classic',
       appIconChoice: '{label}: {description}',
       openFilesNewWindow: 'Open files in new window',
       openFolderNewWindow: 'Open folder in new window',

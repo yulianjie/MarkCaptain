@@ -1,6 +1,6 @@
 /**
  * Document-state factories — port of the original
- * `marktext/src/renderer/store/help.js`.
+ * `upstream/src/renderer/store/help.js`.
  *
  * One document = one editor tab. The fields here are read by the editor
  * store, the tab bar, the sidebar's "opened files" section, and the

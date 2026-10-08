@@ -26,7 +26,7 @@ When a document is attached, choose the narrowest useful view: inspect its outli
 
 Before presenting the result, consider what the intended reader needs to understand or do. Check unexplained terms, missing prerequisites, unsupported claims and contradictions within the available material. For longer work, also check whether the headings lead naturally to the conclusion. State any material limit of the review when only a selection was available.
 
-## Deliver in MarkText
+## Deliver in MarkCaptain
 
 For an attached-document change, use `propose_edit` with exact, unique `oldText`; use an empty `oldText` only to append. Combine related changes into the single contiguous proposal supported by the editor. Explain the change briefly and let the existing review controls handle application.
 

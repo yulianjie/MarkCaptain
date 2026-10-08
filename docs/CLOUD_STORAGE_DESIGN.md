@@ -1,6 +1,6 @@
 # Cloud storage architecture
 
-MarkText cloud storage is local-first. The editor, project tree, search, image
+MarkCaptain cloud storage is local-first. The editor, project tree, search, image
 resolver, and file watcher continue to operate on a normal local directory.
 The Rust storage layer synchronizes that working copy with one configured
 provider. A failed network request must never make a successful local save
@@ -12,7 +12,7 @@ fail.
   at most one active storage binding: local, Git, self-hosted, WebDAV, or one
   storage plugin.
 - Opening an unconfigured non-Git directory keeps the project in local mode.
-- Opening a Git repository root defaults to Git mode. MarkText discovers the
+- Opening a Git repository root defaults to Git mode. MarkCaptain discovers the
   current branch and preferred remote and creates the project binding when a
   usable remote exists; a repository without a remote remains visibly in Git
   mode without inventing one.
@@ -28,7 +28,7 @@ fail.
 
 Only four provider families are in scope:
 
-1. **Self-hosted MarkText Sync** — a separate private service and repository.
+1. **Self-hosted MarkCaptain Sync** — a separate private service and repository.
 2. **Git** — an existing local checkout with a configured remote and branch.
 3. **WebDAV** — standards-based file and directory synchronization.
 4. **Plugin** — all other cloud services are external executables speaking the
@@ -69,7 +69,7 @@ changes(cursor)             optional capability
 ```
 
 Providers return opaque versions. WebDAV uses a strong ETag where available;
-MarkText Sync uses its revision; plugins choose a value with equivalent
+MarkCaptain Sync uses its revision; plugins choose a value with equivalent
 compare-and-swap semantics. A provider without conditional writes is marked
 unsafe and may create conflict copies but may not automatically overwrite a
 remote object.
@@ -113,7 +113,7 @@ Git conflict handling offers two paths:
 
 ## Self-hosted service
 
-The private `marktext-sync-server` repository owns authentication, SQLite
+The private `markcaptain-sync-server` repository owns authentication, SQLite
 metadata, filesystem blobs, stable entry IDs, immutable revisions, a monotonic
 change cursor, conditional writes, and version recovery. It is deployable with
 Docker Compose and exposes no desktop credentials.

@@ -165,7 +165,7 @@ export async function muyaImageAction(input: File | string, _id: string, _name?:
           owner: prefs.imageBed.github.owner,
           repo: prefs.imageBed.github.repo,
           branch: prefs.imageBed.github.branch || undefined,
-          path: `marktext/${filename}`,
+          path: `markcaptain/${filename}`,
           contentBase64: base64,
         })
         return downloadUrl

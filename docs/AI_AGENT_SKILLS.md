@@ -18,15 +18,15 @@
 | 清晰简洁的写作 | [softaworks/agent-toolkit / writing-clearly-and-concisely](https://github.com/softaworks/agent-toolkit/tree/3027f20f3181758385a1bb8c022d4041dfb4de84/skills/writing-clearly-and-concisely) | 同上 | 技能 MIT；部分参考资料为公有领域、CC BY-SA 4.0 |
 | Markdown 说明文档 | [softaworks/agent-toolkit / crafting-effective-readmes](https://github.com/softaworks/agent-toolkit/tree/3027f20f3181758385a1bb8c022d4041dfb4de84/skills/crafting-effective-readmes) | 同上 | 技能 MIT；部分参考资料为 CC BY 2.0 |
 | 团队沟通文档 | [Anthropic / internal-comms](https://github.com/anthropics/skills/tree/34040c9c568585f6929bedeaad110ad08f079624/skills/internal-comms) | `34040c9c568585f6929bedeaad110ad08f079624` | Apache 2.0 |
-| Markdown 协作写作 | [MarkText / markdown-coauthor](../src-tauri/skills/markdown-coauthor/SKILL.md) | 随 MarkText 版本发布 | MIT |
+| Markdown 协作写作 | [MarkCaptain / markdown-coauthor](../src-tauri/skills/markdown-coauthor/SKILL.md) | 随 MarkCaptain 版本发布 | MIT |
 
 资源位于 `src-tauri/skills/`，保留上游入口和文本参考资料，`source.json` 记录来源与版本。原始许可证随包保留，额外参考资料署名及许可见各包的 `NOTICE.txt` 和 `LICENSE-*.txt`。`build.rs` 将这些文本嵌入原生程序；运行时不下载或自动更新技能。
 
-引入的上游技能按原文保留。Agent 的系统规则负责适配 MarkText：使用文档审阅工具代替 CLI 文件写入；只按需读取段落；使用本地 Mermaid 10 支持的语法；简化解释时保持准确；没有子 Agent 时自行检查读者理解。技能文本不能增加权限或工具。
+引入的上游技能按原文保留。Agent 的系统规则负责适配 MarkCaptain：使用文档审阅工具代替 CLI 文件写入；只按需读取段落；使用本地 Mermaid 10 支持的语法；简化解释时保持准确；没有子 Agent 时自行检查读者理解。技能文本不能增加权限或工具。
 
-`internal-comms` 保留四份官方参考资料，分别用于进展/计划/问题、内部通讯、FAQ 和一般团队沟通。按实际写作任务选择参考资料；MarkText 中没有 Slack、邮件或公司知识库工具时，依照用户提供的材料写作。
+`internal-comms` 保留四份官方参考资料，分别用于进展/计划/问题、内部通讯、FAQ 和一般团队沟通。按实际写作任务选择参考资料；MarkCaptain 中没有 Slack、邮件或公司知识库工具时，依照用户提供的材料写作。
 
-`markdown-coauthor` 是 MarkText 自主编写的精简技能，参考 `doc-coauthoring` 的文档协作思路，使用新的名称和指令正文。它按读者和目标起草、局部修订并检查理解难点，不要求固定轮次的访谈、逐章节确认或外部子 Agent。由于已核对的上游 `doc-coauthoring` 目录没有明确的技能许可，本项目只采用通用方法，不包含其原文；来源说明见该包的 `NOTICE.txt`。
+`markdown-coauthor` 是 MarkCaptain 自主编写的精简技能，参考 `doc-coauthoring` 的文档协作思路，使用新的名称和指令正文。它按读者和目标起草、局部修订并检查理解难点，不要求固定轮次的访谈、逐章节确认或外部子 Agent。由于已核对的上游 `doc-coauthoring` 目录没有明确的技能许可，本项目只采用通用方法，不包含其原文；来源说明见该包的 `NOTICE.txt`。
 
 ## 自定义技能格式
 
@@ -57,7 +57,7 @@ license: MIT
 
 导入包含同目录及最多 8 层子目录中的 `.md`、`.txt`、`.mmd` 和许可证文本；跳过隐藏目录、脚本和其他格式，拒绝符号链接及越界路径。最多 30 个导入技能，每个 128 个文件/1 MB，单文件 100 KB；序列化配置最多 32 MB。脚本、二进制、远程 URL 和外部目录引用不会获得执行或读取能力。
 
-自定义包和启停状态保存在应用配置目录的 `agent-skills.json`（Windows 通常为 `%APPDATA%\com.marktext.rs\agent-skills.json`）。它与模型密钥、会话记录分开；不存入正在编辑的 Markdown。导入技能可能把其正文/参考资料发送给所配置的模型，因此请只导入准备在模型中使用的文本。
+自定义包和启停状态保存在应用配置目录的 `agent-skills.json`（Windows 通常为 `%APPDATA%\io.github.yulianjie.markcaptain\agent-skills.json`）。它与模型密钥、会话记录分开；不存入正在编辑的 Markdown。导入技能可能把其正文/参考资料发送给所配置的模型，因此请只导入准备在模型中使用的文本。
 
 ## 工具与上下文
 

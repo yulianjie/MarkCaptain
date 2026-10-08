@@ -1,6 +1,6 @@
 /**
  * Tiny typed event bus — replaces the Vue 2 `$bus` (`new Vue()` instance) used
- * throughout marktext's renderer.
+ * throughout markcaptain's renderer.
  *
  * Vue 3 dropped `$on`/`$off`/`$emit`. We keep the same call sites but route
  * everything through a single mitt-style emitter. Channel names follow the
@@ -27,7 +27,7 @@ export interface BusEventMap {
   'invalidate-image-cache': void
   'insert-image': { src: string; alt?: string; title?: string }
 
-  // Paragraph manipulation (mirrors upstream marktext bus events)
+  // Paragraph manipulation (mirrors upstream markcaptain bus events)
   'duplicate': void
   'createParagraph': void
   'deleteParagraph': void

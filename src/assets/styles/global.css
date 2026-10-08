@@ -51,7 +51,7 @@
  *
  * Each `[data-theme='*']` block defines a full palette so themes feel
  * distinct, not just an accent recolouring. Ported from the upstream
- * Electron theme files (`marktext/src/renderer/assets/themes/*.theme.css`)
+ * Electron theme files (`upstream/src/renderer/assets/themes/*.theme.css`)
  * — variable names adapted to our `--mt-*` namespace.
  */
 
@@ -147,7 +147,7 @@
 
 /* ── Muya legacy variable bridge ─────────────────────────────────
  *
- * Original Electron marktext defined a set of `--xxx` editor variables
+ * The legacy Electron editor defined a set of `--xxx` editor variables
  * (--floatBgColor, --themeColor, --editorColor*, …) in
  * `renderer/assets/styles/index.css`. Webpack bundled that file into
  * the page shell, so every `var(--xxx)` inside `src/muya/lib/**.css`
@@ -244,7 +244,7 @@ body {
    * after re-attachment and multi-line node labels overflow the rect
    * (last line clipped below the bottom border).
    *
-   * Upstream Electron marktext gets this for free because
+   * Upstream Electron markcaptain gets this for free because
    * `muya/themes/default.css` sets `html, body { line-height: 1.6 }`
    * globally — that stylesheet is bundled by webpack into the page
    * shell. Our Vite build only imports per-component CSS, so the
@@ -252,7 +252,7 @@ body {
   line-height: var(--mt-line-height);
 }
 
-/* No global box-sizing reset — original marktext doesn't have one either.
+/* No global box-sizing reset — the legacy editor doesn't have one either.
  * Muya, Element Plus and our own SFCs set box-sizing explicitly where they
  * need border-box. A global `* { box-sizing: border-box }` leaks into the
  * <div> mermaid appends inside its measurement <foreignObject>
@@ -290,7 +290,7 @@ body.mt-typewriter .muya-container {
 }
 
 /* Focus mode — fade non-active paragraphs. Muya marks active blocks with
- * `.ag-active` (see `marktext/src/muya/lib/index.js`). */
+ * `.ag-active` (see `upstream/src/muya/lib/index.js`). */
 body.mt-focus .muya-host *:not(.ag-active):not(.ag-active *) {
   opacity: 0.35;
   transition: opacity 200ms;

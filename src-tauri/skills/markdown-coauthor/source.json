@@ -1,12 +1,12 @@
 {
-  "repo": "yulianjie/marktext-rs",
+  "repo": "yulianjie/MarkCaptain",
   "revision": "v0.5.0",
   "path": "src-tauri/skills/markdown-coauthor",
-  "url": "https://github.com/yulianjie/marktext-rs/tree/v0.5.0/src-tauri/skills/markdown-coauthor",
+  "url": "https://github.com/yulianjie/MarkCaptain/tree/v0.5.0/src-tauri/skills/markdown-coauthor",
   "kind": "original",
   "inspiration": {
     "name": "doc-coauthoring",
     "url": "https://github.com/anthropics/skills/tree/34040c9c568585f6929bedeaad110ad08f079624/skills/doc-coauthoring",
-    "note": "Original concise instructions for MarkText, informed by document collaboration concepts; no upstream skill text is included."
+    "note": "Original concise instructions for MarkCaptain, informed by document collaboration concepts; no upstream skill text is included."
   }
 }

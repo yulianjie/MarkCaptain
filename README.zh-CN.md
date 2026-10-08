@@ -1,16 +1,16 @@
-# MarkText
+# MarkCaptain
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
-> 基于 Tauri 2、Vue 3 与 Rust 重写的现代、本地优先 Markdown 编辑器；内置写作 Agent，帮助你思考、写作、审阅和修改，但不会越过你直接控制文档。
+> 不仅是 Markdown 编辑器：这是一个现代、本地优先的智能写作空间；内置 Agent，帮助你思考、写作、审阅和修改，但不会越过你直接控制文档。
 
-[下载最新版本](https://github.com/yulianjie/marktext-rs/releases/latest) · [写作 Agent 指南](docs/AI_AGENT.md) · [v0.7.0 发布说明](docs/releases/v0.7.0.md)
+[下载最新版本](https://github.com/yulianjie/MarkCaptain/releases/latest) · [使用指南](https://github.com/yulianjie/MarkCaptain/wiki) · [写作 Agent 指南](docs/AI_AGENT.md) · [v0.7.0 发布说明](docs/releases/v0.7.0.md)
 
-![带文章目录、多标签页与实时 Markdown 预览的 MarkText 编辑器](img/marktext-view.png)
+![带文章目录、多标签页与实时 Markdown 预览的 MarkCaptain 编辑器](img/markcaptain-view.png)
 
-MarkText 保留原版 [MarkText](https://github.com/marktext/marktext) 专注、实时的写作体验，同时将桌面集成、文件访问、凭据、同步和 AI 执行迁移到 Rust 后端。支持 Windows、macOS 与 Linux。
+MarkCaptain 基于 Tauri 2、Vue 3 与 Rust，将专注、实时的写作体验与原生桌面集成、本地优先存储和以审阅为核心的 AI 工作流结合在一起。支持 Windows、macOS 与 Linux。
 
-## 为什么选择 MarkText
+## 为什么选择 MarkCaptain
 
 - **直接写作，不必来回预览。** 在实时所见即所得界面中编辑 Markdown，需要精确控制时可随时切换源码模式。
 - **使用 AI，但不交出控制权。** Agent 可以读取你附加的快照并提出修改，不能静默改写或保存文件。
@@ -75,14 +75,14 @@ MarkText 保留原版 [MarkText](https://github.com/marktext/marktext) 专注、
 - 专注模式、打字机模式、多套内置主题、用户主题和自动深浅色切换。
 - 键盘优先的命令面板；原生菜单与编辑器共用一套可自定义快捷键系统。
 - 导出带样式 HTML；通过系统打印对话框打印或保存 PDF；可选 Pandoc 导出 PDF、DOCX、ODT 与 EPUB。
-- 本地优先的项目存储，并可选接入私有 MarkText Sync、Git、WebDAV 与 Storage Plugin Protocol 存储插件。
+- 本地优先的项目存储，并可选接入私有 MarkCaptain Sync、Git、WebDAV 与 Storage Plugin Protocol 存储插件。
 - 应用界面支持简体中文、英文与日文。
 
 ## 本地优先的存储与同步
 
-MarkText 始终先写入本地工作副本。可选项目存储会把本地保存状态与远端同步状态分开，因此网络故障不会让一次成功的本地保存变成失败。
+MarkCaptain 始终先写入本地工作副本。可选项目存储会把本地保存状态与远端同步状态分开，因此网络故障不会让一次成功的本地保存变成失败。
 
-- **私有 MarkText Sync：** 基于 Axum/SQLite 的自建服务，提供版本历史、条件写入、增量游标和软删除墓碑。
+- **私有 MarkCaptain Sync：** 基于 Axum/SQLite 的自建服务，提供版本历史、条件写入、增量游标和软删除墓碑。
 - **Git：** 校验仓库、fetch、仅快进 pull 和非 force push。分叉与冲突会明确展示，不会 reset、自动提交或自动推送。
 - **WebDAV：** 使用强 ETag 进行安全的条件修改；远端无法提供可靠版本检查时，拒绝不安全的自动写入。
 - **存储插件：** 面向用户主动安装并信任的原生提供商，使用与厂商无关的 JSON-RPC stdio 协议。
@@ -91,7 +91,7 @@ MarkText 始终先写入本地工作副本。可选项目存储会把本地保�
 
 ## 下载
 
-从 [GitHub 最新版本](https://github.com/yulianjie/marktext-rs/releases/latest) 获取发布包：
+从 [GitHub 最新版本](https://github.com/yulianjie/MarkCaptain/releases/latest) 获取发布包：
 
 | 平台 | 安装包 |
 | --- | --- |
@@ -152,8 +152,8 @@ Rust / Tauri 2 后端
 
 ## 项目状态
 
-本仓库是原版 Electron MarkText 的活跃 Tauri 重写。核心编辑器、桌面工作流、写作 Agent、导出路径与本地优先存储已经实现；完整功能对齐和各平台细节仍在持续完善。当前已验证范围请以[版本说明](docs/releases/)与[最新版本](https://github.com/yulianjie/marktext-rs/releases/latest)为准。
+MarkCaptain 是持续开发中的 Tauri 桌面应用。核心编辑器、桌面工作流、写作 Agent、导出路径与本地优先存储已经实现；功能覆盖和各平台细节仍在持续完善。当前已验证范围请以[版本说明](docs/releases/)与[最新版本](https://github.com/yulianjie/MarkCaptain/releases/latest)为准。
 
 ## 致谢与许可证
 
-MarkText 基于原版 [MarkText](https://github.com/marktext/marktext) 项目及其 Muya 编辑器引擎。本仓库采用 [MIT License](LICENSE)。
+MarkCaptain 使用与 MarkText 同款的 [Muya](https://github.com/marktext/muya) 所见即所得编辑器引擎。本仓库采用 [MIT License](LICENSE)，并在许可证和第三方声明中保留上游署名。

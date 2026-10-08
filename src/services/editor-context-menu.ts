@@ -71,7 +71,7 @@ export interface EditorContextMenuOptions {
   shortcuts?: Partial<Record<keyof EditorContextMenuCapabilities, string>>
 }
 
-// Keep these separators aligned with Muya's marktext/spellchecker helper so
+// Keep these separators aligned with Muya's markcaptain/spellchecker helper so
 // the word offered by our menu is accepted by `_replaceCurrentWordInlineUnsafe`.
 /* eslint-disable no-useless-escape */
 const WORD_DEFINITION = /(?:-?\d*\.\d\w*)|(?:[^`~!@#$%^&*()\-=+[\{\]}\\|;:'",\.<>/?\s]+)/g

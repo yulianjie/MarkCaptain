@@ -1,7 +1,7 @@
-//! MarkText Tauri backend.
+//! MarkCaptain Tauri backend.
 //!
 //! Mirrors the responsibilities of the original Electron main process
-//! (`marktext/src/main/`). The top-level orchestrator lives in
+//! (`upstream/src/main/`). The top-level orchestrator lives in
 //! [`app::AppState`]; IPC commands are grouped under [`commands`] and wired
 //! up in [`run`].
 
@@ -24,7 +24,7 @@ use tauri_plugin_window_state::StateFlags;
 /// (we need to know whether to restore the window's saved size *before* the
 /// window-state plugin is built, but at that point the store plugin isn't
 /// available yet).
-const BUNDLE_IDENTIFIER: &str = "com.marktext.rs";
+const BUNDLE_IDENTIFIER: &str = "io.github.yulianjie.markcaptain";
 
 /// Reads the `rememberWindowSize` preference straight off disk. Falls back
 /// to `false` (don't restore size — every launch uses the conf default) if
@@ -147,7 +147,7 @@ pub fn run() {
             }
         })
         .manage(menu::FormatMenuHandles::default())
-        .invoke_handler(marktext_handler!())
+        .invoke_handler(markcaptain_handler!())
         .setup(move |app| {
             // HiDPI-aware 4:3 clamp. Runs every launch when the user hasn't
             // opted in to remembering window size — the conf-default 1200×900
@@ -216,7 +216,7 @@ fn init_logging() {
     use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
     let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("info,marktext_lib=debug,tauri=info"));
+        .unwrap_or_else(|_| EnvFilter::new("info,markcaptain_lib=debug,tauri=info"));
 
     tracing_subscriber::registry()
         .with(filter)

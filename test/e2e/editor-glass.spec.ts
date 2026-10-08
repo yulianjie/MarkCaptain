@@ -202,7 +202,7 @@ test('glass outline filters, expands, navigates and tracks real scroll', async (
 
   await page.locator('.muya-host').evaluate(el => { el.scrollTop = 0 })
   await page.mouse.move(1500, 1030)
-  await page.screenshot({ path: 'output/design/marktext-glass-implemented.png', animations: 'disabled' })
+  await page.screenshot({ path: 'output/design/markcaptain-glass-implemented.png', animations: 'disabled' })
   await page.locator('.collapse-outline').click()
   await expect(page.locator('.toc-pane')).toHaveCount(0)
   await page.locator('.sidebar-toggle').click()
@@ -227,5 +227,5 @@ test('search remains reachable in a narrow window and dark theme', async ({ page
     usePreferencesStore().theme = 'dark'
   })
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
-  await page.screenshot({ path: 'output/design/marktext-glass-dark-800.png', animations: 'disabled' })
+  await page.screenshot({ path: 'output/design/markcaptain-glass-dark-800.png', animations: 'disabled' })
 })

@@ -3,7 +3,7 @@
  * Preferences window — sectioned settings UI.
  *
  * Each section maps to one cluster from the original
- * `marktext/src/renderer/prefComponents/`. Writes go straight through the
+ * the upstream renderer preference components. Writes go straight through the
  * preferences store (which persists via tauri-plugin-store), so changes are
  * effective immediately. Edits made here propagate to other open windows via
  * the Rust-emitted `mt://prefs/changed` event.

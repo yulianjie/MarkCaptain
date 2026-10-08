@@ -132,7 +132,7 @@ onBeforeUnmount(() => {
   <header v-if="customChrome || nativeMac" class="title-bar" :class="{ 'mac-title-bar': nativeMac, 'is-maximized': maximized }" data-tauri-drag-region>
     <div class="brand" data-tauri-drag-region>
       <img :src="logo" alt="" draggable="false" data-tauri-drag-region>
-      <strong data-tauri-drag-region>MarkText</strong>
+      <strong data-tauri-drag-region>MarkCaptain</strong>
     </div>
     <nav v-if="customChrome" class="app-menu" role="menubar" :aria-label="t('chrome.menu')">
       <button v-for="(menu, index) in menus" :key="menu.actionId" ref="menuButtons"

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Project Overview
 
-MarkText (Tauri rewrite) — a Tauri 2 + Vue 3 + Rust port of the original Electron MarkText. Keeps the Muya WYSIWYG editor engine verbatim from upstream, but replaces the Electron main process with a Rust backend, Vue 2 with Vue 3 + Pinia, Element UI with Element Plus, and webpack with Vite. **Goal: feature parity with the original Electron build.**
+MarkCaptain — a Tauri 2 + Vue 3 + Rust Markdown editor with an integrated writing Agent. It uses the same Muya WYSIWYG editor engine as MarkText, with a Rust backend, Vue 3 + Pinia, Element Plus, and Vite. **Goal: a focused native writing experience with safe, review-first Agent workflows.**
 
 ## Commands
 

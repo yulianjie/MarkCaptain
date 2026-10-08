@@ -48,6 +48,7 @@ import {
 } from '@/services/tauri-invoke'
 import { listenTyped } from '@/services/tauri-bridge'
 import { resolveEditorMenuCommand } from '@/services/editor-menu-actions'
+import { PROJECT_ISSUES_URL, PROJECT_WIKI_URL } from '@/services/project-links'
 import { handleApplicationShortcut, rendererOwnsApplicationShortcuts } from '@/services/application-shortcuts'
 import {
   isEditorShortcutTarget,
@@ -562,8 +563,8 @@ const MENU_ACTIONS: Record<string, () => void | Promise<void>> = {
     await w.setFullscreen(!cur)
   },
   'help.about': () => bus.emit('aboutDialog', undefined),
-  'help.openDocs': async () => { const sh = await import('@tauri-apps/plugin-shell'); await sh.open('https://github.com/marktext/marktext') },
-  'help.openIssues': async () => { const sh = await import('@tauri-apps/plugin-shell'); await sh.open('https://github.com/marktext/marktext/issues') },
+  'help.openDocs': async () => { const sh = await import('@tauri-apps/plugin-shell'); await sh.open(PROJECT_WIKI_URL) },
+  'help.openIssues': async () => { const sh = await import('@tauri-apps/plugin-shell'); await sh.open(PROJECT_ISSUES_URL) },
   'help.checkForUpdates': () => bus.emit('show-updater-dialog', undefined),
 }
 

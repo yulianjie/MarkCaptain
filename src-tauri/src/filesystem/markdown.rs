@@ -1,4 +1,4 @@
-//! Markdown file I/O — equivalent to `marktext/src/main/filesystem/markdown.js`.
+//! Markdown file I/O — equivalent to `upstream/src/main/filesystem/markdown.js`.
 
 use std::path::{Path, PathBuf};
 
@@ -130,7 +130,7 @@ mod tests {
     #[tokio::test]
     async fn save_preserves_existing_bom_unless_explicitly_disabled() {
         let root =
-            std::env::temp_dir().join(format!("marktext-markdown-bom-{}", uuid::Uuid::new_v4()));
+            std::env::temp_dir().join(format!("markcaptain-markdown-bom-{}", uuid::Uuid::new_v4()));
         fs::create_dir_all(&root).unwrap();
         let path = root.join("note.md");
         let mut original = Bom::Utf8.bytes().to_vec();
@@ -156,7 +156,7 @@ mod tests {
     #[tokio::test]
     async fn save_can_add_utf16_bom_and_read_reports_it() {
         let root = std::env::temp_dir().join(format!(
-            "marktext-markdown-utf16-bom-{}",
+            "markcaptain-markdown-utf16-bom-{}",
             uuid::Uuid::new_v4()
         ));
         let path = root.join("nested").join("note.md");
@@ -177,7 +177,7 @@ mod tests {
     #[tokio::test]
     async fn encoding_failure_leaves_existing_document_untouched() {
         let root = std::env::temp_dir().join(format!(
-            "marktext-markdown-encode-failure-{}",
+            "markcaptain-markdown-encode-failure-{}",
             uuid::Uuid::new_v4()
         ));
         fs::create_dir_all(&root).unwrap();

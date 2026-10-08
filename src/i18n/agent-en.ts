@@ -85,7 +85,7 @@ export default {
     skillInvalid: 'Invalid skill: SKILL.md needs YAML name and description plus a body. Names use lowercase letters, digits and hyphens. Linked files are not supported.',
     skillLimit: 'Skill limit exceeded: 30 imported skills, 1 MB and 128 text files per skill, 100 KB per file.',
     skillExists: 'A skill with this name is already imported. Remove the old copy or use another name.', skillNotFound: 'The selected skill is disabled or missing. Choose again.',
-    unknown: 'Could not complete this action. Check model settings and try again.', desktopOnly: 'AI connections require the MarkText desktop app.',
+    unknown: 'Could not complete this action. Check model settings and try again.', desktopOnly: 'AI connections require the MarkCaptain desktop app.',
     invalidUrl: 'Use an HTTP or HTTPS base URL without a username, password, query, fragment or /chat/completions.',
     invalidModel: 'Enter a valid model name.', invalidKey: 'Invalid key format. Please enter it again.', invalidHeaders: 'Headers are invalid, duplicated, or include transport fields the app cannot override.',
     keychain: 'Cannot access the OS credential store. Unlock or enable it, or choose “Unauthenticated local service” in settings for a model that needs no authentication.', configRead: 'Cannot read model settings. Save them again.', configWrite: 'Cannot save model settings. Check local file permissions.',

@@ -1,8 +1,8 @@
 {
-  "name": "marktext-rs",
+  "name": "markcaptain",
   "version": "0.7.3",
   "private": true,
-  "description": "MarkText rewritten with Tauri 2 + Vue 3 + Rust",
+  "description": "MarkCaptain — an intelligent, local-first Markdown editor with an integrated writing Agent",
   "type": "module",
   "scripts": {
     "dev": "vite",

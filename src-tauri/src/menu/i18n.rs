@@ -185,7 +185,7 @@ pub const EN: MenuStrings = MenuStrings {
     documentation: "Documentation",
     report_issue: "Report an Issue",
     check_for_updates: "Check for Updates…",
-    about: "About MarkText",
+    about: "About MarkCaptain",
 };
 
 pub const ZH_CN: MenuStrings = MenuStrings {
@@ -273,7 +273,7 @@ pub const ZH_CN: MenuStrings = MenuStrings {
     documentation: "文档",
     report_issue: "报告问题",
     check_for_updates: "检查更新…",
-    about: "关于 MarkText",
+    about: "关于 MarkCaptain",
 };
 
 pub const JA: MenuStrings = MenuStrings {
@@ -361,7 +361,7 @@ pub const JA: MenuStrings = MenuStrings {
     documentation: "ドキュメント",
     report_issue: "問題を報告",
     check_for_updates: "アップデートを確認…",
-    about: "MarkText について",
+    about: "MarkCaptain について",
 };
 
 pub fn for_locale(locale: &str) -> &'static MenuStrings {

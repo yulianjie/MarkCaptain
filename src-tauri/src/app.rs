@@ -1,6 +1,6 @@
 //! Top-level application state and startup hooks.
 //!
-//! Equivalent to the original `marktext/src/main/app/index.js` `App` class —
+//! Equivalent to the original `upstream/src/main/app/index.js` `App` class —
 //! owns the recent-documents list, file watchers, and any other long-lived
 //! state that outlives a single command invocation.
 
@@ -396,7 +396,7 @@ mod tests {
 /// file-association launches take on Windows / Linux (the OS hands the path
 /// in as argv[1]).
 pub fn on_startup(app: &mut App) -> AppResult<()> {
-    tracing::info!("MarkText starting up");
+    tracing::info!("MarkCaptain starting up");
 
     let argv: Vec<String> = std::env::args().skip(1).collect();
     let files: Vec<PathBuf> = argv

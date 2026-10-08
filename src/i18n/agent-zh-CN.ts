@@ -85,7 +85,7 @@ export default {
     skillInvalid: '技能格式无效：SKILL.md 需要包含 name、description 的 YAML 头部和正文。名称仅支持小写字母、数字及短横线；不支持链接文件。',
     skillLimit: '技能超过限制：最多 30 个导入技能，每个 1 MB、128 个文本文件，单文件最多 100 KB。',
     skillExists: '同名技能已导入。请先删除旧副本或使用其他技能名称。', skillNotFound: '所选技能已停用或不存在，请重新选择。',
-    unknown: '操作未完成，请检查模型设置后重试。', desktopOnly: 'AI 连接需要在 MarkText 桌面应用中使用。',
+    unknown: '操作未完成，请检查模型设置后重试。', desktopOnly: 'AI 连接需要在 MarkCaptain 桌面应用中使用。',
     invalidUrl: '请填写 HTTP 或 HTTPS 基础地址，且不要包含用户名、密码、查询参数、片段或 /chat/completions。',
     invalidModel: '请填写有效的模型名称。', invalidKey: '密钥格式无效，请重新输入。', invalidHeaders: '请求头格式无效、重复或包含不允许由应用覆盖的传输字段。',
     keychain: '无法访问系统凭据库。请解锁或启用凭据库；若使用无需认证的本地模型，请在设置中选择“无认证本地服务”。', configRead: '无法读取模型设置，请重新保存设置。', configWrite: '无法保存模型设置，请检查本机文件权限。',

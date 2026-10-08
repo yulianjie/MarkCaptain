@@ -1,10 +1,10 @@
 [package]
-name = "marktext-rs"
+name = "markcaptain"
 version = "0.7.3"
-description = "MarkText rewritten with Tauri 2 + Vue 3"
-authors = ["MarkText contributors"]
+description = "MarkCaptain — an intelligent, local-first Markdown editor with a writing Agent"
+authors = ["Lianjie Yu and MarkCaptain contributors"]
 license = "MIT"
-repository = ""
+repository = "https://github.com/yulianjie/MarkCaptain"
 edition = "2021"
 rust-version = "1.77"
 
@@ -12,7 +12,7 @@ rust-version = "1.77"
 # to make the lib name unique and wouldn't conflict with the bin name.
 # This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
 [lib]
-name = "marktext_lib"
+name = "markcaptain_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

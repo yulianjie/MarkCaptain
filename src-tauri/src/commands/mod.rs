@@ -4,7 +4,7 @@
 //! `docs/IPC_MAP.md` at the project root for the full channel → command
 //! mapping table.
 //!
-//! The canonical list of commands lives in the `marktext_handler!` macro at
+//! The canonical list of commands lives in the `markcaptain_handler!` macro at
 //! the bottom of this file. `lib.rs::run` expands it via
 //! `tauri::Builder::invoke_handler`. Add a `#[tauri::command]` here AND in
 //! the macro — the build fails fast if you forget either.
@@ -28,7 +28,7 @@ pub mod workspace;
 /// `tauri::generate_handler!` returns an opaque closure type that can't be
 /// boxed cleanly across an FFI boundary.
 #[macro_export]
-macro_rules! marktext_handler {
+macro_rules! markcaptain_handler {
     () => {
         tauri::generate_handler![
             $crate::commands::agent::history::cmd_agent_history_settings,

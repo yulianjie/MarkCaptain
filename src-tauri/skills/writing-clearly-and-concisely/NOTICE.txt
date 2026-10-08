@@ -17,6 +17,6 @@ Source: https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing
 Author history: https://en.wikipedia.org/w/index.php?title=Wikipedia:Signs_of_AI_writing&action=history
 Licensed under Creative Commons Attribution-ShareAlike 4.0 International:
 https://creativecommons.org/licenses/by-sa/4.0/legalcode
-This reference retains that license; it is not relicensed under MIT. MarkText
+This reference retains that license; it is not relicensed under MIT. MarkCaptain
 has not changed the upstream Markdown text. Remote images are referenced only,
 not bundled or fetched by the skill runtime.

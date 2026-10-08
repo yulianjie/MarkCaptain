@@ -4,33 +4,33 @@
     <DirectoryRef Id="INSTALLDIR">
       <Component
         Id="MarkdownFileIconRegistry"
-        Guid="{1ABC2FD4-E95A-410F-9958-7CCB54449483}"
+        Guid="{92E85B18-1703-4533-9062-DF35EDC53A3B}"
         Win64="yes"
       >
         <RegistryValue
           Id="MarkdownMdDefaultIcon"
           Root="HKCR"
-          Key="MarkText.md\DefaultIcon"
+          Key="MarkCaptain.md\DefaultIcon"
           Value="&quot;[INSTALLDIR]icons\md.ico&quot;,0"
           Type="string"
           KeyPath="yes"
         />
-        <RegistryValue Id="MarkdownMarkdownDefaultIcon" Root="HKCR" Key="MarkText.markdown\DefaultIcon" Value="&quot;[INSTALLDIR]icons\md.ico&quot;,0" Type="string" />
-        <RegistryValue Id="MarkdownMkdDefaultIcon" Root="HKCR" Key="MarkText.mkd\DefaultIcon" Value="&quot;[INSTALLDIR]icons\md.ico&quot;,0" Type="string" />
-        <RegistryValue Id="MarkdownMdownDefaultIcon" Root="HKCR" Key="MarkText.mdown\DefaultIcon" Value="&quot;[INSTALLDIR]icons\md.ico&quot;,0" Type="string" />
-        <RegistryValue Id="MarkdownMkdnDefaultIcon" Root="HKCR" Key="MarkText.mkdn\DefaultIcon" Value="&quot;[INSTALLDIR]icons\md.ico&quot;,0" Type="string" />
-        <RegistryValue Id="MarkdownMdtxtDefaultIcon" Root="HKCR" Key="MarkText.mdtxt\DefaultIcon" Value="&quot;[INSTALLDIR]icons\md.ico&quot;,0" Type="string" />
-        <RegistryValue Id="MarkdownMdtextDefaultIcon" Root="HKCR" Key="MarkText.mdtext\DefaultIcon" Value="&quot;[INSTALLDIR]icons\md.ico&quot;,0" Type="string" />
-        <RegistryValue Id="MarkdownApplicationFriendlyName" Root="HKCR" Key="Applications\marktext-rs.exe" Name="FriendlyAppName" Value="MarkText" Type="string" />
-        <RegistryValue Id="MarkdownApplicationDefaultIcon" Root="HKCR" Key="Applications\marktext-rs.exe\DefaultIcon" Value="&quot;[INSTALLDIR]icons\md.ico&quot;,0" Type="string" />
-        <RegistryValue Id="MarkdownApplicationOpenCommand" Root="HKCR" Key="Applications\marktext-rs.exe\shell\open\command" Value="&quot;[INSTALLDIR]marktext-rs.exe&quot; &quot;%1&quot;" Type="string" />
-        <RegistryValue Id="MarkdownApplicationSupportsMd" Root="HKCR" Key="Applications\marktext-rs.exe\SupportedTypes" Name=".md" Value="" Type="string" />
-        <RegistryValue Id="MarkdownApplicationSupportsMarkdown" Root="HKCR" Key="Applications\marktext-rs.exe\SupportedTypes" Name=".markdown" Value="" Type="string" />
-        <RegistryValue Id="MarkdownApplicationSupportsMkd" Root="HKCR" Key="Applications\marktext-rs.exe\SupportedTypes" Name=".mkd" Value="" Type="string" />
-        <RegistryValue Id="MarkdownApplicationSupportsMdown" Root="HKCR" Key="Applications\marktext-rs.exe\SupportedTypes" Name=".mdown" Value="" Type="string" />
-        <RegistryValue Id="MarkdownApplicationSupportsMkdn" Root="HKCR" Key="Applications\marktext-rs.exe\SupportedTypes" Name=".mkdn" Value="" Type="string" />
-        <RegistryValue Id="MarkdownApplicationSupportsMdtxt" Root="HKCR" Key="Applications\marktext-rs.exe\SupportedTypes" Name=".mdtxt" Value="" Type="string" />
-        <RegistryValue Id="MarkdownApplicationSupportsMdtext" Root="HKCR" Key="Applications\marktext-rs.exe\SupportedTypes" Name=".mdtext" Value="" Type="string" />
+        <RegistryValue Id="MarkdownMarkdownDefaultIcon" Root="HKCR" Key="MarkCaptain.markdown\DefaultIcon" Value="&quot;[INSTALLDIR]icons\md.ico&quot;,0" Type="string" />
+        <RegistryValue Id="MarkdownMkdDefaultIcon" Root="HKCR" Key="MarkCaptain.mkd\DefaultIcon" Value="&quot;[INSTALLDIR]icons\md.ico&quot;,0" Type="string" />
+        <RegistryValue Id="MarkdownMdownDefaultIcon" Root="HKCR" Key="MarkCaptain.mdown\DefaultIcon" Value="&quot;[INSTALLDIR]icons\md.ico&quot;,0" Type="string" />
+        <RegistryValue Id="MarkdownMkdnDefaultIcon" Root="HKCR" Key="MarkCaptain.mkdn\DefaultIcon" Value="&quot;[INSTALLDIR]icons\md.ico&quot;,0" Type="string" />
+        <RegistryValue Id="MarkdownMdtxtDefaultIcon" Root="HKCR" Key="MarkCaptain.mdtxt\DefaultIcon" Value="&quot;[INSTALLDIR]icons\md.ico&quot;,0" Type="string" />
+        <RegistryValue Id="MarkdownMdtextDefaultIcon" Root="HKCR" Key="MarkCaptain.mdtext\DefaultIcon" Value="&quot;[INSTALLDIR]icons\md.ico&quot;,0" Type="string" />
+        <RegistryValue Id="MarkdownApplicationFriendlyName" Root="HKCR" Key="Applications\markcaptain.exe" Name="FriendlyAppName" Value="MarkCaptain" Type="string" />
+        <RegistryValue Id="MarkdownApplicationDefaultIcon" Root="HKCR" Key="Applications\markcaptain.exe\DefaultIcon" Value="&quot;[INSTALLDIR]icons\md.ico&quot;,0" Type="string" />
+        <RegistryValue Id="MarkdownApplicationOpenCommand" Root="HKCR" Key="Applications\markcaptain.exe\shell\open\command" Value="&quot;[INSTALLDIR]markcaptain.exe&quot; &quot;%1&quot;" Type="string" />
+        <RegistryValue Id="MarkdownApplicationSupportsMd" Root="HKCR" Key="Applications\markcaptain.exe\SupportedTypes" Name=".md" Value="" Type="string" />
+        <RegistryValue Id="MarkdownApplicationSupportsMarkdown" Root="HKCR" Key="Applications\markcaptain.exe\SupportedTypes" Name=".markdown" Value="" Type="string" />
+        <RegistryValue Id="MarkdownApplicationSupportsMkd" Root="HKCR" Key="Applications\markcaptain.exe\SupportedTypes" Name=".mkd" Value="" Type="string" />
+        <RegistryValue Id="MarkdownApplicationSupportsMdown" Root="HKCR" Key="Applications\markcaptain.exe\SupportedTypes" Name=".mdown" Value="" Type="string" />
+        <RegistryValue Id="MarkdownApplicationSupportsMkdn" Root="HKCR" Key="Applications\markcaptain.exe\SupportedTypes" Name=".mkdn" Value="" Type="string" />
+        <RegistryValue Id="MarkdownApplicationSupportsMdtxt" Root="HKCR" Key="Applications\markcaptain.exe\SupportedTypes" Name=".mdtxt" Value="" Type="string" />
+        <RegistryValue Id="MarkdownApplicationSupportsMdtext" Root="HKCR" Key="Applications\markcaptain.exe\SupportedTypes" Name=".mdtext" Value="" Type="string" />
       </Component>
       <!--
         A previous installer can leave a per-user Applications ProgID behind.
@@ -39,19 +39,19 @@
       -->
       <Component
         Id="MarkdownCurrentUserApplicationRegistration"
-        Guid="{0BCAF392-A693-4A5A-8D52-878145BB3730}"
+        Guid="{05D5BFF9-C0B2-47FF-AEA6-E8E1156008F8}"
         Win64="yes"
       >
-        <RegistryValue Id="MarkdownCurrentUserApplicationFriendlyName" Root="HKCU" Key="Software\Classes\Applications\marktext-rs.exe" Name="FriendlyAppName" Value="MarkText" Type="string" />
-        <RegistryValue Id="MarkdownCurrentUserApplicationDefaultIcon" Root="HKCU" Key="Software\Classes\Applications\marktext-rs.exe\DefaultIcon" Value="&quot;[INSTALLDIR]icons\md.ico&quot;,0" Type="string" KeyPath="yes" />
-        <RegistryValue Id="MarkdownCurrentUserApplicationOpenCommand" Root="HKCU" Key="Software\Classes\Applications\marktext-rs.exe\shell\open\command" Value="&quot;[INSTALLDIR]marktext-rs.exe&quot; &quot;%1&quot;" Type="string" />
-        <RegistryValue Id="MarkdownCurrentUserApplicationSupportsMd" Root="HKCU" Key="Software\Classes\Applications\marktext-rs.exe\SupportedTypes" Name=".md" Value="" Type="string" />
-        <RegistryValue Id="MarkdownCurrentUserApplicationSupportsMarkdown" Root="HKCU" Key="Software\Classes\Applications\marktext-rs.exe\SupportedTypes" Name=".markdown" Value="" Type="string" />
-        <RegistryValue Id="MarkdownCurrentUserApplicationSupportsMkd" Root="HKCU" Key="Software\Classes\Applications\marktext-rs.exe\SupportedTypes" Name=".mkd" Value="" Type="string" />
-        <RegistryValue Id="MarkdownCurrentUserApplicationSupportsMdown" Root="HKCU" Key="Software\Classes\Applications\marktext-rs.exe\SupportedTypes" Name=".mdown" Value="" Type="string" />
-        <RegistryValue Id="MarkdownCurrentUserApplicationSupportsMkdn" Root="HKCU" Key="Software\Classes\Applications\marktext-rs.exe\SupportedTypes" Name=".mkdn" Value="" Type="string" />
-        <RegistryValue Id="MarkdownCurrentUserApplicationSupportsMdtxt" Root="HKCU" Key="Software\Classes\Applications\marktext-rs.exe\SupportedTypes" Name=".mdtxt" Value="" Type="string" />
-        <RegistryValue Id="MarkdownCurrentUserApplicationSupportsMdtext" Root="HKCU" Key="Software\Classes\Applications\marktext-rs.exe\SupportedTypes" Name=".mdtext" Value="" Type="string" />
+        <RegistryValue Id="MarkdownCurrentUserApplicationFriendlyName" Root="HKCU" Key="Software\Classes\Applications\markcaptain.exe" Name="FriendlyAppName" Value="MarkCaptain" Type="string" />
+        <RegistryValue Id="MarkdownCurrentUserApplicationDefaultIcon" Root="HKCU" Key="Software\Classes\Applications\markcaptain.exe\DefaultIcon" Value="&quot;[INSTALLDIR]icons\md.ico&quot;,0" Type="string" KeyPath="yes" />
+        <RegistryValue Id="MarkdownCurrentUserApplicationOpenCommand" Root="HKCU" Key="Software\Classes\Applications\markcaptain.exe\shell\open\command" Value="&quot;[INSTALLDIR]markcaptain.exe&quot; &quot;%1&quot;" Type="string" />
+        <RegistryValue Id="MarkdownCurrentUserApplicationSupportsMd" Root="HKCU" Key="Software\Classes\Applications\markcaptain.exe\SupportedTypes" Name=".md" Value="" Type="string" />
+        <RegistryValue Id="MarkdownCurrentUserApplicationSupportsMarkdown" Root="HKCU" Key="Software\Classes\Applications\markcaptain.exe\SupportedTypes" Name=".markdown" Value="" Type="string" />
+        <RegistryValue Id="MarkdownCurrentUserApplicationSupportsMkd" Root="HKCU" Key="Software\Classes\Applications\markcaptain.exe\SupportedTypes" Name=".mkd" Value="" Type="string" />
+        <RegistryValue Id="MarkdownCurrentUserApplicationSupportsMdown" Root="HKCU" Key="Software\Classes\Applications\markcaptain.exe\SupportedTypes" Name=".mdown" Value="" Type="string" />
+        <RegistryValue Id="MarkdownCurrentUserApplicationSupportsMkdn" Root="HKCU" Key="Software\Classes\Applications\markcaptain.exe\SupportedTypes" Name=".mkdn" Value="" Type="string" />
+        <RegistryValue Id="MarkdownCurrentUserApplicationSupportsMdtxt" Root="HKCU" Key="Software\Classes\Applications\markcaptain.exe\SupportedTypes" Name=".mdtxt" Value="" Type="string" />
+        <RegistryValue Id="MarkdownCurrentUserApplicationSupportsMdtext" Root="HKCU" Key="Software\Classes\Applications\markcaptain.exe\SupportedTypes" Name=".mdtext" Value="" Type="string" />
       </Component>
     </DirectoryRef>
   </Fragment>

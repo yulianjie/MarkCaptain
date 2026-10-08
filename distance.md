@@ -1,6 +1,6 @@
-# MarkText Tauri 移植对比审计（distance）
+# MarkCaptain Tauri 移植对比审计（distance）
 
-> 对比 `C:\Users\jack\Desktop\github\marktext`（原版 Electron） vs. 本仓库（Tauri 2 + Vue 3 + Rust 移植版），按"完全缺失 / 部分迁移 / 编辑体验差异"三类盘点距离 feature parity 的距离。
+> 对比 `C:\Users\jack\Desktop\github\markcaptain`（原版 Electron） vs. 本仓库（Tauri 2 + Vue 3 + Rust 移植版），按"完全缺失 / 部分迁移 / 编辑体验差异"三类盘点距离 feature parity 的距离。
 
 ## 总览
 
@@ -55,8 +55,8 @@
 - **原版**：`electron-updater` + 菜单"检查更新" + 下载完成后 Quit & Install 提示。
 - **现状**：`tauri-plugin-updater` 已注册（[src-tauri/src/lib.rs](src-tauri/src/lib.rs)），但**前端没有任何检查入口、进度或重启 UI**，菜单未挂动作。
 
-### A9. 项目级配置 `marktext.json`
-- **原版**：工作目录根放 `marktext.json` 可覆盖全局偏好；打开文件夹时自动检测。
+### A9. 项目级配置
+- **上游实现**：工作目录根的项目配置文件可覆盖全局偏好；打开文件夹时自动检测。
 - **现状**：未实现，所有偏好走 [src-tauri/src/preferences/store.rs](src-tauri/src/preferences/store.rs) 全局单 store。
 
 ### A10. 键盘布局识别（native-keymap）
@@ -96,7 +96,7 @@
 - **现状** [src/services/muya-preferences-applier.ts](src/services/muya-preferences-applier.ts)：21 个；缺 `spellcheckerLanguage`、`editorLineWidth`（CSS 宽度类）、部分 markdown 扩展项。
 
 ### B6. 用户主题热重载
-- **原版**：`mt::reload-user-themes` 监视 `~/.marktext/themes/`，改动即时生效。
+- **上游实现**：`mt::reload-user-themes` 监视用户主题目录，改动即时生效。
 - **现状**：[src-tauri/src/commands/mod.rs](src-tauri/src/commands/mod.rs) 有 `cmd_list_themes` / `cmd_read_theme_css`，但**没有用户主题目录的文件监视**。
 
 ### B7. 最近打开（Open Recent）
@@ -163,7 +163,7 @@
 | **P1** | B5 偏好 watcher 补 3 项 | 0.5 | 一次性差异修复 |
 | **P2** | B3 图片路径模板变量 | 1 | `${filename}` 等 |
 | **P2** | B4 剪贴板文件路径检测 | 1 | 平台相关 |
-| **P2** | A9 项目级 `marktext.json` 覆盖 | 1-2 | 文件加载 + merge |
+| **P2** | A9 项目级 `markcaptain.json` 覆盖 | 1-2 | 文件加载 + merge |
 | **P2** | B6 用户主题目录监视 | 1 | notify 监视 + 事件 |
 | **P2** | A7 截图工具 | 2 | 平台特定 API |
 | **P3** | A10 键盘布局识别替代 | 2-3 | 用 tauri-plugin-os 或第三方 |
@@ -192,12 +192,12 @@
 - 自动更新 UI：[src/pages/PreferencesPage.vue](src/pages/PreferencesPage.vue) 或 Help 菜单
 
 **原版对照参考**
-- 拼写：`marktext/src/renderer/spellchecker/index.js`
-- 命令面板：`marktext/src/renderer/components/commandPalette/index.vue`
-- 标题栏：`marktext/src/renderer/components/titleBar/index.vue`
-- 图片动作：`marktext/src/renderer/components/editorWithTabs/editor.vue` L684-800
-- 导出对话框：`marktext/src/renderer/components/exportSettings/`
-- 主题 CSS：`marktext/src/renderer/assets/themes/*.theme.css`
+- 拼写：`upstream/src/renderer/spellchecker/index.js`
+- 命令面板：`upstream/src/renderer/components/commandPalette/index.vue`
+- 标题栏：`upstream/src/renderer/components/titleBar/index.vue`
+- 图片动作：`upstream/src/renderer/components/editorWithTabs/editor.vue` L684-800
+- 导出对话框：`upstream/src/renderer/components/exportSettings/`
+- 主题 CSS：`upstream/src/renderer/assets/themes/*.theme.css`
 
 ---
 

@@ -377,7 +377,7 @@ mod tests {
     impl TempDir {
         fn new() -> Self {
             let path =
-                std::env::temp_dir().join(format!("marktext-search-{}", uuid::Uuid::new_v4()));
+                std::env::temp_dir().join(format!("markcaptain-search-{}", uuid::Uuid::new_v4()));
             fs::create_dir_all(&path).unwrap();
             Self(path)
         }
@@ -622,8 +622,10 @@ mod tests {
 
     #[test]
     fn rejects_missing_root_and_reports_match_column() {
-        let missing =
-            std::env::temp_dir().join(format!("marktext-search-missing-{}", uuid::Uuid::new_v4()));
+        let missing = std::env::temp_dir().join(format!(
+            "markcaptain-search-missing-{}",
+            uuid::Uuid::new_v4()
+        ));
         assert!(run_search_in_root(args(missing)).is_err());
 
         let temp = TempDir::new();

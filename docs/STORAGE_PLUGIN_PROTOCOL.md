@@ -1,8 +1,8 @@
 # Storage plugin protocol v1
 
 Storage plugins are the only supported route for cloud providers other than
-MarkText Sync, Git, and WebDAV. A plugin is an explicitly installed native
-executable plus a reviewed manifest. MarkText does not load plugin code into
+MarkCaptain Sync, Git, and WebDAV. A plugin is an explicitly installed native
+executable plus a reviewed manifest. MarkCaptain does not load plugin code into
 the WebView or the application process.
 
 Plugins are trusted native programs running as the current OS user. Process,
@@ -47,7 +47,7 @@ executable is canonicalized and must stay below `storage-plugins`; symlink and
 
 ## Transport
 
-For each operation MarkText starts the executable directly, without a shell.
+For each operation MarkCaptain starts the executable directly, without a shell.
 It writes one newline-terminated JSON-RPC 2.0 request to stdin, closes stdin,
 and reads one bounded response from stdout. Stderr is discarded. The process
 has a deadline and is terminated on timeout.
@@ -77,16 +77,16 @@ Successful response:
 {"jsonrpc":"2.0","id":"request-uuid","result":{}}
 ```
 
-Plugin error messages are untrusted and are not forwarded to the UI. MarkText
+Plugin error messages are untrusted and are not forwarded to the UI. MarkCaptain
 surfaces a stable protocol error instead.
 
 ## Methods
 
 - `storage/probe` -> provider capabilities
 - `storage/list` -> `RemoteEntry[]`
-- `storage/read` -> `{ version? }`; MarkText supplies
+- `storage/read` -> `{ version? }`; MarkCaptain supplies
   `transfer.outputPath` and reads only that exact app-created file.
-- `storage/write` -> opaque `RemoteVersion`; MarkText writes the bytes to
+- `storage/write` -> opaque `RemoteVersion`; MarkCaptain writes the bytes to
   `transfer.inputPath` before launch and supplies that path to the plugin.
 - `storage/createDir` -> opaque `RemoteVersion`
 - `storage/move` -> opaque `RemoteVersion`
@@ -101,7 +101,7 @@ file, or exceeds the manifest limit (with an absolute 64 MiB ceiling).
 
 Writes must honor the provided `match` or `missing` precondition. A plugin that
 cannot guarantee a conditional write must declare `conditionalWrite: false`;
-MarkText will not silently downgrade to last-writer-wins.
+MarkCaptain will not silently downgrade to last-writer-wins.
 
 Plugins may report fewer capabilities at runtime than their manifest declares,
 but cannot acquire additional capabilities without a manifest update.

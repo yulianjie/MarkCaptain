@@ -37,7 +37,7 @@ async fn check(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>>
         "settings",
         WebviewUrl::External("about:blank".parse()?),
     )
-    .title("MarkText window recovery test")
+    .title("MarkCaptain window recovery test")
     .inner_size(900.0, 700.0)
     .min_inner_size(760.0, 560.0)
     .visible(false)
@@ -133,7 +133,7 @@ async fn check(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>>
 
     let editor =
         tauri::WebviewWindowBuilder::new(app, "main", WebviewUrl::External("about:blank".parse()?))
-            .title("MarkText window recovery focus test")
+            .title("MarkCaptain window recovery focus test")
             .inner_size(800.0, 600.0)
             .visible(false)
             .build()?;
@@ -165,7 +165,8 @@ fn main() {
     let result_status = exit_status.clone();
     let mut context = tauri::generate_context!();
     context.config_mut().app.windows.clear();
-    context.config_mut().identifier = "com.marktext.rs.window-placement-check".into();
+    context.config_mut().identifier =
+        "io.github.yulianjie.markcaptain.window-placement-check".into();
     tauri::Builder::default()
         .setup(move |app| {
             // Geometry operations run away from the event loop, just like

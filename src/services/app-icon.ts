@@ -29,7 +29,7 @@ export const appIconOptions: AppIconOption[] = [
   {
     id: 'default',
     label: 'Default',
-    description: 'Original MarkText',
+    description: 'Classic',
     src: defaultIcon,
   },
 ]

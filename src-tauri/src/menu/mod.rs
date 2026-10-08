@@ -1,6 +1,6 @@
 //! Native menu builder.
 //!
-//! Mirrors the legacy `marktext/src/main/menu/` tree at the top level
+//! Mirrors the legacy `upstream/src/main/menu/` tree at the top level
 //! (File / Edit / Paragraph / Format / View / Window / Help). Items that
 //! drive the editor emit `mt://menu/<id>` events to the focused webview;
 //! the renderer maps them to the corresponding store action.

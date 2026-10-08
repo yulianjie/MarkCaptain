@@ -14,7 +14,7 @@ The updater currently fails closed:
 - `plugins.updater.active` is `false` and `plugins.updater.pubkey` is empty in
   [`src-tauri/tauri.conf.json`](../src-tauri/tauri.conf.json).
 - The configured endpoint belongs to this repository:
-  `https://github.com/yulianjie/marktext-rs/releases/latest/download/latest.json`.
+  `https://github.com/yulianjie/MarkCaptain/releases/latest/download/latest.json`.
 - `UpdaterDialog.vue` treats `plugins.updater.active` as a project-level UI
   gate and checks for a non-empty public key plus HTTPS endpoints before it
   calls the updater plugin. It explains the disabled or unsafe configuration
@@ -22,7 +22,7 @@ The updater currently fails closed:
 - The current release workflow does not sign updater artifacts or publish a
   `latest.json` manifest, so automatic updates must remain disabled.
 
-`active` is a MarkText renderer gate, not a native field consumed by the
+`active` is a MarkCaptain renderer gate, not a native field consumed by the
 Tauri updater crate. The crate ignores that unknown field; therefore the
 renderer readiness check must not be removed.
 
@@ -35,11 +35,11 @@ Do not set `active` to `true` until every step below is complete.
    assets.
 
    ```bash
-   npx tauri signer generate -w ~/.tauri/marktext.key
+   npx tauri signer generate -w ~/.tauri/markcaptain.key
    ```
 
 2. Put only the generated public key in `plugins.updater.pubkey`. Keep the
-   endpoint on the `yulianjie/marktext-rs` release origin (or another explicitly
+   endpoint on the `yulianjie/MarkCaptain` release origin (or another explicitly
    controlled HTTPS update service).
 
 3. Enable updater artifact generation in the bundle configuration:

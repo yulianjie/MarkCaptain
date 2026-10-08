@@ -1,6 +1,6 @@
 # 写作 Agent
 
-MarkText 内置一个 Rust 驱动的写作 Agent，默认提供 DeepSeek 预设。使用 Chat Completions 兼容协议，支持自定义服务地址、模型和本地 Ollama。模型需支持流式输出与工具调用。
+MarkCaptain 内置一个 Rust 驱动的写作 Agent，默认提供 DeepSeek 预设。使用 Chat Completions 兼容协议，支持自定义服务地址、模型和本地 Ollama。模型需支持流式输出与工具调用。
 
 ## 为什么选择这个方案
 
@@ -74,7 +74,7 @@ MarkText 内置一个 Rust 驱动的写作 Agent，默认提供 DeepSeek 预设�
 
 ### 写作技能
 
-点击面板顶部书本按钮打开「技能管理」。内置 **ELI5 通俗解释、Mermaid 图表、清晰简洁的写作、Markdown 说明文档、团队沟通文档、Markdown 协作写作** 六个技能，随原生程序内置，无须另外安装 CLI。团队沟通采用 Anthropic 官方 `internal-comms`；协作写作采用 MarkText 自主编写的精简 `markdown-coauthor`。
+点击面板顶部书本按钮打开「技能管理」。内置 **ELI5 通俗解释、Mermaid 图表、清晰简洁的写作、Markdown 说明文档、团队沟通文档、Markdown 协作写作** 六个技能，随原生程序内置，无须另外安装 CLI。团队沟通采用 Anthropic 官方 `internal-comms`；协作写作采用 MarkCaptain 自主编写的精简 `markdown-coauthor`。
 
 - 默认「技能 · 自动选择」：模型先看启用技能的名称和用途，需要时才通过工具读取正文、参考资料。
 - 输入框上方可指定本次对话使用的技能；发送时只预加载明确指定的技能正文。
@@ -99,7 +99,7 @@ MarkText 内置一个 Rust 驱动的写作 Agent，默认提供 DeepSeek 预设�
 - 单元测试覆盖选区范围、冲突保护、会话隔离、取消竞态和晚到事件。Rust 测试覆盖 UTF-8/SSE 分片、截断流、角色注入、权限边界及真实回环 HTTP 的多轮工具交互。
 - 浏览器端到端测试使用模拟模型传输层，真实运行 Vue、Muya、CodeMirror、审阅、应用/撤回和撤销，以及设置、错误、停止、主题、窗口适配。
 - 2026-09-13 验证：230 项前端单元测试、80 项 Rust 测试、30 项浏览器测试通过；前端构建和 ESLint 通过。独立应用标识的 Windows 调试构建在真实 WebView2 中通过原生 IPC、系统凭据保存/读取/删除、连接测试、多轮工具调用、修改审阅/应用/撤回和取消测试，模型服务为临时回环 HTTP 服务。测试凭据已删除，测试进程已退出。
-- 本地预览构建位于 `output/agent/MarkText-Agent-Preview.exe`，使用 `com.marktext.rs.agent-preview` 应用标识；它是单独的调试预览程序，不是安装包。界面截图与测试记录位于 `output/agent/`。这些生成文件不进入 Git。
+- 本地预览构建位于 `output/agent/MarkCaptain-Agent-Preview.exe`，使用 `io.github.yulianjie.markcaptain.agent-preview` 应用标识；它是单独的调试预览程序，不是安装包。界面截图与测试记录位于 `output/agent/`。这些生成文件不进入 Git。
 - 没有使用真实云服务密钥进行付费调用。兼容性测试不代表所有供应商/模型都支持这些功能；可使用设置内的连接测试验证自己的服务。
 
 2026-09-15 / v0.5.0 验证：232 项前端单元测试、88 项 Rust 测试和 7 项 Agent 浏览器测试通过。回环 HTTP 测试确认普通回答不发送文档/技能正文，技能与参考文件可按需加载，局部编辑不会发送无关段落；隔离目录测试覆盖技能导入、持久化、重名/大小限制和读取边界。中文、英文、日文及窄面板/深色主题截图已检查。独立标识的 Windows WebView2 预览通过六个技能的原生 IPC、启停持久化、`internal-comms` 参考资料读取及 `markdown-coauthor` 局部修改建议测试；系统文件选择器已打开，但电脑控制授权超时，选择文件并完成导入这一步未验收。未使用真实云模型，也未逐一实机验收各平台安装器。
@@ -110,8 +110,8 @@ MarkText 内置一个 Rust 驱动的写作 Agent，默认提供 DeepSeek 预设�
 
 - 四项按顺序完成：多处修改及逐项审阅；回答插入/新建笔记及原文定位；全文参考与选区修改分离、可恢复分章总结；可选本地历史及手动多文档参考。
 - 完整前端单元测试 258 项、Rust 测试 102 项、浏览器测试 59 项通过；TypeScript、ESLint 和前端生产构建通过。其中新增 17 项独立浏览器流程测试，覆盖双编辑模式、Unicode 多处修改与撤销、答案复用、跨段引用、选区权限、分章停止/恢复、历史重载/导出/删除，以及历史恢复后继续总结和锁定旧修改。
-- 检查了窄窗口深浅主题、分章总结进度和历史界面截图。独立标识 `com.marktext.rs.workflow-preview` 的 Windows WebView2 调试构建通过真实 IPC、多处修改/撤回、引用定位、新建笔记、参考文档按需读取与引用、历史写入；第二个原生进程确认历史跨进程读取和删除。页面错误为 0，测试实例已退出，未替换正在运行的已安装应用。
+- 检查了窄窗口深浅主题、分章总结进度和历史界面截图。独立标识 `io.github.yulianjie.markcaptain.workflow-preview` 的 Windows WebView2 调试构建通过真实 IPC、多处修改/撤回、引用定位、新建笔记、参考文档按需读取与引用、历史写入；第二个原生进程确认历史跨进程读取和删除。页面错误为 0，测试实例已退出，未替换正在运行的已安装应用。
 - 使用临时回环 HTTP 模型服务验证协议与工作流，没有调用真实云模型，也没有评估真实模型的摘要质量。系统文件选择器与原生导出保存对话框未进行自动化点击验收；浏览器已验证标签页参考资料、历史 Markdown 下载，后端测试覆盖读取/持久化边界。
-- 独立预览程序为 `output/agent-workflow/MarkText-Workflow-Preview.exe`，截图、测试脚本及原生结果记录位于同目录；这些生成文件不进入 Git，也不是发布安装包。
+- 独立预览程序为 `output/agent-workflow/MarkCaptain-Workflow-Preview.exe`，截图、测试脚本及原生结果记录位于同目录；这些生成文件不进入 Git，也不是发布安装包。
 
-2026-09-15 / 多模态输入验证：238 项前端单元测试、93 项 Rust 测试、11 项 Agent 浏览器测试、前端生产构建和 ESLint 通过。新增测试覆盖图片粘贴/选择/预览/移除、图片独立大小预算、多轮 HTTP 图片传递、失败重试、异步读取期间切换/清空会话，以及两种编辑模式下自动附加选区与取消附加。独立应用标识 `com.marktext.rs.multimodal-preview` 的 Windows WebView2 预览通过系统剪贴板真实 `Ctrl+V`、原生 IPC、图片与文字/仅图片请求和图片追问，页面无错误；模型为临时回环 HTTP 服务，未验证真实云模型识图效果。测试后已恢复系统剪贴板并退出测试程序。独立预览、截图和记录位于 `output/agent-multimodal/`，不替换已安装应用，也不进入 Git。
+2026-09-15 / 多模态输入验证：238 项前端单元测试、93 项 Rust 测试、11 项 Agent 浏览器测试、前端生产构建和 ESLint 通过。新增测试覆盖图片粘贴/选择/预览/移除、图片独立大小预算、多轮 HTTP 图片传递、失败重试、异步读取期间切换/清空会话，以及两种编辑模式下自动附加选区与取消附加。独立应用标识 `io.github.yulianjie.markcaptain.multimodal-preview` 的 Windows WebView2 预览通过系统剪贴板真实 `Ctrl+V`、原生 IPC、图片与文字/仅图片请求和图片追问，页面无错误；模型为临时回环 HTTP 服务，未验证真实云模型识图效果。测试后已恢复系统剪贴板并退出测试程序。独立预览、截图和记录位于 `output/agent-multimodal/`，不替换已安装应用，也不进入 Git。

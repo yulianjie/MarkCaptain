@@ -61,7 +61,7 @@ export default {
     collapseHeading: '折叠 {heading}',
   },
   app: {
-    name: 'MarkText',
+    name: 'MarkCaptain',
     untitled: '未命名',
   },
   common: {
@@ -118,7 +118,7 @@ export default {
     preferences: '偏好设置',
     docs: '文档',
     issues: '报告问题',
-    about: '关于 MarkText',
+    about: '关于 MarkCaptain',
   },
   tabs: {
     newTab: '新建标签',
@@ -317,7 +317,7 @@ export default {
         fullscreen: '切换全屏',
       },
       help: {
-        about: '关于 MarkText',
+        about: '关于 MarkCaptain',
         openDocs: '打开文档',
         openIssues: '报告问题',
         checkForUpdates: '检查更新',
@@ -341,7 +341,7 @@ export default {
   about: {
     version: '版本 {version}',
     tagline: 'Markdown 编辑器 — Tauri 重写版。',
-    copyright: '© MarkText 贡献者 · MIT 许可',
+    copyright: '© MarkCaptain 贡献者 · MIT 许可',
   },
   updater: {
     title: '检查更新',
@@ -390,7 +390,7 @@ export default {
     saveAll: '全部保存',
   },
   externalChange: {
-    title: '文件已在 MarkText 外部发生变化',
+    title: '文件已在 MarkCaptain 外部发生变化',
     detail: '{filename} 的磁盘内容已变化，同时编辑器中还有未保存的修改。',
     reload: '从磁盘重新加载',
     keepLocal: '保留我的修改',
@@ -399,13 +399,13 @@ export default {
     overwriteTitle: '解决外部修改冲突',
     overwriteDetail: '现在保存 {filename} 会覆盖磁盘上更新的内容。',
     overwrite: '覆盖磁盘文件',
-    removedTitle: '文件已在 MarkText 外部删除',
+    removedTitle: '文件已在 MarkCaptain 外部删除',
     removed: '已将 {filename} 保留为未保存标签页。请使用“保存”选择新位置。',
     savePathChanged: '保存期间 {filename} 的位置发生了变化。修改仍处于未保存状态，请再次保存到新位置。',
   },
   session: {
     crashTitle: '是否恢复未保存的草稿？',
-    crashDetail: 'MarkText 上次未正常退出，检测到 {count} 个可恢复的未保存草稿。',
+    crashDetail: 'MarkCaptain 上次未正常退出，检测到 {count} 个可恢复的未保存草稿。',
     recoverDrafts: '恢复草稿',
     discardDrafts: '丢弃草稿',
     conflictTitle: '草稿与磁盘文件均有修改',
@@ -463,7 +463,7 @@ export default {
       gitSummary: '{state}：领先 {ahead}，落后 {behind}，冲突 {conflicts}',
       agentConflict: 'Git 同步只传输已经提交的更改。准备合并后，需要使用 Git 手动完成或中止。冲突可以直接编辑，也可以把受限片段交给写作 Agent 审阅；Agent 不会自动应用、提交或推送。',
       provider: {
-        selfHosted: '自建 MarkText 同步服务',
+        selfHosted: '自建 MarkCaptain 同步服务',
         git: 'Git',
         webdav: 'WebDAV',
         plugin: '存储插件',
@@ -481,7 +481,7 @@ export default {
       appIconDefault: '默认',
       appIconLiquidGlass: '液态玻璃',
       appIconLiquidGlassAlt: '液态玻璃变体',
-      appIconOriginal: 'MarkText 原版',
+      appIconOriginal: '经典款',
       appIconChoice: '{label}：{description}',
       openFilesNewWindow: '在新窗口打开文件',
       openFolderNewWindow: '在新窗口打开文件夹',

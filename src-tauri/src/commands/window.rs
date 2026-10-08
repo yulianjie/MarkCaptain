@@ -18,7 +18,7 @@ pub async fn cmd_new_window(app: AppHandle, label: Option<String>) -> AppResult<
         .title_bar_style(tauri::TitleBarStyle::Overlay)
         .hidden_title(true);
     let window = builder
-        .title("MarkText")
+        .title("MarkCaptain")
         .inner_size(1200.0, 900.0)
         .min_inner_size(800.0, 600.0)
         .visible(false)

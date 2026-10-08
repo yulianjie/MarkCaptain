@@ -376,7 +376,7 @@ struct TransferDirectory {
 impl TransferDirectory {
     fn new() -> StorageResult<Self> {
         tempfile::Builder::new()
-            .prefix("marktext-storage-plugin-")
+            .prefix("markcaptain-storage-plugin-")
             .tempdir()
             .map(|directory| Self { directory })
             .map_err(|_| StorageError::new(StorageErrorCode::Io))

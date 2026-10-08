@@ -44,7 +44,7 @@ document content, solid fallback in light/dark themes, and forced colors. These
 browser tests do not prove desktop blur.
 
 On each supported desktop, run `npm run tauri:dev`, put a moving/high-contrast
-window behind MarkText, and verify that the title bar and sidebar update while
+window behind MarkCaptain, and verify that the title bar and sidebar update while
 the document stays opaque. Repeat for a new editor window, window resizing,
 closing/reopening, and disabling the compositor's blur effect. On an unsupported
 desktop, verify solid chrome from the first frame. Verify macOS traffic lights

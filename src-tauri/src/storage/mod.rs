@@ -16,7 +16,7 @@ pub mod self_hosted;
 pub mod sync;
 pub mod webdav;
 
-pub const STORAGE_KEYRING_SERVICE: &str = "app.marktext.storage";
+pub const STORAGE_KEYRING_SERVICE: &str = "app.markcaptain.storage";
 
 /// A provider kind is stored in normal configuration.  Secrets are never
 /// embedded in this value or in [`ConnectionConfig`].

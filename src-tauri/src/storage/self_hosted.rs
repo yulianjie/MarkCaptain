@@ -1,4 +1,4 @@
-//! Client for the private MarkText Sync service.
+//! Client for the private MarkCaptain Sync service.
 //!
 //! The service intentionally exposes workspace-relative paths at this layer:
 //! stable entry ids and revision storage remain a server implementation detail.
@@ -169,7 +169,7 @@ impl StorageProvider for SelfHostedProvider {
         }
         let version = response
             .headers()
-            .get("X-MarkText-Revision")
+            .get("X-MarkCaptain-Revision")
             .and_then(|header| header.to_str().ok())
             .map(|value| RemoteVersion::new(value.to_owned()))
             .transpose()?;

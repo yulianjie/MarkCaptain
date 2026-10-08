@@ -1,4 +1,4 @@
-/** Per-document trailing-newline behavior used by the original MarkText. */
+/** Per-document trailing-newline behavior inherited from the legacy editor. */
 export type TrailingNewlinePolicy = 0 | 1 | 2 | 3
 
 const TRAILING_NEWLINES = /(?:\r\n|\r|\n)+$/

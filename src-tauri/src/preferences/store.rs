@@ -366,8 +366,9 @@ mod tests {
     fn store_path_uses_the_data_directory() {
         let root = Path::new("data-root");
         assert_eq!(
-            path_from_data_dir(root, "com.marktext.rs"),
-            root.join("com.marktext.rs").join("preferences.json")
+            path_from_data_dir(root, "io.github.yulianjie.markcaptain"),
+            root.join("io.github.yulianjie.markcaptain")
+                .join("preferences.json")
         );
     }
 

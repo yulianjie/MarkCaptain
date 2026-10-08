@@ -1,4 +1,4 @@
-# marktext-rs 后续工作计划
+# markcaptain 后续工作计划
 
 ## 已完成（按 commit 顺序）
 
@@ -8,7 +8,7 @@
 - **ddb71fd** Phase 5 — 接通菜单 Paragraph/Format/Undo/Redo 到 Muya、完整 HTML 导出（Muya getSanitizeHtml + 嵌入 CSS）、HTML5 拖拽 tab 重排、CodeMirror 6 源码模式
 - **本次（Phase 6 主体）** — 完整 Preferences 多分区表单（General/Editor/Markdown/Theme/Image/Spellchecker/View/Search）、主题系统（CSS vars + light/dark/material-dark/one-dark/graphite-light/ulysses-light + autoSwitchTheme OS 跟随）、实时应用 zoom/font/line-width 到编辑器、Typewriter/Focus 模式、Always-on-Top/Fullscreen 菜单、PDF 通过 OS 打印对话框（emit mt://export/print 由前端 window.print()）、CLI 文件参数启动开文件 + single-instance 转发、Rust 端 set_preference/set_user_data 广播 mt://prefs/changed 给所有窗口
 - **73d1921** Phase 7 — i18n（en + zh-CN 自建 ~40 LOC，无额外依赖），ESLint v9 flat config 修复 `npm run lint`，Muya `imageAction` 三模式（path/folder/upload）路由 + 走 prefs 配置，preferences.ts 类型修复
-- **本次（Phase 8）** — 用户主题加载器（`~/<config>/marktext/themes/*.css` 自动列出 + 注入），全局右键菜单（Tab + 文件树菜单项），多窗口菜单/启动事件路由到聚焦窗口，键位重映射 UI（Preferences 中录入 + 持久化 + 运行时解析），Pandoc 子进程导出 docx/odt/epub，Playwright E2E 配置 + smoke 用例，GitHub Actions CI（release.yml 跨四平台 + ci.yml 前端 + Rust 检查），auto-updater 配置 stub + docs/UPDATER.md
+- **本次（Phase 8）** — 用户主题加载器（`~/<config>/markcaptain/themes/*.css` 自动列出 + 注入），全局右键菜单（Tab + 文件树菜单项），多窗口菜单/启动事件路由到聚焦窗口，键位重映射 UI（Preferences 中录入 + 持久化 + 运行时解析），Pandoc 子进程导出 docx/odt/epub，Playwright E2E 配置 + smoke 用例，GitHub Actions CI（release.yml 跨四平台 + ci.yml 前端 + Rust 检查），auto-updater 配置 stub + docs/UPDATER.md
 
 ## Phase 9 — 后续
 
@@ -90,9 +90,9 @@ Phase 5～8 已合入。拼写检查留作最后压轴。其余按列表优先�
 
 两者都在治症状，没动根因。
 
-### 根因（与原版 Electron marktext 对照）
+### 根因（与上游 Electron 实现对照）
 
-参照 [C:/Users/jack/Desktop/github/marktext/src/renderer/components/editorWithTabs/editor.vue](C:/Users/jack/Desktop/github/marktext/src/renderer/components/editorWithTabs/editor.vue)：
+参照上游 `src/renderer/components/editorWithTabs/editor.vue`：
 
 1. **空文档种子差异。** 原版 `markdown: ''`（从 `getBlankFileState` 来），我们 [MuyaEditor.vue:74](src/components/editorWithTabs/MuyaEditor.vue#L74) 用了 `'\n'` 作为 workaround。原版用 `''` 不崩，说明所谓"空输入崩溃"是别的 bug 的症状（极可能是下面的 race），不是真的需要这个 seed。
 
@@ -104,7 +104,7 @@ Phase 5～8 已合入。拼写检查留作最后压轴。其余按列表优先�
 
    全选删除时，`backspaceCtrl` 用 `setCursor` 把光标重新放回 span 内部 → 之后重输就正常。
 
-   原版没有这个 race —— Muya 在 `created() { $nextTick(...) }` 里只 new 一次，**永不 destroy/recreate**；切 tab / 加载文件走 bus 事件 → `setMarkdownToEditor` → `editor.setMarkdown(markdown, cursor, true)`（[editor.vue:1096-1106](C:/Users/jack/Desktop/github/marktext/src/renderer/components/editorWithTabs/editor.vue#L1096)）。
+   上游实现没有这个 race —— Muya 在 `created() { $nextTick(...) }` 里只 new 一次，**永不 destroy/recreate**；切 tab / 加载文件走 bus 事件 → `setMarkdownToEditor` → `editor.setMarkdown(markdown, cursor, true)`（上游 `editor.vue:1096-1106`）。
 
 ### 修复方案 — 镜像原版架构
 
@@ -123,7 +123,7 @@ Phase 5～8 已合入。拼写检查留作最后压轴。其余按列表优先�
      editor.applyContentChange(id, changes.markdown, { ... })
    })
    ```
-   对应原版 `id: 'muya'` placeholder + Vuex 解析当前 tab 的做法（[editor.vue:596-599](C:/Users/jack/Desktop/github/marktext/src/renderer/components/editorWithTabs/editor.vue#L596)）。
+   对应上游 `id: 'muya'` placeholder + Vuex 解析当前 tab 的做法（上游 `editor.vue:596-599`）。
 
 3. **`watch(currentFileId)` 只调 `loadFile`，不调 `mount`。**
    `if (activeBoundId.value !== id) loadFile(tab)`。彻底消除 race。
@@ -134,11 +134,11 @@ Phase 5～8 已合入。拼写检查留作最后压轴。其余按列表优先�
 
 ### 不在本次范围
 
-- 切 tab 时保留每 tab 的 history（原版有 [editor.vue:1109-1124](C:/Users/jack/Desktop/github/marktext/src/renderer/components/editorWithTabs/editor.vue#L1109) 的 `setHistory` 链路，但需要在 store 里加 history 持久化字段，先放后面）。
+- 切 tab 时保留每 tab 的 history（上游 `editor.vue:1109-1124` 有 `setHistory` 链路，但需要在 store 里加 history 持久化字段，先放后面）。
 
 ### 验证
 
-1. `npm run tauri:build`（旧 `marktext-rs.exe` 要先关掉，否则 cargo 链接失败）。
+1. `npm run tauri:build`（旧 `markcaptain.exe` 要先关掉，否则 cargo 链接失败）。
 2. 跑出来的二进制：打开 Untitled tab，点入编辑器，**立即**输入 `## hi` → 期望出现 H2。
 3. 同位置 `### sub` → H3；新行 `- bullet` → 列表；`**bold**` → 行内粗体。
 4. 打开一个已有 md 文件，编辑一个字符，切回 Untitled tab → 内容互不丢失。

@@ -1,6 +1,6 @@
 //! User-theme commands.
 //!
-//! User themes live in `<config>/marktext/themes/*.css` (config dir comes
+//! User themes live in `<config>/markcaptain/themes/*.css` (config dir comes
 //! from `dirs::config_dir`). The renderer asks for a list, then reads any
 //! one back as a string and injects it into the document.
 //!
@@ -27,7 +27,7 @@ pub struct UserTheme {
 fn themes_dir() -> AppResult<PathBuf> {
     let base = dirs::config_dir()
         .ok_or_else(|| AppError::Other("could not resolve user config dir".into()))?;
-    Ok(base.join("marktext").join("themes"))
+    Ok(base.join("markcaptain").join("themes"))
 }
 
 #[tauri::command]

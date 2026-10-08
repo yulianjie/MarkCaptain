@@ -1,16 +1,16 @@
-# MarkText
+# MarkCaptain
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
-> A modern, local-first Markdown editor rebuilt with Tauri 2, Vue 3, and Rust — with a writing Agent that helps you think, write, review, and revise without taking control of your document.
+> More than a Markdown editor: a modern, local-first writing workspace with an integrated Agent that helps you think, write, review, and revise without taking control of your document.
 
-[Download the latest release](https://github.com/yulianjie/marktext-rs/releases/latest) · [Writing Agent guide](docs/AI_AGENT.md) · [Release notes](docs/releases/v0.7.0.md)
+[Download the latest release](https://github.com/yulianjie/MarkCaptain/releases/latest) · [User guide](https://github.com/yulianjie/MarkCaptain/wiki) · [Writing Agent guide](docs/AI_AGENT.md) · [Release notes](docs/releases/v0.7.0.md)
 
-![MarkText editor with outline, tabs, and live Markdown preview](img/marktext-view-en.png)
+![MarkCaptain editor with outline, tabs, and live Markdown preview](img/markcaptain-view-en.png)
 
-MarkText keeps the distraction-free, real-time editing experience of the original [MarkText](https://github.com/marktext/marktext), while moving desktop integration, file access, credentials, sync, and AI execution into a Rust backend. It runs on Windows, macOS, and Linux.
+Built with Tauri 2, Vue 3, and Rust, MarkCaptain combines a focused real-time writing experience with native desktop integration, local-first storage, and review-first AI workflows. It runs on Windows, macOS, and Linux.
 
-## Why MarkText
+## Why MarkCaptain
 
 - **Write, don't preview.** Edit Markdown in a live WYSIWYG surface or switch to source mode when you want the raw text.
 - **Use AI without surrendering control.** The Agent can inspect attached snapshots and propose changes, but it cannot silently edit or save your files.
@@ -75,15 +75,15 @@ See [docs/AI_AGENT.md](docs/AI_AGENT.md) for setup, limits, protocol details, an
 - Focus and typewriter modes, multiple built-in themes, user themes, and automatic light/dark switching.
 - Keyboard-first command palette and a unified, customizable shortcut system shared by the native menu and editor.
 - Export to styled HTML; print or save as PDF through the system dialog; optional Pandoc export to PDF, DOCX, ODT, and EPUB.
-- Local-first project storage with optional private MarkText Sync, Git, WebDAV, and Storage Plugin Protocol providers.
+- Local-first project storage with optional private MarkCaptain Sync, Git, WebDAV, and Storage Plugin Protocol providers.
 - English, Simplified Chinese, and Japanese application interfaces.
 
 ## Local-first storage and sync
 
-MarkText always saves to a local working copy first. Optional project storage keeps local save state separate from remote sync state, so a network failure does not turn a successful local save into a failure.
+MarkCaptain always saves to a local working copy first. Optional project storage keeps local save state separate from remote sync state, so a network failure does not turn a successful local save into a failure.
 
-- **Private MarkText Sync:** a self-hosted Axum/SQLite service with version history, conditional writes, change cursors, and soft-delete tombstones.
-- **Git:** validates repositories, fetches, fast-forward pulls, and pushes without force. Divergence and conflicts are explicit; MarkText does not reset, auto-commit, or auto-push.
+- **Private MarkCaptain Sync:** a self-hosted Axum/SQLite service with version history, conditional writes, change cursors, and soft-delete tombstones.
+- **Git:** validates repositories, fetches, fast-forward pulls, and pushes without force. Divergence and conflicts are explicit; MarkCaptain does not reset, auto-commit, or auto-push.
 - **WebDAV:** uses strong ETags for safe conditional changes and refuses unsafe automatic remote writes when reliable version checks are unavailable.
 - **Storage plugins:** vendor-neutral JSON-RPC stdio protocol for user-installed, trusted native providers.
 
@@ -91,7 +91,7 @@ For the security model and provider contract, read [docs/STORAGE_PLUGIN_PROTOCOL
 
 ## Download
 
-Get release artifacts from the [latest GitHub release](https://github.com/yulianjie/marktext-rs/releases/latest):
+Get release artifacts from the [latest GitHub release](https://github.com/yulianjie/MarkCaptain/releases/latest):
 
 | Platform | Packages |
 | --- | --- |
@@ -152,8 +152,8 @@ Renderer-to-Rust calls use typed wrappers in `src/services/tauri-invoke.ts`; Rus
 
 ## Project status
 
-This repository is an active Tauri rewrite of the original Electron MarkText. The core editor, desktop workflows, writing Agent, export paths, and local-first storage are implemented, while exact feature parity and platform polish continue to evolve. Check the [release notes](docs/releases/) and [latest release](https://github.com/yulianjie/marktext-rs/releases/latest) for the current verified scope.
+MarkCaptain is an actively developed Tauri desktop application. The core editor, desktop workflows, writing Agent, export paths, and local-first storage are implemented, while feature coverage and platform polish continue to evolve. Check the [release notes](docs/releases/) and [latest release](https://github.com/yulianjie/MarkCaptain/releases/latest) for the current verified scope.
 
 ## Credits and license
 
-MarkText builds on the original [MarkText](https://github.com/marktext/marktext) project and its Muya editor engine. This repository is released under the [MIT License](LICENSE).
+MarkCaptain uses the same [Muya](https://github.com/marktext/muya) WYSIWYG editor engine as MarkText. This repository is released under the [MIT License](LICENSE), with upstream and third-party attribution preserved in the license and notice files.

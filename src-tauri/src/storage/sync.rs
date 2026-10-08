@@ -17,8 +17,8 @@ use std::{
 };
 use walkdir::WalkDir;
 
-const MANIFEST_FILE: &str = ".marktext-sync-manifest.json";
-const JOURNAL_FILE: &str = ".marktext-sync-journal.json";
+const MANIFEST_FILE: &str = ".markcaptain-sync-manifest.json";
+const JOURNAL_FILE: &str = ".markcaptain-sync-journal.json";
 const MANIFEST_VERSION: u8 = 1;
 const MAX_FILE_BYTES: u64 = 64 * 1024 * 1024;
 

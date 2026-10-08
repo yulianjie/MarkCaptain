@@ -585,7 +585,7 @@ mod tests {
             temp.path(),
             &["config", "user.email", "tests@example.invalid"],
         );
-        git(temp.path(), &["config", "user.name", "MarkText test"]);
+        git(temp.path(), &["config", "user.name", "MarkCaptain test"]);
         fs::write(temp.path().join("note.md"), "first\n").unwrap();
         git(temp.path(), &["add", "note.md"]);
         git(temp.path(), &["commit", "-m", "initial"]);

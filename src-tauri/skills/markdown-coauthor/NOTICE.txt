@@ -1,11 +1,11 @@
-Markdown Coauthor is an original MarkText skill, distributed under LICENSE.txt.
+Markdown Coauthor is an original MarkCaptain skill, distributed under LICENSE.txt.
 
 The user requested a concise document collaboration workflow after reviewing
 Anthropic's doc-coauthoring skill:
 https://github.com/anthropics/skills/tree/34040c9c568585f6929bedeaad110ad08f079624/skills/doc-coauthoring
 
 That directory did not provide a specific license at the reviewed revision.
-MarkText therefore supplies newly written instructions for its own editor,
+MarkCaptain therefore supplies newly written instructions for its own editor,
 using general ideas such as identifying readers, refining a draft and checking
 comprehension. No upstream skill text is bundled or relicensed. This skill is
-maintained by MarkText and is not an official Anthropic skill.
+maintained by MarkCaptain and is not an official Anthropic skill.
