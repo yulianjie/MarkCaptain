@@ -215,6 +215,67 @@ describe('Agent document edits', () => {
     expect(tab.markdown).toBe('😀one\n中文two\nthree')
     expect(edit.changes.map(c => c.status)).toEqual(['reverted', 'reverted', 'dismissed'])
   })
+  it('sends exact per-item acceptance, rejection, reasons and withdrawal on following turns', async () => {
+    const editor = useEditorStore(), agent = useAgentStore()
+    const tab = editor.newUntitledTab('one two three')
+    editor.registerAgentEditHandler('wysiwyg', text => editor.setMarkdownExternal(tab.id, text))
+    await agent.send('edit')
+    emit({ requestId: agent.run!.id, kind: 'proposal', proposal: { title: 'Batch', changes: ['one', 'two', 'three'].map(oldText => ({ oldText, newText: oldText.toUpperCase() })) } })
+    emit({ requestId: agent.run!.id, kind: 'done' })
+    const edit = agent.conversation.messages.at(-1)!.edit!
+    const ids = edit.changes.map(c => c.id)
+    expect(new Set(ids).size).toBe(3)
+    agent.apply(edit, 0); agent.dismiss(edit, 1)
+    agent.setReviewReason(edit, 1, '保留原来的语气 "two"')
+    await agent.send('continue')
+    let request = transport.start.mock.calls.at(-1)![0]
+    expect(request.context.markdown).toBe('ONE two three')
+    let feedback = JSON.parse(request.messages[1].content.split('[User review feedback]\n')[1])
+    expect(feedback.changes).toEqual([
+      { id: ids[0], status: 'applied', oldText: 'one', newText: 'ONE' },
+      { id: ids[1], status: 'dismissed', oldText: 'two', newText: 'TWO', reason: '保留原来的语气 "two"' },
+      { id: ids[2], status: 'pending', oldText: 'three', newText: 'THREE' },
+    ])
+    emit({ requestId: agent.run!.id, kind: 'done' })
+    agent.revert(edit, 0)
+    await agent.send('continue again')
+    request = transport.start.mock.calls.at(-1)![0]
+    feedback = JSON.parse(request.messages[1].content.split('[User review feedback]\n')[1])
+    expect(feedback.changes[0]).toMatchObject({ id: ids[0], status: 'reverted' })
+    expect(feedback.changes[1]).toMatchObject({ id: ids[1], status: 'dismissed' })
+  })
+  it('rewrites a rejected item against the updated selected scope while keeping accepted changes', async () => {
+    const editor = useEditorStore(), agent = useAgentStore()
+    const tab = editor.newUntitledTab('outside\none two\nprivate')
+    editor.registerAgentEditHandler('wysiwyg', text => editor.setMarkdownExternal(tab.id, text))
+    agent.selection = { tabId: tab.id, name: 'note', markdown: tab.markdown, from: 8, to: 15 }
+    await agent.send('edit')
+    emit({ requestId: agent.run!.id, kind: 'proposal', proposal: { title: 'Batch', changes: [{ oldText: 'one', newText: 'one expanded' }, { oldText: 'two', newText: 'TWO' }] } })
+    emit({ requestId: agent.run!.id, kind: 'done' })
+    const edit = agent.conversation.messages.at(-1)!.edit!
+    agent.apply(edit, 0); agent.dismiss(edit, 1); agent.setReviewReason(edit, 1, '更口语一些')
+    await agent.rewrite(edit, 1)
+    const request = transport.start.mock.calls.at(-1)![0]
+    expect(request.context.markdown).toBe('one expanded two')
+    expect(request.messages.at(-1).content).toContain(edit.changes[1]!.id)
+    expect(request.messages.at(-1).content).toContain('更口语一些')
+    expect(tab.markdown).toBe('outside\none expanded two\nprivate')
+    emit({ requestId: agent.run!.id, kind: 'done' })
+    editor.setMarkdownExternal(tab.id, 'manually changed')
+    await agent.rewrite(edit, 1)
+    expect(transport.start).toHaveBeenCalledTimes(2)
+  })
+  it('counts review payloads in context limits before mutating the conversation', async () => {
+    const editor = useEditorStore(), agent = useAgentStore()
+    editor.newUntitledTab('one')
+    await agent.send('edit')
+    emit({ requestId: agent.run!.id, kind: 'proposal', proposal: { title: 'Large', oldText: 'one', newText: 'x'.repeat(80_000) } })
+    emit({ requestId: agent.run!.id, kind: 'done' })
+    await agent.send('continue')
+    expect(transport.start).toHaveBeenCalledOnce()
+    expect(agent.conversation.messages).toHaveLength(2)
+    expect(agent.error).not.toBe('')
+  })
   it('applies a batch in one editor transaction and keeps dismissed changes out', async () => {
     const editor = useEditorStore(), agent = useAgentStore()
     const tab = editor.newUntitledTab('one two three')

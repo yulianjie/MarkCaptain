@@ -1,4 +1,7 @@
 export default {
+  reviewReason: 'レビューコメント（任意）', reviewReasonPlaceholder: '承認・拒否・取り消しの理由、または書き直し方を入力',
+  rewrite: 'この意見で書き直す', rewriteDefault: '別の修正案を提案してください。',
+  rewritePrompt: '修正項目 {id} をレビュー意見に従って書き直してください：{reason}。今回添付した現在の文書を基準に、承認済みの修正を維持してください。他の拒否・取り消し済みの修正を再提案せず、新しい案をレビュー用に提示してください。',
   history: { title: '会話履歴', enable: '会話をローカルに保存', detail: '任意のローカル履歴です。画像は保存されません。オフにしても既存の履歴は削除するまで残ります。最大 100 件 / 128 MB。', search: '会話タイトルを検索', empty: '保存した会話はありません', restore: '復元', export: 'Markdown をエクスポート', delete: '削除', restored: 'ローカル履歴を復元しました。過去の編集は閲覧専用です。原文が同じ場合は章ごとの要約を再開できます。', locked: '過去の編集記録 · 適用と取り消しは無効', imagesOmitted: '画像は履歴に保存されていません。画像について質問する前に再添付してください。' },
   references: { title: '参考文書', detail: '必要に応じて読む閲覧専用スナップショット。最大 8 ファイル、各 2 MB、合計 4 MB。編集対象は現在の文書のみです。', openTab: '開いているタブを添付', files: 'Markdown ファイルを選択', reading: '参考ファイルを読み込み中…', remove: '参考文書 {name} を削除' },
 
@@ -52,10 +55,12 @@ export default {
     },
   },
   settings: {
+    authMode: '認証モード', authSystem: 'OS 資格情報ストア', authNone: '認証なしのローカルサービス',
+    authNoneHelp: 'OS 資格情報ストアを使用せず、キーやカスタムヘッダーも送信しません。認証不要の Ollama などで利用でき、Linux Secret Service は不要です。保存済みの資格情報は OS ストアに保持されます。',
     title: 'モデル設定', back: '会話に戻る', description: 'DeepSeek、互換 API、またはローカル Ollama を接続できます。',
     provider: 'サービス', custom: 'カスタム互換サービス', baseUrl: 'API ベース URL', model: 'モデル名', modelPlaceholder: 'サービスが提供するモデル ID',
     urlHelp: 'HTTP または HTTPS のベース URL（例：https://api.deepseek.com）。/chat/completions は含めません。HTTP は暗号化されないため、信頼できるネットワークでのみ使用してください。',
-    keySaved: '保存済み', keepKey: '空欄で保存済みキーを保持', keyPlaceholder: 'API キー（ローカル Ollama は省略可）',
+    keySaved: '保存済み', keepKey: '空欄で保存済みキーを保持', keyPlaceholder: 'サービスの API キー',
     keyHelp: 'キーは OS の資格情報ストアに保存されます。URL を変更しても前のサービスのキーは送信されません。',
     headers: 'カスタムリクエストヘッダー', headersSaved: '保存済み', keepHeaders: '空欄で保存済みヘッダーを保持', headersPlaceholder: '1 行に 1 つ入力します。例：\nX-Tenant-ID: tenant-1\nAuthorization: Token xxx',
     headersHelp: '各行を「名前: 値」で入力します（最大 32 件）。値はキーとともに OS の資格情報ストアへ保存され、カスタム Authorization は Bearer キーより優先されます。',
@@ -65,6 +70,7 @@ export default {
     privacy: '送信時に会話、添付画像、文書の基本情報、有効なスキルの名前と用途をモデルに渡します。文書の段落とスキル本文は必要に応じて読み込みます。接続テストはテストメッセージのみ送信します。',
   },
   errors: {
+    noAuthCredentials: '認証なしモードではキーやカスタムヘッダーを指定できません。認証が必要な場合は OS 資格情報ストアを選択してください。',
     historyRead: 'ローカル会話履歴を読み込めませんでした。', historyWrite: 'ローカル会話履歴を保存できませんでした。', historyInvalid: '保存された会話が無効か未対応の形式です。', historyConflict: '別のウィンドウで変更または削除されました。履歴を開き直してください。', historyDisabled: '別のウィンドウで履歴保存が無効になりました。', historyLimit: '履歴の上限に達しました。古い会話をエクスポートして削除してください。', historyImages: '画像は保存されていません。再添付して新しいメッセージを送信してください。', referenceLimit: '参考文書は最大 8 件、各 2 MB、合計 4 MB までです。', referenceRead: '参考文書を読み込めません。文字コードを確認してください。',
 
     summaryEmpty: '要約できるテキストがありません。', summaryTooMany: '区間が多すぎます。文書を分割してください。', summaryIncomplete: '区間メモが不足しています。要約をやり直してください。', summaryNoAttachment: '文書または選択範囲を添付してください。', summaryChanged: '文書または添付範囲が変わりました。要約をやり直してください。', summaryOutputTooLarge: 'モデルの区間メモが長すぎます。再開するとこの区間を再試行し、完了済みのメモは保持します。',
@@ -81,7 +87,7 @@ export default {
     unknown: '処理できませんでした。モデル設定を確認して再試行してください。', desktopOnly: 'AI 接続は MarkText デスクトップアプリで利用できます。',
     invalidUrl: 'ユーザー名、パスワード、クエリ、フラグメント、/chat/completions を含まない HTTP または HTTPS のベース URL を入力してください。',
     invalidModel: '有効なモデル名を入力してください。', invalidKey: 'キーの形式が無効です。再入力してください。', invalidHeaders: 'ヘッダーが無効、重複、またはアプリが上書きできない通信フィールドを含んでいます。',
-    keychain: 'OS の資格情報ストアにアクセスできません。ロック解除または有効化してください。', configRead: 'モデル設定を読み込めません。再度保存してください。', configWrite: '設定を保存できません。ファイル権限を確認してください。',
+    keychain: 'OS の資格情報ストアにアクセスできません。ロック解除・有効化するか、認証不要のローカルモデルの場合は設定で「認証なしのローカルサービス」を選択してください。', configRead: 'モデル設定を読み込めません。再度保存してください。', configWrite: '設定を保存できません。ファイル権限を確認してください。',
     network: '接続が失敗または中断しました。ネットワークと URL を確認してください。', timeout: 'モデルがタイムアウトしました。再試行するか別のモデルを選んでください。',
     auth: '認証に失敗しました。API キーと権限を確認してください。', rateLimit: 'リクエスト制限または利用枠に達しました。後でもう一度お試しください。', endpoint: 'API またはモデルが見つかりません。URL とモデル名を確認してください。',
     modelRequest: 'リクエストが拒否されました。Chat Completions、ストリーミング、ツール対応を確認してください。', provider: 'モデルサービスで処理できませんでした。後でもう一度お試しください。',

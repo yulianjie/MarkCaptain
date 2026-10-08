@@ -1,4 +1,7 @@
 export default {
+  reviewReason: '审阅意见（可选）', reviewReasonPlaceholder: '说明接受、拒绝或撤回的原因，或希望如何重写',
+  rewrite: '按这个意见重写', rewriteDefault: '请提出一种不同的修改方案。',
+  rewritePrompt: '请按审阅意见重写修改项 {id}：{reason}。以本轮附加的当前文档为准，保留已接受的修改；不要重新提出其他已拒绝或撤回的修改。只提出新建议供我审阅。',
   history: { title: '历史对话', enable: '在本地保存对话', detail: '可选的本地历史，不保存图片。关闭后停止保存，已有历史仍可查看和删除。最多 100 条对话 / 128 MB。', search: '搜索对话标题', empty: '暂无已保存的对话', restore: '恢复', export: '导出 Markdown', delete: '删除', restored: '已恢复本地历史。历史修改仅供查阅；原文未变时可继续分章总结。', locked: '历史修改记录 · 已禁用应用与撤销', imagesOmitted: '历史未保存图片。继续询问图片相关内容前，请重新附加图片。' },
   references: { title: '参考文档', detail: '只读快照，按需读取。最多 8 个文件，单个 2 MB、总计 4 MB。仅可修改当前文档。', openTab: '附加已打开的标签页', files: '选择 Markdown 文件', reading: '正在读取参考文件…', remove: '移除参考文档 {name}' },
 
@@ -52,10 +55,12 @@ export default {
     },
   },
   settings: {
+    authMode: '认证模式', authSystem: '系统凭据库认证', authNone: '无认证本地服务',
+    authNoneHelp: '不读取或写入系统凭据库，不发送密钥或自定义请求头。适用于 Ollama 等无认证服务，无需 Linux Secret Service。此前保存的凭据仍保留在系统凭据库中。',
     title: '模型设置', back: '返回对话', description: '使用你自己的模型服务。默认推荐 DeepSeek，也可连接兼容接口或本地 Ollama。',
     provider: '服务预设', custom: '自定义兼容服务', baseUrl: 'API 地址', model: '模型名称', modelPlaceholder: '填写服务提供的模型 ID',
     urlHelp: '填写 HTTP 或 HTTPS 基础地址，例如 https://api.deepseek.com；不包含 /chat/completions。HTTP 为明文传输，请仅在你信任的网络中使用。',
-    keySaved: '已保存', keepKey: '留空保留当前密钥', keyPlaceholder: '输入密钥；本地 Ollama 可留空',
+    keySaved: '已保存', keepKey: '留空保留当前密钥', keyPlaceholder: '输入服务密钥',
     keyHelp: '密钥保存在系统凭据库中，不写入普通配置文件。更换接口地址不会带走原服务的密钥。',
     headers: '自定义请求头', headersSaved: '已保存', keepHeaders: '留空保留已保存的请求头', headersPlaceholder: '每行一个，例如：\nX-Tenant-ID: tenant-1\nAuthorization: Token xxx',
     headersHelp: '每行填写“名称: 值”，最多 32 项。内容与密钥一同保存在系统凭据库；自定义 Authorization 会覆盖 Bearer 密钥。',
@@ -65,6 +70,7 @@ export default {
     privacy: '点击发送后，会将对话、附加图片、文档基本信息和启用技能的名称与用途交给配置的服务。文档段落及技能正文按需读取。测试连接仅发送测试消息。',
   },
   errors: {
+    noAuthCredentials: '无认证模式不能包含密钥或自定义请求头。需要认证时请选择系统凭据库认证。',
     historyRead: '无法读取本地对话历史。', historyWrite: '无法保存本地对话历史。', historyInvalid: '这条历史对话无效或版本不受支持。', historyConflict: '该对话已被其他窗口修改或删除，请重新打开历史列表。', historyDisabled: '其他窗口已关闭本地历史保存。', historyLimit: '历史存储已达到上限，请导出并删除旧对话后重试。', historyImages: '历史未保存图片，请重新附加图片并发送新消息。', referenceLimit: '最多附加 8 份参考文档，单份不超过 2 MB，总计不超过 4 MB。', referenceRead: '无法解码这份参考文档，请检查文件编码。',
 
     summaryEmpty: '附加内容没有可总结的文字。', summaryTooMany: '分段数量过多，请拆分文档后再总结。', summaryIncomplete: '部分分段笔记缺失，请重新分章总结。', summaryNoAttachment: '请先附加文档或选区。', summaryChanged: '文档或附加范围已变化，请重新分章总结。', summaryOutputTooLarge: '模型返回的分段笔记过长。继续总结可重试当前部分，已完成部分会保留。',
@@ -81,7 +87,7 @@ export default {
     unknown: '操作未完成，请检查模型设置后重试。', desktopOnly: 'AI 连接需要在 MarkText 桌面应用中使用。',
     invalidUrl: '请填写 HTTP 或 HTTPS 基础地址，且不要包含用户名、密码、查询参数、片段或 /chat/completions。',
     invalidModel: '请填写有效的模型名称。', invalidKey: '密钥格式无效，请重新输入。', invalidHeaders: '请求头格式无效、重复或包含不允许由应用覆盖的传输字段。',
-    keychain: '无法访问系统凭据库，请解锁或启用凭据库后重试。', configRead: '无法读取模型设置，请重新保存设置。', configWrite: '无法保存模型设置，请检查本机文件权限。',
+    keychain: '无法访问系统凭据库。请解锁或启用凭据库；若使用无需认证的本地模型，请在设置中选择“无认证本地服务”。', configRead: '无法读取模型设置，请重新保存设置。', configWrite: '无法保存模型设置，请检查本机文件权限。',
     network: '连接中断或无法连接。请检查网络及 API 地址后重试。', timeout: '模型响应超时，请重试或选择响应更快的模型。',
     auth: '身份验证失败，请检查此服务的 API Key 和访问权限。', rateLimit: '服务请求过于频繁或额度不足，请稍后重试。', endpoint: '未找到接口或模型，请检查基础地址及模型名称。',
     modelRequest: '服务未接受请求，请确认模型支持 Chat Completions、流式输出和工具调用。', provider: '模型服务暂时无法完成请求，请稍后重试。',

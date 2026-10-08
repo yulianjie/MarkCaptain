@@ -8,8 +8,8 @@ let config = {baseUrl:'https://api.deepseek.com',model:'deepseek-flash',hasKey:f
 let skills = ['eli5','mermaid-diagrams','writing-clearly-and-concisely','crafting-effective-readmes','internal-comms','markdown-coauthor'].map(name=>({id:'builtin:'+name,name,description:name,license:name==='internal-comms'?'Apache-2.0':'MIT',source:'https://github.com/DreambigOu/ELI5',builtin:true,enabled:true}));
 export const agentTransport = {
   historySettings: async()=>({enabled:false}), historyList: async()=>[],
-  getConfig: async()=>({...config}),
-  saveConfig: async(settings, apiKey, headers)=>{config={...settings,hasKey:apiKey === '' ? false : !!apiKey || config.hasKey,hasHeaders:Array.isArray(headers) ? headers.length > 0 : config.hasHeaders};return {...config}},
+  getConfig: async()=>{if(window.__keychainUnavailable && config.authMode!=='none')throw new Error('agent:keychain');return {...config}},
+  saveConfig: async(settings, apiKey, headers)=>{window.__agentConfigSave={settings,apiKey,headers};if(window.__keychainUnavailable && settings.authMode!=='none')throw new Error('agent:keychain');config={...settings,hasKey:apiKey === '' ? false : !!apiKey || config.hasKey,hasHeaders:Array.isArray(headers) ? headers.length > 0 : config.hasHeaders};return {...config}},
   testConnection: async()=>{},
   listSkills: async()=>skills.map(s=>({...s})),
   importSkill: async()=>{if(skills.some(s=>s.id==='user:team-style'))throw new Error('agent:skillExists');skills.push({id:'user:team-style',name:'team-style',description:'Team writing rules',license:'MIT',source:null,builtin:false,enabled:true});return skills.map(s=>({...s}));},
@@ -50,7 +50,7 @@ async function setup(page: Page, source = false) {
     editor.tabs = [tab]
     editor.sourceCodeMode = source
   }, source)
-  await page.getByRole('button', { name: 'AI 助手', exact: true }).click()
+  await page.getByRole('button', { name: /^AI 助手(?: \(.+\))?$/ }).click()
   await expect(page.getByRole('heading', { name:'一起把想法写好' })).toBeVisible()
 }
 
@@ -61,6 +61,27 @@ async function send(page: Page, text = 'polish') {
 async function markdown(page: Page) {
   return page.evaluate(async () => { const path='/src/stores/editor.ts'; return (await import(path)).useEditorStore().currentFile.markdown })
 }
+
+test('recovers from missing Secret Service by explicitly saving an unauthenticated local model', async ({ page }) => {
+  await page.addInitScript(() => { (window as any).__keychainUnavailable = true })
+  await setup(page)
+  await expect(page.locator('.agent-banner').first()).toContainText('无法访问系统凭据库')
+  await page.getByRole('button', { name: '模型设置', exact: true }).click()
+  await page.locator('#agent-provider').selectOption('ollama')
+  await page.locator('#agent-model').fill('local-tools-model')
+  await expect(page.locator('#agent-auth-mode')).toHaveValue('none')
+  await expect(page.locator('#agent-key')).toHaveCount(0)
+  await expect(page.locator('#agent-headers')).toHaveCount(0)
+  await page.getByRole('button', { name: '保存并测试', exact: true }).click()
+  await expect(page.locator('.agent-settings-feedback')).toContainText('连接成功')
+  const saved = await page.evaluate(() => (window as any).__agentConfigSave)
+  expect(saved.settings).toMatchObject({ authMode: 'none', baseUrl: 'http://localhost:11434/v1', model: 'local-tools-model' })
+  expect(saved.apiKey).toBeUndefined(); expect(saved.headers).toBeUndefined()
+  await page.locator('#agent-auth-mode').selectOption('system')
+  await expect(page.locator('#agent-key')).toBeVisible()
+  await page.getByRole('button', { name: '保存并测试', exact: true }).click()
+  await expect(page.locator('.agent-settings .agent-error')).toContainText('无法访问系统凭据库')
+})
 
 async function pictureData(page: Page) {
   return page.evaluate(() => {
@@ -173,7 +194,7 @@ for (const source of [false, true]) {
     await expect(page.locator('.agent-context-row label')).toContainText('当前文档')
     await select()
     await page.keyboard.press('Shift+ArrowLeft') // a fresh, shorter selection
-    await page.getByRole('button', { name: 'AI 助手', exact: true }).click()
+    await page.getByRole('button', { name: /^AI 助手(?: \(.+\))?$/ }).click()
     await page.keyboard.press('Control+Shift+A')
     await expect(page.locator('.agent-context-row label')).toContainText('选中内容')
     await send(page)
@@ -331,7 +352,7 @@ test('fits light/dark and narrow windows with selection context and per-document
   }
   await page.evaluate(async()=>{const path='/src/stores/editor.ts';(await import(path)).useEditorStore().newUntitledTab('another document')})
   await expect(page.locator('.agent-message')).toHaveCount(0)
-  await page.getByRole('button', { name:'AI 助手', exact:true }).click()
+  await page.getByRole('button', { name: /^AI 助手(?: \(.+\))?$/ }).click()
   await page.keyboard.press('Control+Shift+A')
   await expect(page.locator('.agent-panel')).toBeVisible()
 })

@@ -41,6 +41,15 @@ export const agentTransport = {
       return;
     }
     setTimeout(()=>{
+      if(request.messages.at(-1).content.startsWith('请按审阅意见重写修改项')){
+        const reviewed=request.messages.find(message=>message.content.includes('[User review feedback]'));
+        const feedback=JSON.parse(reviewed.content.split('[User review feedback]\\n')[1]);
+        const target=feedback.changes.find(change=>request.messages.at(-1).content.includes(change.id));
+        send({kind:'delta',text:'保留已接受的修改，按逐项意见继续。'});
+        if(target)send({kind:'proposal',proposal:{title:'按意见重写',changes:[{oldText:target.oldText,newText:'最后一段，表达更克制。'}]}});
+        send({kind:'done'});
+        return;
+      }
       if(request.messages.at(-1).content==='compare'){
         const reference=request.references[0];
         send({kind:'source',text:JSON.stringify({documentId:reference.documentId,startLine:1,endLine:1,label:'参考笔记依据',quote:reference.markdown.split('\\n')[0]})});
@@ -85,7 +94,7 @@ async function setup(page: Page, source: boolean) {
     editor.tabs=[tab]
     editor.sourceCodeMode=source
   }, source)
-  await page.getByRole('button', {name:'AI 助手',exact:true}).click()
+  await page.getByRole('button', { name: /^AI 助手(?: \(.+\))?$/ }).click()
 }
 
 async function markdown(page: Page) {
@@ -98,6 +107,32 @@ async function propose(page: Page) {
   await expect(page.locator('.agent-working')).toHaveCount(0)
   await expect(page.getByText('两处独立修改', {exact:true}).last()).toBeVisible()
 }
+
+test('sends item-level review feedback and rewrites only the requested rejected item', async ({page}) => {
+  await setup(page, true)
+  await propose(page)
+  const first = page.locator('.agent-change').nth(0), second = page.locator('.agent-change').nth(1)
+  const firstId = await first.getAttribute('data-change-id'), secondId = await second.getAttribute('data-change-id')
+  expect(firstId).not.toBe(secondId)
+  await first.getByRole('textbox', { name: '审阅意见（可选）' }).fill('保留这处扩写')
+  await first.getByRole('button', { name: '应用此处', exact: true }).click()
+  await second.getByRole('textbox', { name: '审阅意见（可选）' }).fill('保持克制，不要增加新事实')
+  await second.getByRole('button', { name: '忽略此处', exact: true }).click()
+  const accepted = await markdown(page)
+  await second.getByRole('button', { name: '按这个意见重写', exact: true }).click()
+  const request = await page.evaluate(() => (window as any).__workflowRequest)
+  expect(request.messages.at(-1).content).toContain(secondId)
+  expect(request.messages.at(-1).content).toContain('保持克制，不要增加新事实')
+  expect(request.context.markdown).toBe(accepted)
+  const feedback = JSON.parse(request.messages[1].content.split('[User review feedback]\n')[1])
+  expect(feedback.changes[0]).toMatchObject({ id: firstId, status: 'applied', reason: '保留这处扩写' })
+  expect(feedback.changes[1]).toMatchObject({ id: secondId, status: 'dismissed', oldText: '最后一段', reason: '保持克制，不要增加新事实' })
+  await expect(page.locator('.agent-working')).toHaveCount(0)
+  expect(await markdown(page)).toBe(accepted)
+  await page.setViewportSize({ width: 540, height: 800 })
+  expect(await page.locator('.agent-panel').evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true)
+  await page.screenshot({ path: 'output/agent-feedback/review-narrow.png' })
+})
 
 async function answer(page: Page) {
   await page.getByRole('textbox', {name:'发送给写作助手的消息'}).fill('answer')
@@ -324,7 +359,7 @@ test('opt-in history survives reload, exports, restores safely and deletes witho
   await page.evaluate(async()=>{
     const lp='/src/i18n/index.ts',pp='/src/stores/preferences.ts';(await import(lp)).setLocale('zh-CN');(await import(pp)).usePreferencesStore().language='zh-CN'
   })
-  await page.getByRole('button',{name:'AI 助手',exact:true}).click()
+  await page.getByRole('button', { name: /^AI 助手(?: \(.+\))?$/ }).click()
   await page.getByRole('button',{name:'历史对话',exact:true}).click()
   await expect(page.getByLabel('在本地保存对话',{exact:true})).toBeChecked()
   await page.locator('.agent-history-item').first().getByRole('button',{name:'恢复',exact:true}).click()
@@ -362,7 +397,7 @@ test('saved stopped summaries resume after reload without processing completed c
   await page.reload()
   await page.locator('.muya-host [contenteditable="true"]').waitFor()
   await page.evaluate(async()=>{const lp='/src/i18n/index.ts',pp='/src/stores/preferences.ts';(await import(lp)).setLocale('zh-CN');(await import(pp)).usePreferencesStore().language='zh-CN'})
-  await page.getByRole('button',{name:'AI 助手',exact:true}).click()
+  await page.getByRole('button', { name: /^AI 助手(?: \(.+\))?$/ }).click()
   await page.getByRole('button',{name:'历史对话',exact:true}).click()
   await page.locator('.agent-history-item').filter({hasText:'分章总结'}).getByRole('button',{name:'恢复',exact:true}).click()
   await page.getByRole('button',{name:'继续分章总结',exact:true}).click()

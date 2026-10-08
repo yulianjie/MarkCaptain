@@ -1,5 +1,6 @@
 /** Shared IPC contract and deterministic edit validation. */
-export interface AgentSettings { baseUrl: string; model: string }
+export type AgentAuthMode = 'system' | 'none'
+export interface AgentSettings { baseUrl: string; model: string; authMode?: AgentAuthMode }
 export interface AgentHeader { name: string; value: string }
 export interface AgentConfig extends AgentSettings { hasKey: boolean; hasHeaders: boolean }
 export interface AgentImage { name: string; dataUrl: string }
@@ -62,9 +63,9 @@ export interface ReviewedEdit extends AgentProposal {
   appliedMarkdown?: string
 }
 export type EditStatus = 'pending' | 'applied' | 'dismissed' | 'reverted'
-export interface ReviewedChange extends AgentChange { from: number; to: number; startLine: number; endLine: number; status: EditStatus }
+export interface ReviewedChange extends AgentChange { id: string; reason?: string; from: number; to: number; startLine: number; endLine: number; status: EditStatus }
 
-export function reviewProposal(snapshot: DocumentSnapshot, proposal: AgentProposal): ReviewedEdit {
+export function reviewProposal(snapshot: DocumentSnapshot, proposal: AgentProposal, proposalId: string = crypto.randomUUID()): ReviewedEdit {
   const { markdown, from, to } = snapshot
   if (!Number.isInteger(from) || !Number.isInteger(to) || from < 0 || to < from || to > markdown.length) throw new Error('agent:invalidEdit')
   if (typeof proposal.title !== 'string' || !proposal.title.trim() || new TextEncoder().encode(proposal.title).length > 300) throw new Error('agent:invalidEdit')
@@ -73,18 +74,26 @@ export function reviewProposal(snapshot: DocumentSnapshot, proposal: AgentPropos
   if (!Array.isArray(inputs) || !inputs.length || inputs.length > 32) throw new Error('agent:invalidEdit')
   const scope = markdown.slice(from, to)
   let bytes = 0
-  const changes: ReviewedChange[] = inputs.map(change => {
+  const changes: ReviewedChange[] = inputs.map((change, changeIndex) => {
     if (!change || typeof change.oldText !== 'string' || typeof change.newText !== 'string') throw new Error('agent:invalidEdit')
     const oldText = change.oldText, newText = change.newText.replace(/\r\n?/g, '\n')
     bytes += new TextEncoder().encode(newText).length
     const index = oldText ? scope.indexOf(oldText) : scope.length
     if (index < 0 || oldText && scope.indexOf(oldText, index + 1) !== -1 || oldText === newText || bytes > 240_000) throw new Error('agent:invalidEdit')
     const start = from + index, end = start + oldText.length
-    return { oldText, newText, from: start, to: end, startLine: markdown.slice(0, start).split('\n').length, endLine: markdown.slice(0, Math.max(start, end - 1)).split('\n').length, status: 'pending' }
+    return { id: `${proposalId}:${changeIndex + 1}`, oldText, newText, from: start, to: end, startLine: markdown.slice(0, start).split('\n').length, endLine: markdown.slice(0, Math.max(start, end - 1)).split('\n').length, status: 'pending' }
   })
   const ordered = [...changes].sort((a, b) => a.from - b.from)
   if (ordered.some((change, i) => i > 0 && (change.from < ordered[i - 1]!.to || change.from === ordered[i - 1]!.from))) throw new Error('agent:invalidEdit')
   return { title: proposal.title, snapshot, changes, status: 'pending' }
+}
+
+/** Exact, JSON-escaped feedback: prose and quotes cannot break the item boundaries. */
+export function reviewFeedback(edit: ReviewedEdit): string {
+  return '\n[User review feedback]\n' + JSON.stringify({ title: edit.title, changes: edit.changes.map(change => ({
+    id: change.id, status: change.status, oldText: change.oldText, newText: change.newText,
+    ...(change.reason?.trim() ? { reason: change.reason.trim() } : {}),
+  })) })
 }
 
 /** Always compose from the immutable original so earlier accepted changes cannot shift later targets. */
@@ -134,10 +143,10 @@ export function markdownSelection(markdown: string, cursor: unknown, allowCaret 
 }
 
 export const AGENT_PRESETS = [
-  { id: 'deepseek', name: 'DeepSeek', baseUrl: 'https://api.deepseek.com', model: 'deepseek-flash' },
-  { id: 'openai', name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', model: '' },
-  { id: 'ollama', name: 'Ollama', baseUrl: 'http://localhost:11434/v1', model: '' },
-  { id: 'custom', name: 'custom', baseUrl: '', model: '' },
+  { id: 'deepseek', name: 'DeepSeek', baseUrl: 'https://api.deepseek.com', model: 'deepseek-flash', authMode: 'system' },
+  { id: 'openai', name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', model: '', authMode: 'system' },
+  { id: 'ollama', name: 'Ollama', baseUrl: 'http://localhost:11434/v1', model: '', authMode: 'none' },
+  { id: 'custom', name: 'custom', baseUrl: '', model: '', authMode: 'system' },
 ] as const
 
 /** Parse one HTTP header per line without ever placing saved values in ordinary config. */

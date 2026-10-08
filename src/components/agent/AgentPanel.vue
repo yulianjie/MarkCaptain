@@ -31,7 +31,7 @@ const copied = ref('')
 let copyTimer: ReturnType<typeof setTimeout> | undefined
 const panelWidth = ref(380)
 const selected = computed(() => agent.selection?.tabId === editor.currentFileId ? agent.selection : null)
-const needsKey = computed(() => agent.config && !agent.config.hasKey && !/^http:\/\/(localhost|127\.|\[::1\])/.test(agent.config.baseUrl))
+const needsKey = computed(() => agent.config && agent.config.authMode !== 'none' && !agent.config.hasKey && !agent.config.hasHeaders && !/^http:\/\/(localhost|127\.|\[::1\])/.test(agent.config.baseUrl))
 const attachmentName = computed(() => {
   if (!agent.includeDocument || !editor.currentFile) return t('agent.noAttachment')
   return `${selected.value ? t('agent.selection') : t('agent.document')} · ${editor.currentFile.filename}`

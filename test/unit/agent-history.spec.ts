@@ -70,6 +70,20 @@ describe('Local transcript snapshots', () => {
     expect(transport.historyWrite.mock.calls.at(-1)?.[0].id).toBe(old)
     agent.$dispose()
   })
+  it('retains review IDs and reasons and migrates legacy item IDs deterministically', () => {
+    const chat = blank()
+    const edit = reviewProposal(snapshot, { title: 'Greeting', oldText: 'hello', newText: 'Hello' }, 'a')
+    edit.changes[0]!.status = 'dismissed'; edit.changes[0]!.reason = 'Keep my voice'
+    chat.messages.push({ id: 'a', role: 'assistant', content: '', tools: [], edit })
+    const record = packHistory(metadata(), chat, snapshot)
+    const restored = hydrateHistory(record).chat.messages[0]!.edit!
+    expect(restored.changes[0]).toMatchObject({ id: 'a:1', status: 'dismissed', reason: 'Keep my voice' })
+    const legacy = JSON.parse(JSON.stringify(record))
+    delete legacy.data.chat.messages[0].edit.changes[0].id
+    expect(hydrateHistory(legacy).chat.messages[0]!.edit!.changes[0]!.id).toBe('a:1')
+    legacy.data.chat.messages[0].edit.changes[0].reason = 'x'.repeat(1001)
+    expect(() => hydrateHistory(legacy)).toThrow('agent:historyInvalid')
+  })
   it('restores changed documents into independent tabs, never replacing unsaved text', async () => {
     const editor = useEditorStore(), agent = useAgentStore(), tab = editor.newUntitledTab('live unsaved')
     tab.pathname = 'C:\\notes\\test.md'

@@ -13,11 +13,21 @@ use url::Url;
 
 static CONFIG_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 
+#[derive(Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum AuthMode {
+    #[default]
+    System,
+    None,
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Settings {
     pub base_url: String,
     pub model: String,
+    #[serde(default)]
+    pub auth_mode: AuthMode,
 }
 
 impl Default for Settings {
@@ -25,6 +35,7 @@ impl Default for Settings {
         Self {
             base_url: "https://api.deepseek.com".into(),
             model: "deepseek-flash".into(),
+            auth_mode: AuthMode::System,
         }
     }
 }
@@ -107,12 +118,22 @@ fn credentials_from_secret(secret: String) -> Credentials {
     }
 }
 
-fn credentials_for(settings: &Settings) -> AppResult<Credentials> {
-    match entry(settings)?.get_password() {
+pub(super) fn credentials_for(settings: &Settings) -> AppResult<Credentials> {
+    credentials_for_with(settings, || match entry(settings)?.get_password() {
         Ok(secret) => Ok(credentials_from_secret(secret)),
         Err(keyring::Error::NoEntry) => Ok(Credentials::default()),
         Err(_) => Err(failure("keychain")),
+    })
+}
+
+fn credentials_for_with(
+    settings: &Settings,
+    read: impl FnOnce() -> AppResult<Credentials>,
+) -> AppResult<Credentials> {
+    if settings.auth_mode == AuthMode::None {
+        return Ok(Credentials::default());
     }
+    read()
 }
 
 fn validate_headers(headers: Vec<CustomHeader>) -> AppResult<Vec<CustomHeader>> {
@@ -156,6 +177,9 @@ fn validate_headers(headers: Vec<CustomHeader>) -> AppResult<Vec<CustomHeader>> 
 }
 
 fn write_credentials(settings: &Settings, credentials: &Credentials) -> AppResult<()> {
+    if settings.auth_mode == AuthMode::None {
+        return Ok(());
+    }
     let entry = entry(settings)?;
     if credentials.api_key.is_none() && credentials.headers.is_empty() {
         return match entry.delete_credential() {
@@ -187,7 +211,39 @@ pub fn save(
     let _guard = CONFIG_LOCK.lock();
     let settings = validate(settings)?;
     let config_path = path(app)?;
-    let mut credentials = credentials_for(&settings)?;
+    let credentials = update_credentials_with(
+        &settings,
+        api_key,
+        headers,
+        || credentials_for(&settings),
+        |credentials| write_credentials(&settings, credentials),
+    )?;
+    atomic_write::write(&config_path, &serde_json::to_vec_pretty(&settings)?)
+        .map_err(|_| failure("configWrite"))?;
+    Ok(ConfigView {
+        settings,
+        has_key: credentials.api_key.is_some(),
+        has_headers: !credentials.headers.is_empty(),
+    })
+}
+
+fn update_credentials_with(
+    settings: &Settings,
+    api_key: Option<String>,
+    headers: Option<Vec<CustomHeader>>,
+    read: impl FnOnce() -> AppResult<Credentials>,
+    write: impl FnOnce(&Credentials) -> AppResult<()>,
+) -> AppResult<Credentials> {
+    if settings.auth_mode == AuthMode::None {
+        // Reject secret input rather than silently dropping it or persisting it on disk.
+        if api_key.is_some_and(|key| !key.is_empty())
+            || headers.is_some_and(|headers| !headers.is_empty())
+        {
+            return Err(failure("noAuthCredentials"));
+        }
+        return Ok(Credentials::default());
+    }
+    let mut credentials = read()?;
     if let Some(secret) = api_key {
         if secret.len() > 4096 || secret.chars().any(char::is_control) {
             return Err(failure("invalidKey"));
@@ -202,14 +258,8 @@ pub fn save(
         credentials.headers = validate_headers(headers)?;
     }
     credentials.version = 1;
-    write_credentials(&settings, &credentials)?;
-    atomic_write::write(&config_path, &serde_json::to_vec_pretty(&settings)?)
-        .map_err(|_| failure("configWrite"))?;
-    Ok(ConfigView {
-        settings,
-        has_key: credentials.api_key.is_some(),
-        has_headers: !credentials.headers.is_empty(),
-    })
+    write(&credentials)?;
+    Ok(credentials)
 }
 
 pub fn credentials(app: &AppHandle) -> AppResult<(Settings, Credentials)> {
@@ -223,6 +273,83 @@ pub fn credentials(app: &AppHandle) -> AppResult<(Settings, Credentials)> {
 mod tests {
     use super::*;
     #[test]
+    fn no_auth_never_calls_an_unavailable_credential_store() {
+        let settings = Settings {
+            base_url: "http://localhost:11434/v1".into(),
+            model: "local".into(),
+            auth_mode: AuthMode::None,
+        };
+        let credentials =
+            credentials_for_with(&settings, || panic!("credential read attempted")).unwrap();
+        assert!(credentials.api_key.is_none() && credentials.headers.is_empty());
+        for (key, headers) in [(None, None), (Some(String::new()), Some(vec![]))] {
+            let saved = update_credentials_with(
+                &settings,
+                key,
+                headers,
+                || panic!("credential read attempted"),
+                |_| panic!("credential write/delete attempted"),
+            )
+            .unwrap();
+            assert!(saved.api_key.is_none() && saved.headers.is_empty());
+        }
+        let serialized = serde_json::to_value(&settings).unwrap();
+        assert_eq!(
+            serialized,
+            serde_json::json!({"baseUrl":"http://localhost:11434/v1","model":"local","authMode":"none"})
+        );
+        assert!(update_credentials_with(
+            &settings,
+            Some("secret".into()),
+            None,
+            || panic!("read"),
+            |_| panic!("write")
+        )
+        .is_err());
+        assert!(update_credentials_with(
+            &settings,
+            None,
+            Some(vec![CustomHeader {
+                name: "x-key".into(),
+                value: "secret".into()
+            }]),
+            || panic!("read"),
+            |_| panic!("write")
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn authenticated_mode_fails_closed_and_old_settings_keep_it() {
+        let settings: Settings = serde_json::from_value(
+            serde_json::json!({"baseUrl":"https://api.deepseek.com","model":"test"}),
+        )
+        .unwrap();
+        assert!(settings.auth_mode == AuthMode::System);
+        assert!(credentials_for_with(&settings, || Err(failure("keychain"))).is_err());
+        assert!(update_credentials_with(
+            &settings,
+            Some("secret".into()),
+            None,
+            || Err(failure("keychain")),
+            |_| panic!("must not write after failed read")
+        )
+        .is_err());
+        assert!(update_credentials_with(
+            &settings,
+            Some("secret".into()),
+            None,
+            || Ok(Credentials::default()),
+            |_| Err(failure("keychain"))
+        )
+        .is_err());
+        assert!(serde_json::from_value::<Settings>(
+            serde_json::json!({"baseUrl":"http://localhost","model":"local","authMode":"invalid"})
+        )
+        .is_err());
+    }
+
+    #[test]
     fn urls_accept_http_and_https_without_embedded_secrets() {
         for base_url in [
             "https://user:pass@example.com",
@@ -234,7 +361,8 @@ mod tests {
         ] {
             assert!(validate(Settings {
                 base_url: base_url.into(),
-                model: "model".into()
+                model: "model".into(),
+                ..Settings::default()
             })
             .is_err());
         }
@@ -247,7 +375,8 @@ mod tests {
         ] {
             assert!(validate(Settings {
                 base_url: base_url.into(),
-                model: "model".into()
+                model: "model".into(),
+                ..Settings::default()
             })
             .is_ok());
         }

@@ -11,8 +11,8 @@ import { MAX_MESSAGE_IMAGES, readAgentImage, validateImageBudget } from '@/servi
 import { bus } from '@/bus'
 import { createSearchRevealRequest } from '@/services/search-reveal'
 import {
-  markdownSelection, reviewProposal, reviewSource, reviewedMarkdown,
-  type AgentConfig, type AgentEvent, type AgentHeader, type AgentImage, type AgentSettings, type AgentSkill, type AgentSource, type DocumentSnapshot, type ReviewedEdit, type ReferenceSnapshot,
+  markdownSelection, reviewProposal, reviewSource, reviewedMarkdown, reviewFeedback,
+  type AgentConfig, type AgentEvent, type AgentHeader, type AgentImage, type AgentMessage, type AgentSettings, type AgentSkill, type AgentSource, type DocumentSnapshot, type ReviewedEdit, type ReferenceSnapshot,
 } from '@/services/agent'
 
 export interface ChatItem {
@@ -264,7 +264,7 @@ export const useAgentStore = defineStore('agent', () => {
     }
     if (event.kind === 'proposal' && event.proposal && active.snapshot) {
       try {
-        message.edit = reviewProposal(active.snapshot, event.proposal)
+        message.edit = reviewProposal(active.snapshot, event.proposal, message.id)
       } catch { message.error = t('agent.errors.invalidEdit') }
     }
     if (['done', 'error', 'cancelled'].includes(event.kind)) {
@@ -301,6 +301,7 @@ export const useAgentStore = defineStore('agent', () => {
     const skillIds = chat.skillId ? [chat.skillId] : []
     let attached: DocumentSnapshot | null
     let reading: DocumentSnapshot | null
+    let messages: AgentMessage[]
     try {
       validateReferences(references)
       attached = retryContext === undefined ? snapshot() : retryContext
@@ -309,20 +310,21 @@ export const useAgentStore = defineStore('agent', () => {
       if (reading && (reading.tabId !== attached?.tabId || reading.markdown !== attached.markdown)) throw new Error('agent:selectionChanged')
       validateImageBudget([...chat.messages.flatMap(m => m.images ?? []), ...chat.images])
       if (chat.messages.length >= 22) throw new Error('agent:historyFull')
-      const total = new TextEncoder().encode(prompt + chat.messages.map(m => m.content).join('')).length
+      messages = chat.messages.filter(m => !m.error && !m.cancelled).map(m => ({
+        role: m.role,
+        content: m.content + (m.imagesOmitted ? '\n[Images from this message were excluded from local history and are no longer available. Ask the user to reattach them if needed.]' : '') + (m.edit ? reviewFeedback(m.edit) : ''),
+        ...(m.images?.length ? { images: m.images.map(image => ({ ...image })) } : {}),
+      }))
+      messages.push({ role: 'user', content: prompt.trim(), ...(chat.images.length ? { images: chat.images.map(image => ({ ...image })) } : {}) })
+      const total = messages.reduce((sum, m) => sum + new TextEncoder().encode(m.content).length, 0)
       const documentBytes = new TextEncoder().encode(reading?.markdown.slice(reading.from, reading.to) ?? '').length
-      if (total > 220_000 || new TextEncoder().encode(prompt).length > 80_000 || documentBytes > 2_000_000) throw new Error('agent:contextTooLarge')
+      if (total > 220_000 || messages.some(m => new TextEncoder().encode(m.content).length > 80_000) || documentBytes > 2_000_000) throw new Error('agent:contextTooLarge')
     } catch (cause) { error.value = agentError(cause); return }
     const requestId = crypto.randomUUID()
     const messageId = crypto.randomUUID()
     run.value = { id: requestId, key: currentKey.value, messageId, snapshot: attached, readSnapshot: reading, references }
     chat.messages.push({ id: crypto.randomUUID(), role: 'user', content: prompt.trim(), tools: [], images: chat.images.map(image => ({ ...image })), contextSnapshot: attached, readSnapshot: reading, references,
       attachment: attached ? `${attached.name} · ${reading?.from !== attached.from || reading?.to !== attached.to ? t('agent.referenceDocument') : attached.from !== 0 || attached.to !== attached.markdown.length ? t('agent.selection') : t('agent.document')}` : t('agent.noAttachment') })
-    const messages = chat.messages.filter(m => !m.error && !m.cancelled).map(m => ({
-      role: m.role,
-      content: m.content + (m.imagesOmitted ? '\n[Images from this message were excluded from local history and are no longer available. Ask the user to reattach them if needed.]' : '') + (m.edit ? `\n[Document edit status: ${m.edit.status}. Proposal: ${m.edit.title}]` : ''),
-      ...(m.images?.length ? { images: m.images.map(image => ({ ...image })) } : {}),
-    }))
     chat.messages.push({ id: messageId, role: 'assistant', content: '', tools: [], targetTabId: editor.currentFileId ?? undefined, answerTarget: currentAnswerTarget() })
     chat.draft = ''
     chat.images = []
@@ -501,6 +503,26 @@ export const useAgentStore = defineStore('agent', () => {
     edit.status = statuses.size === 1 ? edit.changes[0]!.status : 'partial'
   }
 
+  function setReviewReason(edit: ReviewedEdit, index: number, reason: string) {
+    if (busy.value || edit.locked) return
+    const change = edit.changes[index]
+    if (change) change.reason = reason.slice(0, 1000)
+  }
+
+  async function rewrite(edit: ReviewedEdit, index: number) {
+    if (busy.value || edit.locked || conversation.value.draft.trim() || conversation.value.images.length) return
+    const change = edit.changes[index]
+    if (!change || change.status === 'applied') return
+    const tab = editor.currentFile
+    if (!tab || tab.id !== edit.snapshot.tabId || tab.markdown !== (edit.appliedMarkdown ?? edit.snapshot.markdown)) {
+      error.value = t('agent.errors.conflict'); return
+    }
+    const delta = edit.changes.reduce((sum, c) => sum + (c.status === 'applied' ? c.newText.length - c.oldText.length : 0), 0)
+    const attached = { ...edit.snapshot, markdown: tab.markdown, to: edit.snapshot.to + delta }
+    const reading = referenceDocument.value ? { ...attached, from: 0, to: tab.markdown.length } : attached
+    await send(t('agent.rewritePrompt', { id: change.id, reason: change.reason?.trim() || t('agent.rewriteDefault') }), attached, reading)
+  }
+
   function apply(edit: ReviewedEdit, index?: number) {
     if (busy.value || edit.locked) return
     const pending = edit.changes.map((change, i) => change.status === 'pending' && (index === undefined || i === index) ? i : -1).filter(i => i >= 0)
@@ -560,5 +582,5 @@ export const useAgentStore = defineStore('agent', () => {
 
   return { ...history, addReferenceTab, chooseReferences, flushForClose, visible, settingsOpen, skillsOpen, skills, skillsLoading, skillsError, loadSkills, changeSkills, config, loadingConfig, configError, error, includeDocument, referenceDocument, selection, conversation,
     busy, runningHere, runningKey, stopping, run, toggle, loadConfig, saveConfig, attachSelection, clearSelection, addImages, send, summarizeChapters, stop, clear, apply, dismiss, revert, retry,
-    captureAnswerTarget, canUseAnswer, useAnswer, locateSource }
+    captureAnswerTarget, canUseAnswer, useAnswer, locateSource, setReviewReason, rewrite }
 })

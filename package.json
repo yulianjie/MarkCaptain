@@ -1,6 +1,6 @@
 {
   "name": "marktext-rs",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "private": true,
   "description": "MarkText rewritten with Tauri 2 + Vue 3 + Rust",
   "type": "module",

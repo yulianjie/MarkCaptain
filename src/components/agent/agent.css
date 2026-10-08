@@ -43,6 +43,8 @@
 .agent-markdown :is(th,td) { border: 1px solid var(--mt-border); padding: 4px 8px; }
 .agent-edit { border: 1px solid var(--mt-border); border-radius: 8px; background: var(--mt-bg); padding: 12px; margin-top: 16px; }
 .agent-edit strong { display: block; font-weight: 600; overflow-wrap: anywhere; }
+.agent-review-reason { display: block; margin-top: 10px; font-size: 11px; color: var(--mt-fg-muted); }
+.agent-review-reason textarea { display: block; width: 100%; box-sizing: border-box; margin-top: 5px; padding: 7px 8px; border: 1px solid var(--mt-border); border-radius: 6px; background: var(--mt-bg); color: var(--mt-fg); font: inherit; line-height: 1.5; resize: vertical; }
 .agent-edit summary { font-size: 11px; color: var(--mt-fg-muted); cursor: pointer; margin-top: 12px; }
 .agent-diff-label { font-size: 10px; color: var(--mt-fg-muted); margin-top: 12px; }
 .agent-edit pre { margin: 5px 0 0; padding: 8px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 260px; overflow-y: auto; font: 12px/1.7 ui-monospace, 'Cascadia Code', 'Microsoft YaHei', monospace; }

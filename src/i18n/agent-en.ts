@@ -1,4 +1,7 @@
 export default {
+  reviewReason: 'Review comment (optional)', reviewReasonPlaceholder: 'Why accept, reject or revert, or how should this be rewritten?',
+  rewrite: 'Rewrite with this feedback', rewriteDefault: 'Please propose a different revision.',
+  rewritePrompt: 'Rewrite change {id} using this review feedback: {reason}. Use the current document attached to this turn and preserve accepted changes. Do not repeat other rejected or reverted changes. Propose a new revision for review.',
   history: { title: 'Conversation history', enable: 'Save conversations locally', detail: 'Optional local history. Images are excluded. Turning this off stops new saves; existing history remains available until deleted. Up to 100 conversations / 128 MB.', search: 'Search conversation titles', empty: 'No saved conversations', restore: 'Restore', export: 'Export Markdown', delete: 'Delete', restored: 'Restored from local history. Archived edits are read-only; unchanged chapter summaries can resume.', locked: 'Archived review · editing and undo are disabled', imagesOmitted: 'Images were not saved. Attach them again before asking image-dependent questions.' },
   references: { title: 'Reference documents', detail: 'Read-only snapshots, loaded on demand. Up to 8 files, 2 MB each, 4 MB total. Only the current document can be edited.', openTab: 'Attach an open tab', files: 'Choose Markdown files', reading: 'Reading reference files…', remove: 'Remove reference {name}' },
 
@@ -52,10 +55,12 @@ export default {
     },
   },
   settings: {
+    authMode: 'Authentication mode', authSystem: 'OS credential store', authNone: 'Unauthenticated local service',
+    authNoneHelp: 'Does not access the OS credential store or send keys or custom headers. For services such as unauthenticated Ollama; Linux Secret Service is not required. Previously saved credentials remain in the OS store.',
     title: 'Model settings', back: 'Back to conversation', description: 'Bring your own model service. Start with DeepSeek, a compatible API, or local Ollama.',
     provider: 'Service preset', custom: 'Custom compatible service', baseUrl: 'API base URL', model: 'Model name', modelPlaceholder: 'Model ID provided by your service',
     urlHelp: 'HTTP or HTTPS base URL, e.g. https://api.deepseek.com, without /chat/completions. HTTP is unencrypted; use it only on a network you trust.',
-    keySaved: 'Saved', keepKey: 'Leave blank to keep the saved key', keyPlaceholder: 'API key; optional for local Ollama',
+    keySaved: 'Saved', keepKey: 'Leave blank to keep the saved key', keyPlaceholder: 'Service API key',
     keyHelp: 'Keys stay in the OS credential store, outside ordinary settings. Changing the URL never transfers the previous service’s key.',
     headers: 'Custom request headers', headersSaved: 'Saved', keepHeaders: 'Leave blank to keep the saved headers', headersPlaceholder: 'One per line, for example:\nX-Tenant-ID: tenant-1\nAuthorization: Token xxx',
     headersHelp: 'Enter “Name: value” on each line, up to 32. Values are stored with the key in the OS credential store; a custom Authorization header overrides the Bearer key.',
@@ -65,6 +70,7 @@ export default {
     privacy: 'Sending shares the conversation, attached images, document metadata, and enabled skill names and descriptions with your service. Passages and skill instructions load on demand. Connection tests send only a test message.',
   },
   errors: {
+    noAuthCredentials: 'Unauthenticated mode cannot contain keys or custom headers. Choose OS credential store authentication if needed.',
     historyRead: 'Could not read local conversation history.', historyWrite: 'Could not save local conversation history.', historyInvalid: 'This saved conversation is invalid or unsupported.', historyConflict: 'This conversation was changed or deleted in another window. Reopen history to refresh.', historyDisabled: 'Local history was disabled in another window.', historyLimit: 'History storage limit reached. Export and delete older conversations, then retry.', historyImages: 'Images were excluded from history. Attach them again and send a new message.', referenceLimit: 'Attach up to 8 references, at most 2 MB each and 4 MB combined.', referenceRead: 'This reference could not be decoded. Check its text encoding.',
 
     summaryEmpty: 'The attachment has no text to summarize.', summaryTooMany: 'This document needs too many chunks. Split it into smaller documents.', summaryIncomplete: 'Some chunk notes are missing. Restart the chapter summary.', summaryNoAttachment: 'Attach a document or selection to summarize.', summaryChanged: 'The document or attached range changed. Start a new chapter summary.', summaryOutputTooLarge: 'The model returned oversized notes. Resume to retry this part; completed parts are retained.',
@@ -81,7 +87,7 @@ export default {
     unknown: 'Could not complete this action. Check model settings and try again.', desktopOnly: 'AI connections require the MarkText desktop app.',
     invalidUrl: 'Use an HTTP or HTTPS base URL without a username, password, query, fragment or /chat/completions.',
     invalidModel: 'Enter a valid model name.', invalidKey: 'Invalid key format. Please enter it again.', invalidHeaders: 'Headers are invalid, duplicated, or include transport fields the app cannot override.',
-    keychain: 'Cannot access the OS credential store. Unlock or enable it and try again.', configRead: 'Cannot read model settings. Save them again.', configWrite: 'Cannot save model settings. Check local file permissions.',
+    keychain: 'Cannot access the OS credential store. Unlock or enable it, or choose “Unauthenticated local service” in settings for a model that needs no authentication.', configRead: 'Cannot read model settings. Save them again.', configWrite: 'Cannot save model settings. Check local file permissions.',
     network: 'Connection failed or was interrupted. Check your network and API URL.', timeout: 'The model timed out. Retry or choose a faster model.',
     auth: 'Authentication failed. Check this service’s API key and access permissions.', rateLimit: 'Rate limit or quota reached. Try again later.', endpoint: 'API endpoint or model not found. Check the URL and model name.',
     modelRequest: 'The service rejected the request. Check that the model supports Chat Completions, streaming and tools.', provider: 'The model service could not complete the request. Try again later.',

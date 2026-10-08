@@ -90,11 +90,21 @@ export function hydrateHistory(record: HistoryRecord): { chat: HistoryChat; docu
     if (object(value.edit)) {
       const edit = value.edit
       if (!validSnapshot(edit.snapshot) || typeof edit.title !== 'string' || !Array.isArray(edit.changes)) throw invalid()
-      const reviewed = reviewProposal(edit.snapshot, { title: edit.title, changes: edit.changes as never })
+      const reviewed = reviewProposal(edit.snapshot, { title: edit.title, changes: edit.changes as never }, message.id)
+      const ids = new Set<string>()
       for (const [index, change] of reviewed.changes.entries()) {
         const previous = edit.changes[index]
         if (!object(previous) || !['pending', 'applied', 'dismissed', 'reverted'].includes(String(previous.status))) throw invalid()
         change.status = previous.status as typeof change.status
+        if (previous.id !== undefined) {
+          if (typeof previous.id !== 'string' || !previous.id || previous.id.length > 160 || ids.has(previous.id)) throw invalid()
+          change.id = previous.id
+        }
+        ids.add(change.id)
+        if (previous.reason !== undefined) {
+          if (typeof previous.reason !== 'string' || previous.reason.length > 1000) throw invalid()
+          change.reason = previous.reason
+        }
       }
       const states = new Set(reviewed.changes.map(change => change.status))
       reviewed.status = states.size === 1 ? reviewed.changes[0]!.status : 'partial'
