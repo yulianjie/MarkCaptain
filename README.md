@@ -4,7 +4,7 @@
 
 > More than a Markdown editor: a modern, local-first writing workspace with an integrated Agent that helps you think, write, review, and revise without taking control of your document.
 
-[Download the latest release](https://github.com/yulianjie/MarkCaptain/releases/latest) · [User guide](https://github.com/yulianjie/MarkCaptain/wiki) · [Writing Agent guide](docs/AI_AGENT.md) · [Release notes](docs/releases/v0.7.0.md)
+[Download the latest release](https://github.com/yulianjie/MarkCaptain/releases/latest) · [User guide](https://github.com/yulianjie/MarkCaptain/wiki) · [Writing Agent guide](docs/AI_AGENT.md) · [Release notes](docs/releases/v0.8.0.md)
 
 ![MarkCaptain editor with outline, tabs, and live Markdown preview](img/markcaptain-view-en.png)
 

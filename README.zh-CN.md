@@ -4,7 +4,7 @@
 
 > 不仅是 Markdown 编辑器：这是一个现代、本地优先的智能写作空间；内置 Agent，帮助你思考、写作、审阅和修改，但不会越过你直接控制文档。
 
-[下载最新版本](https://github.com/yulianjie/MarkCaptain/releases/latest) · [使用指南](https://github.com/yulianjie/MarkCaptain/wiki) · [写作 Agent 指南](docs/AI_AGENT.md) · [v0.7.0 发布说明](docs/releases/v0.7.0.md)
+[下载最新版本](https://github.com/yulianjie/MarkCaptain/releases/latest) · [使用指南](https://github.com/yulianjie/MarkCaptain/wiki) · [写作 Agent 指南](docs/AI_AGENT.md) · [v0.8.0 发布说明](docs/releases/v0.8.0.md)
 
 ![带文章目录、多标签页与实时 Markdown 预览的 MarkCaptain 编辑器](img/markcaptain-view.png)
 
