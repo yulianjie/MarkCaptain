@@ -33,6 +33,14 @@ export const agentTransport = {
   start: async(request)=>{
     window.__workflowRequest=request;
     const send=event=>handler?.({requestId:request.requestId,...event});
+    if(request.messages.at(-1).content==='continue after undo' || request.messages.at(-1).content==='continue after redo' || request.messages.at(-1).content==='continue after large patch'){
+      setTimeout(()=>{send({kind:'delta',text:'按当前正文和逐项审阅状态继续。'});send({kind:'done'})},20);
+      return;
+    }
+    if(request.messages.at(-1).content==='large patch'){
+      setTimeout(()=>{send({kind:'proposal',proposal:{title:'大修改建议',oldText:'第一段 🌱',newText:'大补丁正文 🌱。'.repeat(6000)}});send({kind:'done'})},20);
+      return;
+    }
     if(request.readOnly){
       window.__summaryRequests??=[];
       window.__summaryRequests.push(request);
@@ -142,6 +150,55 @@ async function answer(page: Page) {
 }
 
 for (const source of [false, true]) {
+  test(`ordinary Ctrl+Z and redo update review feedback in ${source ? 'source' : 'wysiwyg'}`, async ({ page }) => {
+    await setup(page, source)
+    const original = await markdown(page)
+    await propose(page)
+    await page.getByRole('button', { name: '应用此处', exact: true }).first().click()
+    await page.getByRole('button', { name: '忽略此处', exact: true }).click()
+    const accepted = await markdown(page)
+    const input = source ? page.locator('.source-pane .cm-content') : page.locator('.muya-host [contenteditable="true"]').first()
+    await input.click()
+    await page.keyboard.press('Control+z')
+    await expect.poll(() => markdown(page)).toBe(original)
+    await expect(page.locator('.agent-change').first()).toContainText('已撤回')
+    await page.getByRole('textbox', { name: '发送给写作助手的消息' }).fill('continue after undo')
+    await page.getByRole('button', { name: '发送', exact: true }).click()
+    await expect(page.locator('.agent-working')).toHaveCount(0)
+    let request = await page.evaluate(() => (window as any).__workflowRequest)
+    let feedback = JSON.parse(request.messages[1].content.split('[User review feedback]\n')[1])
+    expect(feedback.changes.map((c: any) => c.status)).toEqual(['reverted', 'dismissed'])
+    await input.click()
+    await page.keyboard.press('Control+Shift+Z')
+    await expect.poll(() => markdown(page)).toBe(accepted)
+    await expect(page.locator('.agent-change').first()).toContainText('已应用')
+    await page.getByRole('textbox', { name: '发送给写作助手的消息' }).fill('continue after redo')
+    await page.getByRole('button', { name: '发送', exact: true }).click()
+    await expect(page.locator('.agent-working')).toHaveCount(0)
+    request = await page.evaluate(() => (window as any).__workflowRequest)
+    feedback = JSON.parse(request.messages[1].content.split('[User review feedback]\n')[1])
+    expect(feedback.changes.map((c: any) => c.status)).toEqual(['applied', 'dismissed'])
+  })
+  test(`large patches retain a usable conversation in ${source ? 'source' : 'wysiwyg'}`, async ({ page }) => {
+    await setup(page, source)
+    const original = await markdown(page)
+    await page.getByRole('textbox', { name: '发送给写作助手的消息' }).fill('large patch')
+    await page.getByRole('button', { name: '发送', exact: true }).click()
+    await expect(page.getByText('大修改建议', { exact: true })).toBeVisible()
+    await page.getByRole('button', { name: '应用修改', exact: true }).click()
+    await expect.poll(() => markdown(page)).not.toBe(original)
+    const accepted = await markdown(page)
+    await page.getByRole('textbox', { name: '发送给写作助手的消息' }).fill('continue after large patch')
+    await page.getByRole('button', { name: '发送', exact: true }).click()
+    await expect(page.locator('.agent-working')).toHaveCount(0)
+    const request = await page.evaluate(() => (window as any).__workflowRequest)
+    const feedback = JSON.parse(request.messages[1].content.split('[User review feedback]\n')[1])
+    expect(feedback.changes[0]).toMatchObject({ status: 'applied', newTextTruncated: true })
+    expect(request.reviewChanges[0].newText.length).toBeGreaterThan(40_000)
+    expect(new TextEncoder().encode(request.messages[1].content).length).toBeLessThan(2_000)
+    await expect(page.locator('.agent-banner')).toContainText('精简反馈')
+    expect(await markdown(page)).toBe(accepted)
+  })
   test(`independent review applies disjoint Unicode changes and undoes the batch in ${source ? 'source' : 'wysiwyg'}`, async ({page})=>{
     await setup(page,source)
     const original=await markdown(page)

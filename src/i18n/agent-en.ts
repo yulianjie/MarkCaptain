@@ -1,4 +1,5 @@
 export default {
+  reviewDocumentChanged: 'The document changed. Previously accepted edits need to be checked against the current text.', reviewUnverified: 'Previously accepted · unverified', feedbackCompacted: 'This request uses compact feedback or excerpts of earlier replies. Full content stays local; patch details can be read by ID in pages.', reviewTool: 'Read review patch details',
   reviewReason: 'Review comment (optional)', reviewReasonPlaceholder: 'Why accept, reject or revert, or how should this be rewritten?',
   rewrite: 'Rewrite with this feedback', rewriteDefault: 'Please propose a different revision.',
   rewritePrompt: 'Rewrite change {id} using this review feedback: {reason}. Use the current document attached to this turn and preserve accepted changes. Do not repeat other rejected or reverted changes. Propose a new revision for review.',

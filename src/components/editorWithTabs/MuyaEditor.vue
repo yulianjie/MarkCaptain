@@ -45,6 +45,7 @@ import {
 import { applyPreferencesToMuya } from '@/services/muya-preferences-applier'
 import { effectiveThemeId } from '@/services/preferences-applier'
 import { normalizeMarkdown } from '@/services/trailing-newline'
+import { installMuyaContentHistory, stepMuyaHistory } from '@/services/muya-history'
 import { setFormatMenuState } from '@/services/tauri-invoke'
 import { spellchecker } from '@/services/spellchecker'
 import {
@@ -226,8 +227,8 @@ function handleEditorContextMenu(muya: any, event: MouseEvent, selection: Contex
 
   const restore = () => restoreContext(muya, cursor, tabId)
   const actions: EditorContextMenuActions = {
-    undo: () => { if (restore()) muya.undo?.() },
-    redo: () => { if (restore()) muya.redo?.() },
+    undo: () => { if (restore()) stepMuyaHistory(muya, 'undo') },
+    redo: () => { if (restore()) stepMuyaHistory(muya, 'redo') },
     cut: () => copyOrCut(muya, cursor, tabId, 'cut'),
     copy: () => copyOrCut(muya, cursor, tabId, 'copy'),
     paste: () => pasteFromClipboard(muya, cursor, tabId),
@@ -474,6 +475,7 @@ async function construct() {
 
   muyaRef.value = muya
   editor.setMuyaInstance(muya)
+  busUnsubs.push(installMuyaContentHistory(muya.contentState.history))
   busUnsubs.push(editor.registerAgentEditHandler('wysiwyg', markdown => {
     const state = muya.contentState
     state.history.commitPending()
@@ -681,8 +683,8 @@ function installBusHandlers() {
   // ── paragraph / format / clipboard ────────────────────────────
   busUnsubs.push(bus.on('paragraph', (type) => withVisibleMuya(m => m.updateParagraph(type))))
   busUnsubs.push(bus.on('format', (type) => withVisibleMuya(m => m.format(type))))
-  busUnsubs.push(bus.on('undo', () => withVisibleMuya(m => m.undo())))
-  busUnsubs.push(bus.on('redo', () => withVisibleMuya(m => m.redo())))
+  busUnsubs.push(bus.on('undo', () => withVisibleMuya(m => stepMuyaHistory(m, 'undo'))))
+  busUnsubs.push(bus.on('redo', () => withVisibleMuya(m => stepMuyaHistory(m, 'redo'))))
   busUnsubs.push(bus.on('selectAll', () => withVisibleMuya(m => m.selectAll())))
   busUnsubs.push(bus.on('copyAsMarkdown', () => withVisibleMuya(m => m.copyAsMarkdown?.())))
   busUnsubs.push(bus.on('copyAsHtml', () => withVisibleMuya(m => m.copyAsHtml?.())))

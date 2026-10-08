@@ -16,6 +16,7 @@ const applied = computed(() => props.edit.changes.some(change => change.status =
 <template>
   <section class="agent-edit">
     <strong>{{ edit.title }}</strong>
+    <p v-if="edit.documentChanged" class="agent-muted" role="status">{{ t('agent.reviewDocumentChanged') }}</p>
     <p v-if="edit.locked" class="agent-muted">{{ t('agent.history.locked') }}</p>
     <div v-for="(change, index) in edit.changes" :key="change.id" class="agent-edit-change agent-change" :data-change-id="change.id">
       <details open>
@@ -26,7 +27,7 @@ const applied = computed(() => props.edit.changes.some(change => change.status =
         <textarea :id="`agent-reason-${change.id}`" :value="change.reason ?? ''" :disabled="agent.busy || edit.locked" rows="2" maxlength="1000" :placeholder="t('agent.reviewReasonPlaceholder')" @input="agent.setReviewReason(edit, index, ($event.target as HTMLTextAreaElement).value)" />
       </label>
       <footer>
-        <span>{{ t(`agent.editStatus.${change.status}`) }}</span>
+        <span>{{ t(edit.documentChanged && change.status === 'applied' ? 'agent.reviewUnverified' : `agent.editStatus.${change.status}`) }}</span>
         <button v-if="change.status === 'pending' || change.status === 'dismissed'" type="button" @click="agent.locateSource({ ...edit.snapshot, from: change.from, to: change.to })">{{ t('agent.locateSource') }}</button>
         <template v-if="change.status === 'pending'">
           <button type="button" :disabled="agent.busy || edit.locked" @click="agent.dismiss(edit, index)">{{ t(edit.changes.length > 1 ? 'agent.dismissChange' : 'agent.dismiss') }}</button>
@@ -37,7 +38,7 @@ const applied = computed(() => props.edit.changes.some(change => change.status =
       </footer>
     </div>
     <footer v-if="edit.changes.length > 1" class="agent-edit-all">
-      <span>{{ t(`agent.editStatus.${edit.status}`) }}</span>
+      <span>{{ t(edit.documentChanged && applied ? 'agent.reviewUnverified' : `agent.editStatus.${edit.status}`) }}</span>
       <template v-if="pending">
         <button type="button" :disabled="agent.busy || edit.locked" @click="agent.dismiss(edit)">{{ t('agent.dismissAll') }}</button>
         <button type="button" class="agent-primary" :disabled="agent.busy || edit.locked" @click="agent.apply(edit)">{{ t('agent.applyAll') }}</button>

@@ -197,6 +197,7 @@ onBeforeUnmount(() => { document.removeEventListener('focusout', captureEditorBl
     <template v-else>
       <div class="agent-model-row"><span :title="agent.config?.baseUrl">{{ agent.config?.model || t('agent.notConfigured') }}</span><span>{{ t('agent.reviewFirst') }}</span></div>
       <div v-if="agent.configError" class="agent-banner" role="alert">{{ agent.configError }}<button type="button" @click="agent.loadConfig">{{ t('agent.retry') }}</button></div>
+      <div v-if="agent.contextNotice" class="agent-banner" role="status">{{ agent.contextNotice }}</div>
       <div v-if="agent.skillsError" class="agent-banner" role="alert">{{ agent.skillsError }}<button type="button" @click="agent.loadSkills">{{ t('agent.retry') }}</button></div>
       <div v-if="agent.busy && !agent.runningHere" class="agent-banner" role="status">{{ t('agent.runningElsewhere') }}<button type="button" @click="agent.runningKey && editor.setCurrent(agent.runningKey)">{{ t('agent.returnToRun') }}</button></div>
       <div v-if="agent.historyError" class="agent-banner" role="alert">{{ agent.historyError }}</div>
@@ -224,7 +225,7 @@ onBeforeUnmount(() => { document.removeEventListener('focusout', captureEditorBl
           </template>
           <template v-else>
             <div class="agent-author"><Sparkles :size="13" />{{ t('agent.title') }}</div>
-            <details v-if="message.tools.length" class="agent-tool-list"><summary><Check :size="12" />{{ t('agent.steps', { count: message.tools.length }) }}</summary><div v-for="(tool, step) in message.tools" :key="step">{{ t(`agent.tools.${tool}`) }}</div></details>
+            <details v-if="message.tools.length" class="agent-tool-list"><summary><Check :size="12" />{{ t('agent.steps', { count: message.tools.length }) }}</summary><div v-for="(tool, step) in message.tools" :key="step">{{ t(tool === 'read_review_change' ? 'agent.reviewTool' : `agent.tools.${tool}`) }}</div></details>
             <!-- Sanitized allowlist; no links, images or remote content in replies. -->
             <!-- eslint-disable-next-line vue/no-v-html -->
             <div class="agent-markdown" v-html="message.html" />

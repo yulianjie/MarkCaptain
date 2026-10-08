@@ -1,4 +1,5 @@
 export default {
+  reviewDocumentChanged: '文書が変更されました。承認済みの修正が現在の本文に残っているか再確認が必要です。', reviewUnverified: '承認済み・現在の状態は未確認', feedbackCompacted: '今回は簡潔なレビュー情報または以前の回答の抜粋を送信します。全文はローカルに保持され、修正内容は ID で分割して読めます。', reviewTool: 'レビューの修正詳細を読む',
   reviewReason: 'レビューコメント（任意）', reviewReasonPlaceholder: '承認・拒否・取り消しの理由、または書き直し方を入力',
   rewrite: 'この意見で書き直す', rewriteDefault: '別の修正案を提案してください。',
   rewritePrompt: '修正項目 {id} をレビュー意見に従って書き直してください：{reason}。今回添付した現在の文書を基準に、承認済みの修正を維持してください。他の拒否・取り消し済みの修正を再提案せず、新しい案をレビュー用に提示してください。',

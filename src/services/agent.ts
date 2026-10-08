@@ -28,7 +28,10 @@ export interface AgentRequest {
   editRange?: { from: number; to: number }
   readOnly?: boolean
   references?: AgentReference[]
+  /** Kept in the local Rust task; provider sees text only through read_review_change. */
+  reviewChanges?: AgentReviewChange[]
 }
+export interface AgentReviewChange extends AgentChange { id: string; reason?: string }
 export interface AgentChange { oldText: string; newText: string }
 export interface AgentProposal { title: string; changes?: AgentChange[]; oldText?: string; newText?: string }
 export interface AgentEvent {
@@ -57,6 +60,7 @@ export function reviewSource(snapshot: DocumentSnapshot, value: unknown): AgentS
 }
 export interface ReviewedEdit extends AgentProposal {
   locked?: boolean
+  documentChanged?: boolean
   snapshot: DocumentSnapshot
   changes: ReviewedChange[]
   status: EditStatus | 'partial'
@@ -88,11 +92,27 @@ export function reviewProposal(snapshot: DocumentSnapshot, proposal: AgentPropos
   return { title: proposal.title, snapshot, changes, status: 'pending' }
 }
 
-/** Exact, JSON-escaped feedback: prose and quotes cannot break the item boundaries. */
-export function reviewFeedback(edit: ReviewedEdit): string {
+/** Bound JSON-escaped bytes too: control characters must not expand beyond the budget. */
+export function reviewExcerpt(text: string, budget: number): string {
+  const encoder = new TextEncoder()
+  let size = 0, end = 0
+  for (const char of text) {
+    size += encoder.encode(JSON.stringify(char)).length - 2
+    if (size > budget) break
+    end += char.length
+  }
+  return text.slice(0, end)
+}
+
+export function reviewFeedback(edit: ReviewedEdit, excerptBytes = 512, reasonBytes = 512, available?: Set<string>): string {
   return '\n[User review feedback]\n' + JSON.stringify({ title: edit.title, changes: edit.changes.map(change => ({
-    id: change.id, status: change.status, oldText: change.oldText, newText: change.newText,
-    ...(change.reason?.trim() ? { reason: change.reason.trim() } : {}),
+    id: change.id, status: edit.documentChanged && change.status === 'applied' ? 'unverified' : change.status,
+    ...(edit.documentChanged && change.status === 'applied' ? { reviewStatus: change.status } : {}),
+    oldText: reviewExcerpt(change.oldText, excerptBytes), newText: reviewExcerpt(change.newText, excerptBytes),
+    ...(reviewExcerpt(change.oldText, excerptBytes) !== change.oldText ? { oldTextTruncated: true } : {}),
+    ...(reviewExcerpt(change.newText, excerptBytes) !== change.newText ? { newTextTruncated: true } : {}),
+    ...(change.reason?.trim() ? { reason: reviewExcerpt(change.reason.trim(), reasonBytes), ...(reviewExcerpt(change.reason.trim(), reasonBytes) !== change.reason.trim() ? { reasonTruncated: true } : {}) } : {}),
+    ...(available && !available.has(change.id) ? { detailsAvailable: false } : {}),
   })) })
 }
 

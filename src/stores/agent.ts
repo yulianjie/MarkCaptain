@@ -1,5 +1,7 @@
 import { createChapterSummary, summaryJobInput, finishSummaryJob, type ChapterSummary } from '@/services/agent-summary'
-import { computed, nextTick, onScopeDispose, ref } from 'vue'
+import { computed, nextTick, onScopeDispose, ref, watch } from 'vue'
+import { createReviewStateTracker } from '@/services/agent-review-state'
+import { conversationRequest } from '@/services/agent-conversation-request'
 import { openFiles, readMarkdown } from '@/services/tauri-invoke'
 import { referenceSnapshot, referenceRequest, validateReferences } from '@/services/agent-references'
 import { agentHistoryController } from '@/services/agent-history-controller'
@@ -11,7 +13,7 @@ import { MAX_MESSAGE_IMAGES, readAgentImage, validateImageBudget } from '@/servi
 import { bus } from '@/bus'
 import { createSearchRevealRequest } from '@/services/search-reveal'
 import {
-  markdownSelection, reviewProposal, reviewSource, reviewedMarkdown, reviewFeedback,
+  markdownSelection, reviewProposal, reviewSource, reviewedMarkdown,
   type AgentConfig, type AgentEvent, type AgentHeader, type AgentImage, type AgentMessage, type AgentSettings, type AgentSkill, type AgentSource, type DocumentSnapshot, type ReviewedEdit, type ReferenceSnapshot,
 } from '@/services/agent'
 
@@ -64,7 +66,17 @@ export const useAgentStore = defineStore('agent', () => {
   const loadingConfig = ref(false)
   const configError = ref('')
   const error = ref('')
+  const contextNotice = ref('')
   const sessions = ref<Record<string, Conversation>>({})
+  const reviewStates = createReviewStateTracker()
+  let changingReview = false
+  function synchronizeReviews() {
+    if (changingReview) return
+    for (const chat of Object.values(sessions.value)) for (const message of chat.messages) {
+      if (message.edit) reviewStates.reconcile(message.edit, editor.tabs.find(tab => tab.id === message.edit!.snapshot.tabId)?.markdown)
+    }
+  }
+  watch(() => editor.tabs.map(tab => [tab.id, tab.markdown]), synchronizeReviews, { flush: 'sync' })
   const currentKey = computed(() => editor.currentFileId ?? 'no-document')
   function getConversation(key = currentKey.value): Conversation {
     if (!sessions.value[key]) sessions.value[key] = newConversation()
@@ -250,7 +262,7 @@ export const useAgentStore = defineStore('agent', () => {
         if (active.summaryJob === message.summary!.jobs.length - 1) message.content = summaryBuffer
       } else message.content += event.text ?? ''
     }
-    if (event.kind === 'tool' && ['read_document', 'search_document', 'cite_document', 'propose_edit', 'read_skill', 'read_skill_file'].includes(event.text ?? '')) message.tools.push(event.text!)
+    if (event.kind === 'tool' && ['read_document', 'search_document', 'cite_document', 'propose_edit', 'read_skill', 'read_skill_file', 'read_review_change'].includes(event.text ?? '')) message.tools.push(event.text!)
     const readSnapshot = active.readSnapshot === undefined ? active.snapshot : active.readSnapshot
     if (event.kind === 'source' && event.text) {
       try {
@@ -296,12 +308,15 @@ export const useAgentStore = defineStore('agent', () => {
   async function send(prompt = conversation.value.draft, retryContext?: DocumentSnapshot | null, retryReadContext?: DocumentSnapshot | null, retryReferences?: ReferenceSnapshot[]) {
     if (busy.value || skillsLoading.value || conversation.value.readingImages || conversation.value.readingReferences || !prompt.trim() && !conversation.value.images.length) return
     error.value = ''
+    contextNotice.value = ''
+    synchronizeReviews()
     const chat = getConversation()
     const references = (retryReferences ?? chat.references).map(ref => ({ documentId: ref.documentId, snapshot: { ...ref.snapshot } }))
     const skillIds = chat.skillId ? [chat.skillId] : []
     let attached: DocumentSnapshot | null
     let reading: DocumentSnapshot | null
     let messages: AgentMessage[]
+    let reviewChanges: ReturnType<typeof conversationRequest>['reviewChanges']
     try {
       validateReferences(references)
       attached = retryContext === undefined ? snapshot() : retryContext
@@ -310,15 +325,11 @@ export const useAgentStore = defineStore('agent', () => {
       if (reading && (reading.tabId !== attached?.tabId || reading.markdown !== attached.markdown)) throw new Error('agent:selectionChanged')
       validateImageBudget([...chat.messages.flatMap(m => m.images ?? []), ...chat.images])
       if (chat.messages.length >= 22) throw new Error('agent:historyFull')
-      messages = chat.messages.filter(m => !m.error && !m.cancelled).map(m => ({
-        role: m.role,
-        content: m.content + (m.imagesOmitted ? '\n[Images from this message were excluded from local history and are no longer available. Ask the user to reattach them if needed.]' : '') + (m.edit ? reviewFeedback(m.edit) : ''),
-        ...(m.images?.length ? { images: m.images.map(image => ({ ...image })) } : {}),
-      }))
-      messages.push({ role: 'user', content: prompt.trim(), ...(chat.images.length ? { images: chat.images.map(image => ({ ...image })) } : {}) })
-      const total = messages.reduce((sum, m) => sum + new TextEncoder().encode(m.content).length, 0)
+      const prepared = conversationRequest(chat.messages, prompt, chat.images)
+      messages = prepared.messages; reviewChanges = prepared.reviewChanges
+      if (prepared.compacted) contextNotice.value = t('agent.feedbackCompacted')
       const documentBytes = new TextEncoder().encode(reading?.markdown.slice(reading.from, reading.to) ?? '').length
-      if (total > 220_000 || messages.some(m => new TextEncoder().encode(m.content).length > 80_000) || documentBytes > 2_000_000) throw new Error('agent:contextTooLarge')
+      if (documentBytes > 2_000_000) throw new Error('agent:contextTooLarge')
     } catch (cause) { error.value = agentError(cause); return }
     const requestId = crypto.randomUUID()
     const messageId = crypto.randomUUID()
@@ -333,6 +344,7 @@ export const useAgentStore = defineStore('agent', () => {
         await ensureListener()
         if (disposed) { run.value = null; return }
         await agentTransport.start({ requestId, messages, language: getLocale(), skillIds,
+          ...(reviewChanges.length ? { reviewChanges } : {}),
           references: referenceRequest(references),
           ...(attached && reading && (attached.from !== reading.from || attached.to !== reading.to) ? { editRange: { from: attached.from - reading.from, to: attached.to - reading.from } } : {}),
           context: reading ? { name: reading.name, markdown: reading.markdown.slice(reading.from, reading.to) } : null })
@@ -530,9 +542,14 @@ export const useAgentStore = defineStore('agent', () => {
     try {
       const accepted = edit.changes.map((change, i) => change.status === 'applied' ? i : -1).filter(i => i >= 0)
       const next = reviewedMarkdown(edit, [...accepted, ...pending])
-      edit.appliedMarkdown = editor.applyAgentEdit(edit.snapshot.tabId, edit.appliedMarkdown ?? edit.snapshot.markdown, next)
+      reviewStates.remember(edit)
+      changingReview = true
+      try { edit.appliedMarkdown = editor.applyAgentEdit(edit.snapshot.tabId, edit.appliedMarkdown ?? edit.snapshot.markdown, next) }
+      finally { changingReview = false }
       for (const i of pending) edit.changes[i]!.status = 'applied'
       updateEditStatus(edit)
+      reviewStates.remember(edit)
+      synchronizeReviews()
       selection.value = null
       error.value = ''
     } catch (cause) { error.value = agentError(cause) }
@@ -550,9 +567,14 @@ export const useAgentStore = defineStore('agent', () => {
     if (!reverting.length) return
     try {
       const remaining = edit.changes.map((change, i) => change.status === 'applied' && !reverting.includes(i) ? i : -1).filter(i => i >= 0)
-      edit.appliedMarkdown = editor.applyAgentEdit(edit.snapshot.tabId, edit.appliedMarkdown, reviewedMarkdown(edit, remaining))
+      reviewStates.remember(edit)
+      changingReview = true
+      try { edit.appliedMarkdown = editor.applyAgentEdit(edit.snapshot.tabId, edit.appliedMarkdown, reviewedMarkdown(edit, remaining)) }
+      finally { changingReview = false }
       for (const i of reverting) edit.changes[i]!.status = 'reverted'
       updateEditStatus(edit)
+      reviewStates.remember(edit)
+      synchronizeReviews()
       error.value = ''
     } catch (cause) { error.value = agentError(cause) }
   }
@@ -582,5 +604,5 @@ export const useAgentStore = defineStore('agent', () => {
 
   return { ...history, addReferenceTab, chooseReferences, flushForClose, visible, settingsOpen, skillsOpen, skills, skillsLoading, skillsError, loadSkills, changeSkills, config, loadingConfig, configError, error, includeDocument, referenceDocument, selection, conversation,
     busy, runningHere, runningKey, stopping, run, toggle, loadConfig, saveConfig, attachSelection, clearSelection, addImages, send, summarizeChapters, stop, clear, apply, dismiss, revert, retry,
-    captureAnswerTarget, canUseAnswer, useAnswer, locateSource, setReviewReason, rewrite }
+    captureAnswerTarget, canUseAnswer, useAnswer, locateSource, setReviewReason, rewrite, contextNotice }
 })

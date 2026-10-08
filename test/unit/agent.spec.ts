@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { changeDiff, markdownSelection, parseAgentHeaders, proposalMarkdown, reviewProposal, type AgentEvent, type AgentImage } from '../../src/services/agent'
 import { readAgentImage } from '../../src/services/agent-images'
+import { conversationRequest } from '../../src/services/agent-conversation-request'
 
 const transport = vi.hoisted(() => ({ getConfig: vi.fn(), saveConfig: vi.fn(), testConnection: vi.fn(), start: vi.fn(), cancel: vi.fn(), listen: vi.fn(), listSkills: vi.fn(), importSkill: vi.fn() }))
 vi.mock('@/services/agent-transport', () => ({ agentTransport: transport }))
@@ -265,16 +266,88 @@ describe('Agent document edits', () => {
     await agent.rewrite(edit, 1)
     expect(transport.start).toHaveBeenCalledTimes(2)
   })
-  it('counts review payloads in context limits before mutating the conversation', async () => {
+  it('continues after a large proposal without truncating the locally retained patch', async () => {
     const editor = useEditorStore(), agent = useAgentStore()
     editor.newUntitledTab('one')
     await agent.send('edit')
     emit({ requestId: agent.run!.id, kind: 'proposal', proposal: { title: 'Large', oldText: 'one', newText: 'x'.repeat(80_000) } })
     emit({ requestId: agent.run!.id, kind: 'done' })
     await agent.send('continue')
-    expect(transport.start).toHaveBeenCalledOnce()
-    expect(agent.conversation.messages).toHaveLength(2)
-    expect(agent.error).not.toBe('')
+    expect(transport.start).toHaveBeenCalledTimes(2)
+    const request = transport.start.mock.calls.at(-1)![0]
+    const feedback = JSON.parse(request.messages[1].content.split('[User review feedback]\n')[1])
+    expect(feedback.changes[0]).toMatchObject({ status: 'pending', newTextTruncated: true })
+    expect(new TextEncoder().encode(request.messages[1].content).length).toBeLessThan(2_000)
+    expect(request.reviewChanges[0].newText).toHaveLength(80_000)
+    expect(agent.conversation.messages[1]!.edit!.changes[0]!.newText).toHaveLength(80_000)
+    expect(agent.error).toBe('')
+    expect(agent.contextNotice).not.toBe('')
+  })
+  it('synchronizes undo/redo checkpoints by change ID without undoing rejection decisions', async () => {
+    const editor = useEditorStore(), agent = useAgentStore()
+    const tab = editor.newUntitledTab('one two three')
+    editor.registerAgentEditHandler('wysiwyg', text => editor.setMarkdownExternal(tab.id, text))
+    await agent.send('edit')
+    emit({ requestId: agent.run!.id, kind: 'proposal', proposal: { title: 'Batch', changes: ['one', 'two', 'three'].map(oldText => ({ oldText, newText: oldText.toUpperCase() })) } })
+    emit({ requestId: agent.run!.id, kind: 'done' })
+    const edit = agent.conversation.messages.at(-1)!.edit!
+    agent.apply(edit, 0)
+    agent.dismiss(edit, 1)
+    agent.setReviewReason(edit, 1, 'keep two')
+    agent.apply(edit, 2)
+    editor.setMarkdownExternal(tab.id, 'ONE two three') // undo last application
+    expect(edit.changes.map(c => c.status)).toEqual(['applied', 'dismissed', 'reverted'])
+    editor.setMarkdownExternal(tab.id, 'one two three') // undo first application
+    expect(edit.changes.map(c => c.status)).toEqual(['reverted', 'dismissed', 'reverted'])
+    await agent.send('continue after undo')
+    let feedback = JSON.parse(transport.start.mock.calls.at(-1)![0].messages[1].content.split('[User review feedback]\n')[1])
+    expect(feedback.changes[0]).toMatchObject({ id: edit.changes[0]!.id, status: 'reverted' })
+    emit({ requestId: agent.run!.id, kind: 'done' })
+    editor.setMarkdownExternal(tab.id, 'ONE two three') // redo first
+    editor.setMarkdownExternal(tab.id, 'ONE two THREE') // redo last
+    expect(edit.changes.map(c => c.status)).toEqual(['applied', 'dismissed', 'applied'])
+    await agent.send('continue after redo')
+    feedback = JSON.parse(transport.start.mock.calls.at(-1)![0].messages[1].content.split('[User review feedback]\n')[1])
+    expect(feedback.changes[0].status).toBe('applied')
+    expect(feedback.changes[1]).toMatchObject({ status: 'dismissed', reason: 'keep two' })
+    expect(edit.appliedMarkdown).toBe(tab.markdown)
+  })
+  it('never reports an unverifiable acceptance as currently applied and isolates tabs', async () => {
+    const editor = useEditorStore(), agent = useAgentStore()
+    const tab = editor.newUntitledTab('one')
+    editor.registerAgentEditHandler('wysiwyg', text => editor.setMarkdownExternal(tab.id, text))
+    await agent.send('edit')
+    emit({ requestId: agent.run!.id, kind: 'proposal', proposal: { title: 'Edit', oldText: 'one', newText: 'ONE' } })
+    emit({ requestId: agent.run!.id, kind: 'done' })
+    const edit = agent.conversation.messages.at(-1)!.edit!
+    agent.apply(edit)
+    const other = editor.newUntitledTab('other')
+    editor.setMarkdownExternal(other.id, 'other changed')
+    expect(edit.documentChanged).toBe(false)
+    editor.setCurrent(tab.id)
+    editor.setMarkdownExternal(tab.id, 'manual edit')
+    await agent.send('continue')
+    const feedback = JSON.parse(transport.start.mock.calls.at(-1)![0].messages[1].content.split('[User review feedback]\n')[1])
+    expect(feedback.changes[0]).toMatchObject({ status: 'unverified', reviewStatus: 'applied' })
+    expect(edit.documentChanged).toBe(true)
+  })
+  it('recovers aggregate feedback and oversized historical replies with bounded transport excerpts', () => {
+    const items = Array.from({ length: 6 }, (_, index) => {
+      const markdown = Array.from({ length: 32 }, (_, i) => `passage-${i}`).join('\n')
+      const edit = reviewProposal({ tabId: 'doc', name: 'note', markdown, from: 0, to: markdown.length }, {
+        title: 'Many changes', changes: Array.from({ length: 32 }, (_, i) => ({ oldText: `passage-${i}${i < 31 ? '\n' : ''}`, newText: '😀\n"'.repeat(1000) })),
+      }, `message-${index}`)
+      for (const change of edit.changes) change.reason = '中文\n"'.repeat(200)
+      return { id: `message-${index}`, role: 'assistant' as const, content: 'long earlier reply'.repeat(7000), tools: [], edit }
+    })
+    const before = JSON.stringify(items)
+    const prepared = conversationRequest(items, 'continue', [])
+    expect(prepared.compacted).toBe(true)
+    expect(prepared.messages.every(m => new TextEncoder().encode(m.content).length <= 80_000)).toBe(true)
+    expect(prepared.messages.reduce((n, m) => n + new TextEncoder().encode(m.content).length, 0)).toBeLessThanOrEqual(220_000)
+    expect(prepared.reviewChanges).toHaveLength(192)
+    expect(prepared.messages[0]!.content).toContain('Earlier reply excerpt')
+    expect(JSON.stringify(items)).toBe(before)
   })
   it('applies a batch in one editor transaction and keeps dismissed changes out', async () => {
     const editor = useEditorStore(), agent = useAgentStore()

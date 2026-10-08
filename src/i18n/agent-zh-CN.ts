@@ -1,4 +1,5 @@
 export default {
+  reviewDocumentChanged: '正文已变化，之前接受的修改是否仍在正文中需要重新核对。', reviewUnverified: '曾接受 · 当前状态未核实', feedbackCompacted: '本轮使用精简反馈或较早回答的摘录；完整内容仍保留本地，修改详情可按 ID 分段读取。', reviewTool: '读取审阅修改详情',
   reviewReason: '审阅意见（可选）', reviewReasonPlaceholder: '说明接受、拒绝或撤回的原因，或希望如何重写',
   rewrite: '按这个意见重写', rewriteDefault: '请提出一种不同的修改方案。',
   rewritePrompt: '请按审阅意见重写修改项 {id}：{reason}。以本轮附加的当前文档为准，保留已接受的修改；不要重新提出其他已拒绝或撤回的修改。只提出新建议供我审阅。',
