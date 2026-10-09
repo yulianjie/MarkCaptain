@@ -1,6 +1,8 @@
 import { createChapterSummary, summaryJobInput, finishSummaryJob, type ChapterSummary } from '@/services/agent-summary'
 import { computed, nextTick, onScopeDispose, ref, watch } from 'vue'
 import { createReviewStateTracker } from '@/services/agent-review-state'
+import type { AgentProposal } from '@/services/agent'
+import { rebasePendingReview, refreshedReviewSnapshot } from '@/services/agent-rebase'
 import { conversationRequest } from '@/services/agent-conversation-request'
 import { openFiles, readMarkdown } from '@/services/tauri-invoke'
 import { referenceSnapshot, referenceRequest, validateReferences } from '@/services/agent-references'
@@ -13,11 +15,12 @@ import { MAX_MESSAGE_IMAGES, readAgentImage, validateImageBudget } from '@/servi
 import { bus } from '@/bus'
 import { createSearchRevealRequest } from '@/services/search-reveal'
 import {
-  markdownSelection, reviewProposal, reviewSource, reviewedMarkdown,
+  isDocumentBoundary, markdownSelection, reviewProposal, reviewSource, reviewedMarkdown,
   type AgentConfig, type AgentEvent, type AgentHeader, type AgentImage, type AgentMessage, type AgentSettings, type AgentSkill, type AgentSource, type DocumentSnapshot, type ReviewedEdit, type ReferenceSnapshot,
 } from '@/services/agent'
 
 export interface ChatItem {
+  externalProposalId?: string
   id: string
   role: 'user' | 'assistant'
   content: string
@@ -36,6 +39,8 @@ export interface ChatItem {
   sources?: AgentSource[]
   targetTabId?: string
   answerTarget?: DocumentSnapshot | null
+  /** Local source request retained when a stale proposal becomes a new review card. */
+  regenerateFrom?: string
 }
 export interface Conversation {
   id: string; createdAt: number; historyRevision: number; restored: boolean
@@ -277,6 +282,7 @@ export const useAgentStore = defineStore('agent', () => {
     if (event.kind === 'proposal' && event.proposal && active.snapshot) {
       try {
         message.edit = reviewProposal(active.snapshot, event.proposal, message.id)
+        reviewStates.reconcile(message.edit, editor.tabs.find(tab => tab.id === active.snapshot!.tabId)?.markdown)
       } catch { message.error = t('agent.errors.invalidEdit') }
     }
     if (['done', 'error', 'cancelled'].includes(event.kind)) {
@@ -332,6 +338,8 @@ export const useAgentStore = defineStore('agent', () => {
       if (documentBytes > 2_000_000) throw new Error('agent:contextTooLarge')
     } catch (cause) { error.value = agentError(cause); return }
     const requestId = crypto.randomUUID()
+    if (attached) attached = { ...attached, snapshotId: requestId }
+    if (reading) reading = { ...reading, snapshotId: requestId }
     const messageId = crypto.randomUUID()
     run.value = { id: requestId, key: currentKey.value, messageId, snapshot: attached, readSnapshot: reading, references }
     chat.messages.push({ id: crypto.randomUUID(), role: 'user', content: prompt.trim(), tools: [], images: chat.images.map(image => ({ ...image })), contextSnapshot: attached, readSnapshot: reading, references,
@@ -347,7 +355,7 @@ export const useAgentStore = defineStore('agent', () => {
           ...(reviewChanges.length ? { reviewChanges } : {}),
           references: referenceRequest(references),
           ...(attached && reading && (attached.from !== reading.from || attached.to !== reading.to) ? { editRange: { from: attached.from - reading.from, to: attached.to - reading.from } } : {}),
-          context: reading ? { name: reading.name, markdown: reading.markdown.slice(reading.from, reading.to) } : null })
+          context: reading ? { name: reading.name, markdown: reading.markdown.slice(reading.from, reading.to), snapshotId: requestId, offset: reading.from } : null })
       })()
       await startPromise
     } catch (cause) {
@@ -429,6 +437,25 @@ export const useAgentStore = defineStore('agent', () => {
     if (sessions.value[key] !== previous || busy.value) return
     sessions.value[key] = { ...newConversation(), includeDocument: previous.includeDocument, dismissedSelection: previous.selection ?? previous.dismissedSelection }
     error.value = ''
+  }
+
+  function receiveExternalProposal(snapshot: DocumentSnapshot, proposal: AgentProposal, proposalId: string): ReviewedEdit {
+    const tab = editor.tabs.find(item => item.id === snapshot.tabId)
+    if (!tab || editor.currentFileId !== tab.id || tab.markdown !== snapshot.markdown) throw new Error('agent:selectionChanged')
+    const edit = reviewProposal(snapshot, proposal, proposalId)
+    reviewStates.reconcile(edit, tab.markdown)
+    const chat = getConversation(snapshot.tabId)
+    chat.messages.push({ id: proposalId, externalProposalId: proposalId, role: 'assistant', content: '', tools: [], edit })
+    visible.value = true
+    return chat.messages[chat.messages.length - 1]!.edit!
+  }
+
+  function externalReview(proposalId: string): ReviewedEdit | undefined {
+    for (const chat of Object.values(sessions.value)) {
+      const item = chat.messages.find(message => message.id === proposalId)
+      if (item?.edit) return item.edit
+    }
+    return undefined
   }
 
   function currentAnswerTarget(): DocumentSnapshot | null {
@@ -516,13 +543,13 @@ export const useAgentStore = defineStore('agent', () => {
   }
 
   function setReviewReason(edit: ReviewedEdit, index: number, reason: string) {
-    if (busy.value || edit.locked) return
+    if (busy.value || edit.locked || edit.rebasedTo) return
     const change = edit.changes[index]
     if (change) change.reason = reason.slice(0, 1000)
   }
 
   async function rewrite(edit: ReviewedEdit, index: number) {
-    if (busy.value || edit.locked || conversation.value.draft.trim() || conversation.value.images.length) return
+    if (busy.value || edit.locked || edit.rebasedTo || edit.documentChanged || conversation.value.draft.trim() || conversation.value.images.length) return
     const change = edit.changes[index]
     if (!change || change.status === 'applied') return
     const tab = editor.currentFile
@@ -536,7 +563,7 @@ export const useAgentStore = defineStore('agent', () => {
   }
 
   function apply(edit: ReviewedEdit, index?: number) {
-    if (busy.value || edit.locked) return
+    if (busy.value || edit.locked || edit.rebasedTo || edit.documentChanged) return
     const pending = edit.changes.map((change, i) => change.status === 'pending' && (index === undefined || i === index) ? i : -1).filter(i => i >= 0)
     if (!pending.length) return
     try {
@@ -556,13 +583,13 @@ export const useAgentStore = defineStore('agent', () => {
   }
 
   function dismiss(edit: ReviewedEdit, index?: number) {
-    if (busy.value || edit.locked) return
+    if (busy.value || edit.locked || edit.rebasedTo) return
     for (const [i, change] of edit.changes.entries()) if (change.status === 'pending' && (index === undefined || index === i)) change.status = 'dismissed'
     updateEditStatus(edit)
   }
 
   function revert(edit: ReviewedEdit, index?: number) {
-    if (busy.value || edit.locked || edit.appliedMarkdown === undefined) return
+    if (busy.value || edit.locked || edit.rebasedTo || edit.documentChanged || edit.appliedMarkdown === undefined) return
     const reverting = edit.changes.map((change, i) => change.status === 'applied' && (index === undefined || index === i) ? i : -1).filter(i => i >= 0)
     if (!reverting.length) return
     try {
@@ -577,6 +604,73 @@ export const useAgentStore = defineStore('agent', () => {
       synchronizeReviews()
       error.value = ''
     } catch (cause) { error.value = agentError(cause) }
+  }
+
+  function originalReviewRequest(edit: ReviewedEdit) {
+    const messages = conversation.value.messages
+    const index = messages.findIndex(message => message.edit === edit)
+    if (index < 0) return undefined
+    const message = messages[index]!
+    if (message.externalProposalId) return undefined
+    const user = message.regenerateFrom ? messages.find(item => item.id === message.regenerateFrom) : messages[index - 1]
+    return user?.role === 'user' && user.contextSnapshot?.tabId === edit.snapshot.tabId ? user : undefined
+  }
+
+  function canRegenerateReview(edit: ReviewedEdit) {
+    return !busy.value && !edit.locked && !edit.rebasedTo && includeDocument.value && editor.currentFileId === edit.snapshot.tabId
+      && (edit.changes.some(change => change.status === 'pending') || !!edit.rebaseConflicts?.length)
+      && !conversation.value.draft.trim() && !conversation.value.images.length && !!originalReviewRequest(edit)
+  }
+
+  function currentReviewScope(edit: ReviewedEdit, allowReselection = false): DocumentSnapshot | null {
+    const tab = editor.currentFile
+    if (!includeDocument.value || !tab || tab.id !== edit.snapshot.tabId) return null
+    const refreshed = refreshedReviewSnapshot(edit, tab.markdown)
+    const attached = selection.value
+    if (!refreshed) {
+      // A new selection is explicit authorization; never infer a whole-document fallback.
+      return allowReselection && attached?.tabId === tab.id && attached.markdown === tab.markdown
+        && isDocumentBoundary(tab.markdown, attached.from) && isDocumentBoundary(tab.markdown, attached.to) && attached.from < attached.to
+        ? { ...referenceSnapshot(tab), from: attached.from, to: attached.to, snapshotId: crypto.randomUUID() } : null
+    }
+    if (!attached) return refreshed
+    if (attached.tabId !== tab.id) return null
+    if (attached.markdown !== tab.markdown) {
+      // Only the original captured selection can be safely carried forward.
+      return attached.markdown === edit.snapshot.markdown && attached.from === edit.snapshot.from && attached.to === edit.snapshot.to ? refreshed : null
+    }
+    if (attached.from < refreshed.from || attached.to > refreshed.to) return null
+    return { ...refreshed, from: attached.from, to: attached.to }
+  }
+
+  async function regenerateReview(edit: ReviewedEdit) {
+    if (!canRegenerateReview(edit)) return
+    const user = originalReviewRequest(edit)!
+    if (user.imagesOmitted) { error.value = t('agent.errors.historyImages'); return }
+    const attached = currentReviewScope(edit, true)
+    if (!attached) { error.value = t('agent.errors.reviewSelectionChanged'); return }
+    const reading = referenceDocument.value ? { ...attached, from: 0, to: attached.markdown.length } : attached
+    await send(t('agent.regeneratePrompt', { prompt: user.content }), attached, reading, conversation.value.references)
+  }
+
+  function rebaseReview(edit: ReviewedEdit) {
+    if (busy.value || edit.locked || edit.rebasedTo || !edit.documentChanged || editor.currentFileId !== edit.snapshot.tabId) return
+    const tab = editor.currentFile
+    if (!tab) return
+    const result = rebasePendingReview(edit, tab.markdown)
+    edit.rebaseConflicts = result.conflicts
+    if (!result.edit) { error.value = t('agent.rebaseConflict', { count: result.conflicts.length }); return }
+    const scope = currentReviewScope(edit)
+    if (!scope || result.edit.changes.some(change => change.from < scope.from || change.to > scope.to)) {
+      error.value = t('agent.errors.reviewSelectionChanged'); return
+    }
+    const id = crypto.randomUUID()
+    const user = originalReviewRequest(edit)
+    conversation.value.messages.push({ id, role: 'assistant', content: '', tools: [], completed: true, edit: result.edit,
+      ...(user ? { regenerateFrom: user.id } : {}) })
+    edit.rebasedTo = id
+    reviewStates.reconcile(result.edit, tab.markdown)
+    error.value = result.conflicts.length ? t('agent.rebaseConflict', { count: result.conflicts.length }) : ''
   }
 
   function retry() {
@@ -604,5 +698,5 @@ export const useAgentStore = defineStore('agent', () => {
 
   return { ...history, addReferenceTab, chooseReferences, flushForClose, visible, settingsOpen, skillsOpen, skills, skillsLoading, skillsError, loadSkills, changeSkills, config, loadingConfig, configError, error, includeDocument, referenceDocument, selection, conversation,
     busy, runningHere, runningKey, stopping, run, toggle, loadConfig, saveConfig, attachSelection, clearSelection, addImages, send, summarizeChapters, stop, clear, apply, dismiss, revert, retry,
-    captureAnswerTarget, canUseAnswer, useAnswer, locateSource, setReviewReason, rewrite, contextNotice }
+    captureAnswerTarget, canUseAnswer, useAnswer, locateSource, setReviewReason, rewrite, canRegenerateReview, regenerateReview, rebaseReview, receiveExternalProposal, externalReview, contextNotice }
 })

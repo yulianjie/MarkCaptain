@@ -16,6 +16,7 @@ function validSnapshot(v: unknown): v is DocumentSnapshot {
     && typeof v.markdown === 'string' && bytes(v.markdown) <= 2_000_000
     && Number.isInteger(v.from) && Number.isInteger(v.to) && (v.from as number) >= 0 && (v.to as number) >= (v.from as number)
     && (v.to as number) <= v.markdown.length && (v.path === undefined || typeof v.path === 'string' && v.path.length <= 8192)
+    && (v.snapshotId === undefined || typeof v.snapshotId === 'string' && v.snapshotId.length > 0 && v.snapshotId.length <= 160)
 }
 
 /** Intern immutable snapshots so long documents are stored once per range, not per message. */
@@ -24,11 +25,12 @@ export function packHistory(metadata: HistoryMetadata, chat: HistoryChat, docume
   function pack(value: unknown, depth = 0): unknown {
     if (depth > 25) throw invalid()
     if (validSnapshot(value)) {
-      const complete = { ...value, from: 0, to: value.markdown.length }
+      const { snapshotId, ...content } = value
+      const complete = { ...content, from: 0, to: value.markdown.length }
       const key = JSON.stringify(complete)
       let id = keys.get(key)
       if (id === undefined) { id = snapshots.length; keys.set(key, id); snapshots.push(complete) }
-      return { $snapshot: id, from: value.from, to: value.to }
+      return { $snapshot: id, from: value.from, to: value.to, ...(snapshotId !== undefined ? { snapshotId } : {}) }
     }
     if (Array.isArray(value)) return value.map(item => pack(item, depth + 1))
     if (object(value)) return Object.fromEntries(Object.entries(value).filter(([key]) => key !== 'images' && key !== 'readingImages').map(([key, val]) => [key, pack(val, depth + 1)]))
@@ -50,7 +52,7 @@ export function hydrateHistory(record: HistoryRecord): { chat: HistoryChat; docu
       if (!Number.isInteger(value.$snapshot)) throw invalid()
       const snapshot = record.data.snapshots[value.$snapshot as number]
       if (!snapshot) throw invalid()
-      const ranged = { ...snapshot, from: value.from, to: value.to }
+      const ranged = { ...snapshot, from: value.from, to: value.to, ...(value.snapshotId !== undefined ? { snapshotId: value.snapshotId } : {}) }
       if (!validSnapshot(ranged)) throw invalid()
       return ranged
     }
@@ -101,6 +103,12 @@ export function hydrateHistory(record: HistoryRecord): { chat: HistoryChat; docu
           change.id = previous.id
         }
         ids.add(change.id)
+        if (previous.sourceChangeIds !== undefined) {
+          if (!Array.isArray(previous.sourceChangeIds) || previous.sourceChangeIds.length > 64
+            || previous.sourceChangeIds.some(id => typeof id !== 'string' || !id || id.length > 160)
+            || new Set(previous.sourceChangeIds).size !== previous.sourceChangeIds.length) throw invalid()
+          change.sourceChangeIds = previous.sourceChangeIds as string[]
+        }
         if (previous.reason !== undefined) {
           if (typeof previous.reason !== 'string' || previous.reason.length > 1000) throw invalid()
           change.reason = previous.reason
@@ -108,6 +116,15 @@ export function hydrateHistory(record: HistoryRecord): { chat: HistoryChat; docu
       }
       const states = new Set(reviewed.changes.map(change => change.status))
       reviewed.status = states.size === 1 ? reviewed.changes[0]!.status : 'partial'
+      for (const key of ['rebasedFrom', 'rebasedTo'] as const) if (edit[key] !== undefined) {
+        if (typeof edit[key] !== 'string' || !edit[key] || edit[key].length > 160) throw invalid()
+        reviewed[key] = edit[key]
+      }
+      if (edit.rebaseConflicts !== undefined) {
+        if (!Array.isArray(edit.rebaseConflicts) || edit.rebaseConflicts.length > 32
+          || edit.rebaseConflicts.some(id => typeof id !== 'string' || !id || id.length > 160)) throw invalid()
+        reviewed.rebaseConflicts = edit.rebaseConflicts as string[]
+      }
       reviewed.locked = true // Archived review is readable, never revives stale Apply/Undo actions.
       message.edit = reviewed
     }

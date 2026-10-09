@@ -33,6 +33,15 @@ export const agentTransport = {
   start: async(request)=>{
     window.__workflowRequest=request;
     const send=event=>handler?.({requestId:request.requestId,...event});
+    if(request.messages.at(-1).content==='anchor second occurrence'){
+      const oldText='重复句子';
+      const from=request.context.markdown.indexOf(oldText,request.context.markdown.indexOf(oldText)+1);
+      setTimeout(()=>{
+        send({kind:'proposal',proposal:{title:'仅修改第二个相同句子',changes:[{oldText,newText:'第二句已修改',anchor:{snapshotId:request.context.snapshotId,from,to:from+oldText.length}}]}});
+        send({kind:'done'});
+      },20);
+      return;
+    }
     if(request.messages.at(-1).content==='continue after undo' || request.messages.at(-1).content==='continue after redo' || request.messages.at(-1).content==='continue after large patch'){
       setTimeout(()=>{send({kind:'delta',text:'按当前正文和逐项审阅状态继续。'});send({kind:'done'})},20);
       return;
@@ -88,20 +97,20 @@ export const agentTransport = {
   cancel: async(id)=>handler?.({requestId:id,kind:'cancelled'}),
 };`
 
-async function setup(page: Page, source: boolean) {
+async function setup(page: Page, source: boolean, initial = '# 独立审阅\n\n第一段 🌱\n\n```js\nconst untouched = true\n```\n\n最后一段\n') {
   await page.route('**/src/services/agent-transport.ts', route => route.fulfill({ contentType: 'text/javascript', body: fixture }))
   await page.goto('/')
   await page.locator('.muya-host [contenteditable="true"]').waitFor()
-  await page.evaluate(async source => {
+  await page.evaluate(async ({ source, initial }) => {
     const ep='/src/stores/editor.ts', pp='/src/stores/preferences.ts', lp='/src/i18n/index.ts'
     const editor=(await import(ep)).useEditorStore()
     Object.assign((await import(pp)).usePreferencesStore(), {language:'zh-CN',theme:'light',autoSave:false,sideBarVisibility:false})
     ;(await import(lp)).setLocale('zh-CN')
-    const tab=editor.newUntitledTab('# 独立审阅\n\n第一段 🌱\n\n```js\nconst untouched = true\n```\n\n最后一段\n')
+    const tab=editor.newUntitledTab(initial)
     tab.pendingBaselineUpdate=false
     editor.tabs=[tab]
     editor.sourceCodeMode=source
-  }, source)
+  }, { source, initial })
   await page.getByRole('button', { name: /^AI 助手(?: \(.+\))?$/ }).click()
 }
 
@@ -115,6 +124,66 @@ async function propose(page: Page) {
   await expect(page.locator('.agent-working')).toHaveCount(0)
   await expect(page.getByText('两处独立修改', {exact:true}).last()).toBeVisible()
 }
+
+for (const source of [false, true]) {
+  test(`snapshot anchor edits the second repeated sentence in ${source ? 'source' : 'wysiwyg'}`, async ({ page }) => {
+    await setup(page, source, '重复句子\n\n重复句子\n')
+    const input = source ? page.locator('.source-pane .cm-content') : page.locator('.muya-host [contenteditable="true"]').first()
+    const before = await markdown(page)
+    await page.getByRole('textbox', { name: '发送给写作助手的消息' }).fill('anchor second occurrence')
+    await page.getByRole('button', { name: '发送', exact: true }).click()
+    const card = page.locator('.agent-edit').last()
+    await expect(card).toContainText('仅修改第二个相同句子')
+    expect(await markdown(page)).toBe(before)
+    await card.getByRole('button', { name: '应用修改', exact: true }).click()
+    const second = before.indexOf('重复句子', before.indexOf('重复句子') + 1)
+    expect(await markdown(page)).toBe(before.slice(0, second) + '第二句已修改' + before.slice(second + '重复句子'.length))
+    await input.click()
+    await page.keyboard.press('Control+z')
+    expect(await markdown(page)).toBe(before)
+  })
+
+  test(`stale review relocates only the unchanged ending and awaits confirmation in ${source ? 'source' : 'wysiwyg'}`, async ({ page }) => {
+    await setup(page, source)
+    await propose(page)
+    // Use the editor's actual input path so its buffer and undo state agree.
+    const input = source ? page.locator('.source-pane .cm-content') : page.locator('.muya-host [contenteditable="true"]').first()
+    await input.click()
+    await page.keyboard.press('Control+Home')
+    await page.keyboard.type('新增开头 ')
+    const changed = await markdown(page)
+    const old = page.locator('.agent-edit').first()
+    await expect(old.getByRole('status')).toContainText('建议已过期')
+    await expect(old.getByRole('button', { name: '应用此处', exact: true }).first()).toBeDisabled()
+    await old.getByRole('button', { name: '重新审阅未冲突修改', exact: true }).click()
+    await expect(page.locator('.agent-edit')).toHaveCount(2)
+    expect(await markdown(page)).toBe(changed)
+    const fresh = page.locator('.agent-edit').last()
+    await expect(fresh).toContainText('已按当前正文重定位')
+    await fresh.getByRole('button', { name: '应用此处', exact: true }).last().click()
+    expect(await markdown(page)).toBe(changed.replace('最后一段', '最后一段已修改'))
+    await input.click()
+    await page.keyboard.press('Control+z')
+    expect(await markdown(page)).toBe(changed)
+  })
+}
+
+test('changing the target paragraph reports a conflict instead of retargeting the old review', async ({ page }) => {
+  await setup(page, true)
+  await propose(page)
+  const input = page.locator('.source-pane .cm-content')
+  await input.click()
+  await page.keyboard.press('Control+End')
+  await page.keyboard.press('ArrowUp')
+  await page.keyboard.press('End')
+  await page.keyboard.type('，这是人的新内容')
+  const changed = await markdown(page)
+  await page.locator('.agent-edit').first().getByRole('button', { name: '重新审阅未冲突修改', exact: true }).click()
+  await expect(page.locator('.agent-panel')).toContainText('冲突或定位不明确')
+  expect(await markdown(page)).toBe(changed)
+  const fresh = page.locator('.agent-edit').last()
+  await expect(fresh).not.toContainText('最后一段已修改')
+})
 
 test('sends item-level review feedback and rewrites only the requested rejected item', async ({page}) => {
   await setup(page, true)
@@ -224,8 +293,8 @@ test('partial review preserves accepted changes and blocks overwriting subsequen
   await page.getByRole('button',{name:'撤回已应用',exact:true}).click()
   await propose(page)
   await page.evaluate(async()=>{const p='/src/stores/editor.ts';const e=(await import(p)).useEditorStore();e.setMarkdownExternal(e.currentFileId,e.currentFile.markdown+'\n手动新增内容')})
-  await page.getByRole('button',{name:'全部应用',exact:true}).last().click()
-  await expect(page.locator('.agent-composer-error')).toContainText('文档已变化')
+  await expect(page.getByRole('button',{name:'全部应用',exact:true}).last()).toBeDisabled()
+  await expect(page.locator('.agent-edit').last().getByRole('status')).toContainText('建议已过期')
   expect(await markdown(page)).toContain('手动新增内容')
   expect(await markdown(page)).not.toContain('最后一段已修改')
 })

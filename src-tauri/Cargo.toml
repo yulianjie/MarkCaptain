@@ -1,6 +1,6 @@
 [package]
 name = "markcaptain"
-version = "0.8.0"
+version = "0.8.1"
 description = "MarkCaptain — an intelligent, local-first Markdown editor with a writing Agent"
 authors = ["Lianjie Yu and MarkCaptain contributors"]
 license = "MIT"

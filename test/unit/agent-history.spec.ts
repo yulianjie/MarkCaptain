@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { packHistory, hydrateHistory, exportHistory, type HistoryChat } from '../../src/services/agent-history'
 import { createChapterSummary, finishSummaryJob } from '../../src/services/agent-summary'
-import { reviewProposal, reviewSource, type AgentEvent } from '../../src/services/agent'
+import { reviewFeedback, reviewProposal, reviewSource, type AgentEvent } from '../../src/services/agent'
 
 const transport = vi.hoisted(() => ({ start: vi.fn(), cancel: vi.fn(), listen: vi.fn(), historySettings: vi.fn(), historySetEnabled: vi.fn(), historyList: vi.fn(), historyRead: vi.fn(), historyWrite: vi.fn(), historyDelete: vi.fn() }))
 const files = vi.hoisted(() => ({ openFiles: vi.fn(), readMarkdown: vi.fn(), saveMarkdown: vi.fn(), saveAsDialog: vi.fn(), renameFile: vi.fn() }))
@@ -39,6 +39,45 @@ describe('Local transcript snapshots', () => {
     expect(restored.chat.messages[0]?.imagesOmitted).toBe(true)
     expect(restored.chat.messages[1]?.sources?.[0]?.snapshot).toEqual(source.snapshot)
     expect(exportHistory(packed)).toContain('Images were not saved')
+  })
+  it('interns identical text once while preserving each request version and anchor', () => {
+    const chat = blank()
+    for (const snapshotId of ['first-request', 'second-request']) {
+      const versioned = { ...snapshot, snapshotId }
+      const edit = reviewProposal(versioned, { title: 'Greeting', changes: [{ oldText: 'hello', newText: 'Hello',
+        anchor: { snapshotId, from: 9, to: 14 } }] }, snapshotId)
+      chat.messages.push({ id: `${snapshotId}-user`, role: 'user', content: 'polish', tools: [], contextSnapshot: versioned },
+        { id: snapshotId, role: 'assistant', content: '', tools: [], edit })
+    }
+    const record = packHistory(metadata(), chat, snapshot)
+    expect(record.data.snapshots).toHaveLength(1)
+    expect(record.data.snapshots[0]!.snapshotId).toBeUndefined()
+    const restored = hydrateHistory(record).chat.messages
+    for (const [i, snapshotId] of ['first-request', 'second-request'].entries()) {
+      expect(restored[i * 2]!.contextSnapshot!.snapshotId).toBe(snapshotId)
+      expect(restored[i * 2 + 1]!.edit!.snapshot.snapshotId).toBe(snapshotId)
+      expect(restored[i * 2 + 1]!.edit!.changes[0]!.anchor!.snapshotId).toBe(snapshotId)
+    }
+    for (const invalidId of ['', null, 42, 'x'.repeat(161)]) {
+      const corrupt = JSON.parse(JSON.stringify(record))
+      corrupt.data.chat.messages[0].contextSnapshot.snapshotId = invalidId
+      expect(() => hydrateHistory(corrupt)).toThrow('agent:historyInvalid')
+    }
+  })
+  it('accepts legacy snapshots with their version stored on the interned document', () => {
+    const chat = blank(), snapshotId = 'legacy-request'
+    const versioned = { ...snapshot, snapshotId }
+    const edit = reviewProposal(versioned, { title: 'Greeting', changes: [{ oldText: 'hello', newText: 'Hello',
+      anchor: { snapshotId, from: 9, to: 14 } }] })
+    chat.messages.push({ id: 'legacy', role: 'assistant', content: '', tools: [], edit })
+    const legacy = JSON.parse(JSON.stringify(packHistory(metadata(), chat, versioned)))
+    legacy.data.snapshots[0].snapshotId = snapshotId
+    delete legacy.data.chat.messages[0].edit.snapshot.snapshotId
+    delete legacy.data.document.snapshotId
+    const restored = hydrateHistory(legacy)
+    expect(restored.document!.snapshotId).toBe(snapshotId)
+    expect(restored.chat.messages[0]!.edit!.snapshot.snapshotId).toBe(snapshotId)
+    expect(restored.chat.messages[0]!.edit!.changes[0]!.anchor!.snapshotId).toBe(snapshotId)
   })
   it('rebuilds a bounded summary graph, preserves completed work and locks historical edits', () => {
     const chat = blank(), summary = createChapterSummary(snapshot)
@@ -83,6 +122,23 @@ describe('Local transcript snapshots', () => {
     expect(hydrateHistory(legacy).chat.messages[0]!.edit!.changes[0]!.id).toBe('a:1')
     legacy.data.chat.messages[0].edit.changes[0].reason = 'x'.repeat(1001)
     expect(() => hydrateHistory(legacy)).toThrow('agent:historyInvalid')
+  })
+  it('retains bounded relocation ancestry and superseded feedback when restoring history', () => {
+    const chat = blank()
+    const edit = reviewProposal(snapshot, { title: 'Greeting', oldText: 'hello', newText: 'Hello' }, 'a')
+    edit.rebasedFrom = 'old:1'; edit.rebasedTo = 'new-card'; edit.rebaseConflicts = ['conflict:1']
+    edit.changes[0]!.sourceChangeIds = ['root:1', 'old:1']
+    chat.messages.push({ id: 'a', role: 'assistant', content: '', tools: [], edit })
+    const record = packHistory(metadata(), chat, snapshot)
+    const restored = hydrateHistory(record).chat.messages[0]!.edit!
+    expect(restored).toMatchObject({ rebasedFrom: 'old:1', rebasedTo: 'new-card', rebaseConflicts: ['conflict:1'], locked: true })
+    expect(restored.changes[0]!.sourceChangeIds).toEqual(['root:1', 'old:1'])
+    expect(JSON.parse(reviewFeedback(restored).split('[User review feedback]\n')[1]!).changes[0].status).toBe('superseded')
+    const corrupt = JSON.parse(JSON.stringify(record))
+    corrupt.data.chat.messages[0].edit.changes[0].sourceChangeIds = ['duplicate', 'duplicate']
+    expect(() => hydrateHistory(corrupt)).toThrow('agent:historyInvalid')
+    corrupt.data.chat.messages[0].edit.changes[0].sourceChangeIds = Array.from({ length: 65 }, (_, i) => `old:${i}`)
+    expect(() => hydrateHistory(corrupt)).toThrow('agent:historyInvalid')
   })
   it('restores changed documents into independent tabs, never replacing unsaved text', async () => {
     const editor = useEditorStore(), agent = useAgentStore(), tab = editor.newUntitledTab('live unsaved')

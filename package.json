@@ -1,6 +1,6 @@
 {
   "name": "markcaptain",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "private": true,
   "description": "MarkCaptain — an intelligent, local-first Markdown editor with an integrated writing Agent",
   "type": "module",

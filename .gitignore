@@ -8,6 +8,9 @@
 /src-tauri/target-agent-multimodal
 /src-tauri/gen
 
+# Generated from src/assets/app-icons/ios26.png by npm run icons:bundle
+/src-tauri/icons/
+
 # Editor / OS
 .DS_Store
 *.log

@@ -9,6 +9,7 @@
  */
 
 import { invoke } from '@tauri-apps/api/core'
+import type { ExternalConnection, ExternalRequest } from './agent-external'
 import type { HistoryRecord, HistoryMetadata } from './agent-history'
 import type { AgentConfig, AgentHeader, AgentRequest, AgentSettings, AgentSkill, AgentSkillDetail } from './agent'
 import type {
@@ -24,6 +25,10 @@ import type {
 } from './cloud-storage'
 
 export const agentGetConfig = () => invoke<AgentConfig>('cmd_agent_get_config')
+export const agentExternalGrant = () => invoke<ExternalConnection>('cmd_agent_external_grant')
+export const agentExternalRevoke = (documentId: string) => invoke<void>('cmd_agent_external_revoke', { documentId })
+export const agentExternalTake = (documentId: string) => invoke<ExternalRequest[]>('cmd_agent_external_take', { documentId })
+export const agentExternalReply = (documentId: string, requestId: string, result: unknown) => invoke<void>('cmd_agent_external_reply', { documentId, requestId, result })
 export const agentHistorySettings = () => invoke<{ enabled: boolean }>('cmd_agent_history_settings')
 export const agentHistorySetEnabled = (enabled: boolean) => invoke<{ enabled: boolean }>('cmd_agent_history_set_enabled', { enabled })
 export const agentHistoryList = () => invoke<HistoryMetadata[]>('cmd_agent_history_list')

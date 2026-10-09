@@ -10,6 +10,7 @@
 //! the macro — the build fails fast if you forget either.
 
 pub mod agent;
+pub mod agent_external;
 pub mod backdrop;
 pub mod debug;
 pub mod export;
@@ -31,6 +32,10 @@ pub mod workspace;
 macro_rules! markcaptain_handler {
     () => {
         tauri::generate_handler![
+            $crate::commands::agent_external::cmd_agent_external_grant,
+            $crate::commands::agent_external::cmd_agent_external_revoke,
+            $crate::commands::agent_external::cmd_agent_external_take,
+            $crate::commands::agent_external::cmd_agent_external_reply,
             $crate::commands::agent::history::cmd_agent_history_settings,
             $crate::commands::agent::history::cmd_agent_history_set_enabled,
             $crate::commands::agent::history::cmd_agent_history_list,

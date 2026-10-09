@@ -1,10 +1,10 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "MarkCaptain",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "identifier": "io.github.yulianjie.markcaptain",
   "build": {
-    "beforeDevCommand": "npm run dev",
+    "beforeDevCommand": "npm run icons:bundle && npm run dev",
     "devUrl": "http://localhost:1420",
     "beforeBuildCommand": "npm run icons:bundle && npm run build",
     "frontendDist": "../dist"
@@ -38,6 +38,7 @@
   },
   "bundle": {
     "active": true,
+    "resources": { "../scripts/markcaptain-mcp.mjs": "markcaptain-mcp.mjs" },
     "targets": "all",
     "category": "Productivity",
     "shortDescription": "Intelligent Markdown editor with a writing Agent",

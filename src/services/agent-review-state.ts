@@ -18,7 +18,7 @@ export function createReviewStateTracker() {
       if (edit.appliedMarkdown !== undefined) edit.appliedMarkdown = markdown
       return
     }
-    const known = !edit.locked && checkpoints.get(edit)?.find(indices => reviewedMarkdown(edit, indices) === markdown)
+    const known = !edit.locked && !edit.rebasedTo && checkpoints.get(edit)?.find(indices => reviewedMarkdown(edit, indices) === markdown)
     if (known && markdown !== undefined) {
       for (const [i, change] of edit.changes.entries()) {
         // Rejection is a review decision, not part of the editor undo stack.

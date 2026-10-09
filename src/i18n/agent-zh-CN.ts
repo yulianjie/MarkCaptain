@@ -1,5 +1,8 @@
 export default {
-  reviewDocumentChanged: '正文已变化，之前接受的修改是否仍在正文中需要重新核对。', reviewUnverified: '曾接受 · 当前状态未核实', feedbackCompacted: '本轮使用精简反馈或较早回答的摘录；完整内容仍保留本地，修改详情可按 ID 分段读取。', reviewTool: '读取审阅修改详情',
+  reviewDocumentChanged: '建议已过期：正文已变化，请重新审阅或重新生成。', reviewUnverified: '曾接受 · 当前状态未核实', feedbackCompacted: '本轮使用精简反馈或较早回答的摘录；完整内容仍保留本地，修改详情可按 ID 分段读取。', reviewTool: '读取审阅修改详情',
+  rebaseReview: '重新审阅未冲突修改', regenerateReview: '重新生成建议', reviewRebased: '已按当前正文重定位，请再次确认差异。', reviewSuperseded: '已生成新的审阅卡；此记录仅供查阅。',
+  rebaseConflict: '有 {count} 处修改与当前段落冲突或定位不明确，请重新生成。',
+  regeneratePrompt: '请根据本轮附加的当前正文重新生成尚未处理的修改建议。原请求：{prompt}。保留已接受的修改，不要重放已接受、拒绝或撤回的修改；仅在本轮授权范围内提出新建议供再次审阅。',
   reviewReason: '审阅意见（可选）', reviewReasonPlaceholder: '说明接受、拒绝或撤回的原因，或希望如何重写',
   rewrite: '按这个意见重写', rewriteDefault: '请提出一种不同的修改方案。',
   rewritePrompt: '请按审阅意见重写修改项 {id}：{reason}。以本轮附加的当前文档为准，保留已接受的修改；不要重新提出其他已拒绝或撤回的修改。只提出新建议供我审阅。',
@@ -71,6 +74,7 @@ export default {
     privacy: '点击发送后，会将对话、附加图片、文档基本信息和启用技能的名称与用途交给配置的服务。文档段落及技能正文按需读取。测试连接仅发送测试消息。',
   },
   errors: {
+    reviewSelectionChanged: '无法安全重定位原授权选区，请在当前正文中重新选择并发送新请求。',
     noAuthCredentials: '无认证模式不能包含密钥或自定义请求头。需要认证时请选择系统凭据库认证。',
     historyRead: '无法读取本地对话历史。', historyWrite: '无法保存本地对话历史。', historyInvalid: '这条历史对话无效或版本不受支持。', historyConflict: '该对话已被其他窗口修改或删除，请重新打开历史列表。', historyDisabled: '其他窗口已关闭本地历史保存。', historyLimit: '历史存储已达到上限，请导出并删除旧对话后重试。', historyImages: '历史未保存图片，请重新附加图片并发送新消息。', referenceLimit: '最多附加 8 份参考文档，单份不超过 2 MB，总计不超过 4 MB。', referenceRead: '无法解码这份参考文档，请检查文件编码。',
 

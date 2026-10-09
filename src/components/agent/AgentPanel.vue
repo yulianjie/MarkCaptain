@@ -17,6 +17,7 @@ import AgentHistory from './AgentHistory.vue'
 import AgentReferences from './AgentReferences.vue'
 import AgentSkills from './AgentSkills.vue'
 import AgentEditReview from './AgentEditReview.vue'
+import AgentExternalAccess from './AgentExternalAccess.vue'
 import './agent.css'
 
 const agent = useAgentStore()
@@ -191,6 +192,7 @@ onBeforeUnmount(() => { document.removeEventListener('focusout', captureEditorBl
       <button type="button" :aria-label="t('agent.settings.title')" :title="t('agent.settings.title')" :aria-pressed="agent.settingsOpen" @click="agent.settingsOpen = !agent.settingsOpen; agent.skillsOpen = false; agent.historyOpen = false"><Settings2 :size="16" /></button>
       <button type="button" :aria-label="t('common.close')" :title="t('common.close')" @click="agent.visible = false"><X :size="16" /></button>
     </header>
+    <AgentExternalAccess />
     <AgentHistory v-if="agent.historyOpen" />
     <AgentSettings v-else-if="agent.settingsOpen" />
     <AgentSkills v-else-if="agent.skillsOpen" />

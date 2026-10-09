@@ -1,5 +1,8 @@
 export default {
-  reviewDocumentChanged: 'The document changed. Previously accepted edits need to be checked against the current text.', reviewUnverified: 'Previously accepted · unverified', feedbackCompacted: 'This request uses compact feedback or excerpts of earlier replies. Full content stays local; patch details can be read by ID in pages.', reviewTool: 'Read review patch details',
+  reviewDocumentChanged: 'Suggestion expired: the document changed. Review it again or regenerate.', reviewUnverified: 'Previously accepted · unverified', feedbackCompacted: 'This request uses compact feedback or excerpts of earlier replies. Full content stays local; patch details can be read by ID in pages.', reviewTool: 'Read review patch details',
+  rebaseReview: 'Review non-conflicting changes again', regenerateReview: 'Regenerate suggestions', reviewRebased: 'Relocated against the current document. Confirm the new diff before applying.', reviewSuperseded: 'A new review card was created. This record is read-only.',
+  rebaseConflict: '{count} change(s) conflict with the current paragraph or cannot be located safely. Regenerate them.',
+  regeneratePrompt: 'Regenerate only unprocessed suggestions against the current document attached to this turn. Original request: {prompt}. Preserve accepted edits and do not replay accepted, rejected or reverted changes. Propose new changes only within this turn\'s authorized scope for another review.',
   reviewReason: 'Review comment (optional)', reviewReasonPlaceholder: 'Why accept, reject or revert, or how should this be rewritten?',
   rewrite: 'Rewrite with this feedback', rewriteDefault: 'Please propose a different revision.',
   rewritePrompt: 'Rewrite change {id} using this review feedback: {reason}. Use the current document attached to this turn and preserve accepted changes. Do not repeat other rejected or reverted changes. Propose a new revision for review.',
@@ -71,6 +74,7 @@ export default {
     privacy: 'Sending shares the conversation, attached images, document metadata, and enabled skill names and descriptions with your service. Passages and skill instructions load on demand. Connection tests send only a test message.',
   },
   errors: {
+    reviewSelectionChanged: 'The original authorized selection cannot be relocated safely. Select it again in the current document and send a new request.',
     noAuthCredentials: 'Unauthenticated mode cannot contain keys or custom headers. Choose OS credential store authentication if needed.',
     historyRead: 'Could not read local conversation history.', historyWrite: 'Could not save local conversation history.', historyInvalid: 'This saved conversation is invalid or unsupported.', historyConflict: 'This conversation was changed or deleted in another window. Reopen history to refresh.', historyDisabled: 'Local history was disabled in another window.', historyLimit: 'History storage limit reached. Export and delete older conversations, then retry.', historyImages: 'Images were excluded from history. Attach them again and send a new message.', referenceLimit: 'Attach up to 8 references, at most 2 MB each and 4 MB combined.', referenceRead: 'This reference could not be decoded. Check its text encoding.',
 

@@ -1,6 +1,6 @@
 import { agentCancel, agentGetConfig, agentSaveConfig, agentStart, agentTestConnection, agentListSkills, agentImportSkill, agentSetSkillEnabled, agentRemoveSkill, agentReadSkill } from './tauri-invoke'
 import { listenTyped } from './tauri-bridge'
-import type { AgentEvent } from './agent'
+import type { AgentEvent, AgentRequest } from './agent'
 import { agentHistorySettings, agentHistorySetEnabled, agentHistoryList, agentHistoryRead, agentHistoryWrite, agentHistoryDelete } from './tauri-invoke'
 
 const desktop = () => '__TAURI_INTERNALS__' in window
@@ -15,7 +15,8 @@ export const agentTransport = {
   getConfig: () => '__TAURI_INTERNALS__' in window ? agentGetConfig() : Promise.reject(new Error('agent:desktopOnly')),
   saveConfig: agentSaveConfig,
   testConnection: agentTestConnection,
-  start: agentStart,
+  start: (request: AgentRequest) => agentStart({ ...request,
+    context: request.context ? { ...request.context, snapshotId: request.context.snapshotId ?? request.requestId } : null }),
   cancel: agentCancel,
   listSkills: agentListSkills,
   importSkill: agentImportSkill,

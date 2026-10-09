@@ -5,7 +5,7 @@ export interface AgentHeader { name: string; value: string }
 export interface AgentConfig extends AgentSettings { hasKey: boolean; hasHeaders: boolean }
 export interface AgentImage { name: string; dataUrl: string }
 export interface AgentMessage { role: 'user' | 'assistant'; content: string; images?: AgentImage[] }
-export interface AgentContext { name: string; markdown: string }
+export interface AgentContext { name: string; markdown: string; snapshotId?: string; offset?: number }
 export interface AgentReference extends AgentContext { documentId: string }
 export interface ReferenceSnapshot { documentId: string; snapshot: DocumentSnapshot }
 export interface AgentSkill {
@@ -32,7 +32,9 @@ export interface AgentRequest {
   reviewChanges?: AgentReviewChange[]
 }
 export interface AgentReviewChange extends AgentChange { id: string; reason?: string }
-export interface AgentChange { oldText: string; newText: string }
+/** End-exclusive UTF-16 coordinates in the original document, bound to one immutable snapshot. */
+export interface AgentAnchor { snapshotId: string; from: number; to: number }
+export interface AgentChange { oldText: string; newText: string; anchor?: AgentAnchor }
 export interface AgentProposal { title: string; changes?: AgentChange[]; oldText?: string; newText?: string }
 export interface AgentEvent {
   requestId: string
@@ -40,7 +42,7 @@ export interface AgentEvent {
   text?: string
   proposal?: AgentProposal
 }
-export interface DocumentSnapshot { tabId: string; name: string; markdown: string; from: number; to: number; path?: string }
+export interface DocumentSnapshot { tabId: string; name: string; markdown: string; from: number; to: number; path?: string; snapshotId?: string }
 export interface AgentSource { label: string; startLine: number; endLine: number; quote: string; snapshot: DocumentSnapshot }
 
 /** Citation lines refer to the immutable attachment, including a partial first line. */
@@ -61,17 +63,27 @@ export function reviewSource(snapshot: DocumentSnapshot, value: unknown): AgentS
 export interface ReviewedEdit extends AgentProposal {
   locked?: boolean
   documentChanged?: boolean
+  rebasedFrom?: string
+  rebasedTo?: string
+  rebaseConflicts?: string[]
   snapshot: DocumentSnapshot
   changes: ReviewedChange[]
   status: EditStatus | 'partial'
   appliedMarkdown?: string
 }
 export type EditStatus = 'pending' | 'applied' | 'dismissed' | 'reverted'
-export interface ReviewedChange extends AgentChange { id: string; reason?: string; from: number; to: number; startLine: number; endLine: number; status: EditStatus }
+export interface ReviewedChange extends AgentChange { id: string; sourceChangeIds?: string[]; reason?: string; from: number; to: number; startLine: number; endLine: number; status: EditStatus }
+
+/** JS indices count UTF-16 units, but a valid document position cannot bisect a surrogate pair. */
+export function isDocumentBoundary(markdown: string, offset: number): boolean {
+  if (!Number.isInteger(offset) || offset < 0 || offset > markdown.length) return false
+  const before = markdown.charCodeAt(offset - 1), after = markdown.charCodeAt(offset)
+  return !(before >= 0xD800 && before <= 0xDBFF && after >= 0xDC00 && after <= 0xDFFF)
+}
 
 export function reviewProposal(snapshot: DocumentSnapshot, proposal: AgentProposal, proposalId: string = crypto.randomUUID()): ReviewedEdit {
   const { markdown, from, to } = snapshot
-  if (!Number.isInteger(from) || !Number.isInteger(to) || from < 0 || to < from || to > markdown.length) throw new Error('agent:invalidEdit')
+  if (!isDocumentBoundary(markdown, from) || !isDocumentBoundary(markdown, to) || to < from) throw new Error('agent:invalidEdit')
   if (typeof proposal.title !== 'string' || !proposal.title.trim() || new TextEncoder().encode(proposal.title).length > 300) throw new Error('agent:invalidEdit')
   if (proposal.changes && (proposal.oldText !== undefined || proposal.newText !== undefined)) throw new Error('agent:invalidEdit')
   const inputs = proposal.changes ?? [{ oldText: proposal.oldText!, newText: proposal.newText! }]
@@ -82,10 +94,22 @@ export function reviewProposal(snapshot: DocumentSnapshot, proposal: AgentPropos
     if (!change || typeof change.oldText !== 'string' || typeof change.newText !== 'string') throw new Error('agent:invalidEdit')
     const oldText = change.oldText, newText = change.newText.replace(/\r\n?/g, '\n')
     bytes += new TextEncoder().encode(newText).length
-    const index = oldText ? scope.indexOf(oldText) : scope.length
-    if (index < 0 || oldText && scope.indexOf(oldText, index + 1) !== -1 || oldText === newText || bytes > 240_000) throw new Error('agent:invalidEdit')
-    const start = from + index, end = start + oldText.length
-    return { id: `${proposalId}:${changeIndex + 1}`, oldText, newText, from: start, to: end, startLine: markdown.slice(0, start).split('\n').length, endLine: markdown.slice(0, Math.max(start, end - 1)).split('\n').length, status: 'pending' }
+    let start: number, end: number
+    if (change.anchor !== undefined) {
+      const anchor = change.anchor
+      if (!anchor || !snapshot.snapshotId || anchor.snapshotId !== snapshot.snapshotId
+        || !isDocumentBoundary(markdown, anchor.from) || !isDocumentBoundary(markdown, anchor.to)
+        || anchor.from < from || anchor.to > to || anchor.to < anchor.from
+        || markdown.slice(anchor.from, anchor.to) !== oldText) throw new Error('agent:invalidEdit')
+      start = anchor.from; end = anchor.to
+    } else {
+      const index = oldText ? scope.indexOf(oldText) : scope.length
+      if (index < 0 || oldText && scope.indexOf(oldText, index + 1) !== -1) throw new Error('agent:invalidEdit')
+      start = from + index; end = start + oldText.length
+      if (!isDocumentBoundary(markdown, start) || !isDocumentBoundary(markdown, end)) throw new Error('agent:invalidEdit')
+    }
+    if (oldText === newText || bytes > 240_000) throw new Error('agent:invalidEdit')
+    return { id: `${proposalId}:${changeIndex + 1}`, oldText, newText, ...(change.anchor ? { anchor: { ...change.anchor } } : {}), from: start, to: end, startLine: markdown.slice(0, start).split('\n').length, endLine: markdown.slice(0, Math.max(start, end - 1)).split('\n').length, status: 'pending' }
   })
   const ordered = [...changes].sort((a, b) => a.from - b.from)
   if (ordered.some((change, i) => i > 0 && (change.from < ordered[i - 1]!.to || change.from === ordered[i - 1]!.from))) throw new Error('agent:invalidEdit')
@@ -105,8 +129,8 @@ export function reviewExcerpt(text: string, budget: number): string {
 }
 
 export function reviewFeedback(edit: ReviewedEdit, excerptBytes = 512, reasonBytes = 512, available?: Set<string>): string {
-  return '\n[User review feedback]\n' + JSON.stringify({ title: edit.title, changes: edit.changes.map(change => ({
-    id: change.id, status: edit.documentChanged && change.status === 'applied' ? 'unverified' : change.status,
+  return '\n[User review feedback]\n' + JSON.stringify({ title: edit.title, ...(edit.rebasedTo ? { supersededBy: edit.rebasedTo } : {}), changes: edit.changes.map(change => ({
+    id: change.id, status: edit.rebasedTo && change.status === 'pending' ? 'superseded' : edit.documentChanged && change.status === 'applied' ? 'unverified' : change.status,
     ...(edit.documentChanged && change.status === 'applied' ? { reviewStatus: change.status } : {}),
     oldText: reviewExcerpt(change.oldText, excerptBytes), newText: reviewExcerpt(change.newText, excerptBytes),
     ...(reviewExcerpt(change.oldText, excerptBytes) !== change.oldText ? { oldTextTruncated: true } : {}),

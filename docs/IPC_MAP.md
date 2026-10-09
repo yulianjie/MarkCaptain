@@ -185,6 +185,10 @@ The writing agent is native to the Tauri edition (no legacy Electron channel).
 | `cmd_agent_history_write` | Atomically write one record with optimistic revision checking; rejects disabled storage, stale versions and tombstones |
 | `cmd_agent_history_delete` | Replace a matching revision with a content-free tombstone |
 | `cmd_agent_cancel` | Cancel only the calling window's matching request |
+| `cmd_agent_external_grant` | Explicitly authorize one live renderer document; create an in-memory loopback capability and return bundled stdio adapter path |
+| `cmd_agent_external_revoke` | Revoke only the calling window's matching external document grant |
+| `cmd_agent_external_take` | Calling window polls its bounded external-request queue and renews the renderer lease |
+| `cmd_agent_external_reply` | Calling window answers its matching pending request after live-buffer/version/review validation |
 | `cmd_agent_list_skills` | List built-in/imported skill metadata and enabled state |
 | `cmd_agent_import_skill` | Open native SKILL.md picker and import its bounded text package |
 | `cmd_agent_set_skill_enabled` | Persist a skill's enabled state |

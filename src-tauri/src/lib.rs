@@ -129,9 +129,11 @@ pub fn run() {
     builder
         .manage(app::AppState::default())
         .manage(commands::agent::AgentState::default())
+        .manage(commands::agent_external::ExternalAgentState::default())
         .on_window_event(|window, event| {
             if matches!(event, tauri::WindowEvent::Destroyed) {
                 commands::agent::cancel_window(window.app_handle(), window.label());
+                commands::agent_external::revoke_window(window.app_handle(), window.label());
             }
             if matches!(event, tauri::WindowEvent::Focused(true)) {
                 let app = window.app_handle().clone();

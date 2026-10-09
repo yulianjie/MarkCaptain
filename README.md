@@ -135,6 +135,12 @@ npm run tauri:build  # Native production bundles
 
 Native bundles are written under `src-tauri/target/release/bundle/`.
 
+Native icons in `src-tauri/icons/` are generated and ignored by Git. Both
+`tauri:dev` and `tauri:build` regenerate them from `src/assets/app-icons/ios26.png`.
+Before invoking Cargo directly on a fresh checkout, run `npm install` and
+`npm run icons:bundle`. The source artwork and the separately maintained
+Markdown file-association icon under `resources/icons/` remain tracked.
+
 ## Architecture
 
 ```text
