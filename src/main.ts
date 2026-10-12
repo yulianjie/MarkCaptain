@@ -1,4 +1,4 @@
-import { createApp } from 'vue'
+import { createApp, nextTick } from 'vue'
 import { createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
@@ -45,40 +45,50 @@ async function bootstrap() {
   const appWindow = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
     ? getCurrentWindow()
     : null
-  // Secondary windows are created visible by Tauri. Hide them immediately so
-  // their default document colours cannot flash while preferences are loading.
-  if (appWindow) await appWindow.hide().catch(() => undefined)
-  if (appWindow) {
-    const stopBackdrop = await listenTyped('mt://window/backdrop', active => {
-      document.documentElement.classList.toggle('native-glass', active)
-    })
-    window.addEventListener('beforeunload', stopBackdrop, { once: true })
+  try {
+    // Keep native windows hidden while their persisted appearance is loading.
+    if (appWindow) await appWindow.hide().catch(() => undefined)
+    if (appWindow) {
+      const stopBackdrop = await listenTyped('mt://window/backdrop', active => {
+        document.documentElement.classList.toggle('native-glass', active)
+      })
+      window.addEventListener('beforeunload', stopBackdrop, { once: true })
+    }
+    if (appWindow && await enableWindowBackdrop().catch(() => false)) {
+      document.documentElement.classList.add('native-glass')
+    }
+
+    // Load and apply preferences before the first render. This keeps every
+    // window — including Preferences — from flashing the default English/light
+    // appearance while its page-level mounted hook waits for IPC.
+    const prefs = usePreferencesStore(pinia)
+    const listener = useListenForMainStore(pinia)
+    // Subscribe first, then load the snapshot. A sibling window can write while
+    // this window boots without its patch falling into a listener gap.
+    await listener.install().catch(() => undefined)
+    await prefs.load()
+    await applyPreferencesToDom()
+  } catch (error) {
+    // Still attempt to mount with the available/default preferences, so a
+    // failed startup IPC or theme application cannot leave an invisible app.
+    console.error('[bootstrap] failed to initialize application', error)
   }
-  if (appWindow && await enableWindowBackdrop().catch(() => false)) {
-    document.documentElement.classList.add('native-glass')
+
+  try {
+    app.mount('#app')
+    // Flush Vue's DOM updates without waiting for a painted frame. WKWebView
+    // may suspend animation frames while its native window is hidden.
+    await nextTick()
+  } catch (error) {
+    console.error('[bootstrap] failed to mount application', error)
   }
 
-  // Load and apply preferences before the first render. This keeps every
-  // window — including Preferences — from flashing the default English/light
-  // appearance while its page-level mounted hook waits for IPC.
-  const prefs = usePreferencesStore(pinia)
-  const listener = useListenForMainStore(pinia)
-  // Subscribe first, then load the snapshot. A sibling window can write while
-  // this window boots without its patch falling into a listener gap.
-  await listener.install().catch(() => undefined)
-  await prefs.load()
-  await applyPreferencesToDom()
-
-  app.mount('#app')
-
-  // Window starts hidden (tauri.conf.json visible:false) so the user never sees
-  // the unpainted webview or the window-state plugin restoring geometry.
-  // Reveal after the first paint. Browser-only Vite development skips this.
+  // Reveal even after an initialization/mount failure. The Rust command still
+  // repairs saved geometry before showing and focusing the native window.
+  // Browser-only Vite development skips this.
   if (appWindow) {
-    requestAnimationFrame(() => {
-      void showWindow().catch(error => console.error('[window] failed to show window', error))
-    })
+    await showWindow().catch(error => console.error('[window] failed to show window', error))
   }
 }
 
-void bootstrap()
+void bootstrap().catch(error => console.error('[bootstrap] failed to start application', error))
