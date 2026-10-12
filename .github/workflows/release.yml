@@ -35,6 +35,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Manual retries must build the requested release, not current master.
+          ref: ${{ github.event.inputs.tag || github.ref }}
 
       - name: Install Linux build deps
         if: matrix.platform.os == 'ubuntu-22.04'
@@ -80,8 +83,21 @@ jobs:
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
+          # Empty optional secrets still count as configured environment variables
+          # to Tauri. In particular, APPLE_CERTIFICATE="" triggers an invalid
+          # keychain import instead of the intended unsigned build.
+          for key in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            if [ -z "${!key}" ]; then
+              unset "$key"
+            fi
+          done
+
+          # A successful .app build (including any configured signing) is required.
+          # Only the subsequent DMG packaging step is allowed to fail.
+          npm run tauri:build -- --target ${{ matrix.platform.target }} --bundles app
+
           set +e
-          npm run tauri:build -- --target ${{ matrix.platform.target }} --bundles app dmg
+          npm run tauri:build -- --target ${{ matrix.platform.target }} --bundles dmg
           code=$?
           set -e
 
@@ -93,7 +109,7 @@ jobs:
           fi
 
           if [ $code -ne 0 ]; then
-            echo "::warning::DMG bundling failed (known macOS runner Finder regression); shipping .app tarball only"
+            echo "::warning::DMG packaging failed after a successful .app build; shipping .app tarball only"
             rm -rf "$base/dmg"
           fi
 
