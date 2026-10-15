@@ -28,7 +28,7 @@ function readStoredWidth(): number {
   }
 }
 
-export type RightColumn = '' | 'files' | 'search' | 'toc'
+export type RightColumn = '' | 'files' | 'search' | 'toc' | 'notes'
 
 export const useLayoutStore = defineStore('layout', () => {
   const prefs = usePreferencesStore()

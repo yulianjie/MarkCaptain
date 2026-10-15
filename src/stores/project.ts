@@ -22,9 +22,7 @@ import {
   watchFolder,
   unwatchFolder,
   createWorkspaceEntry,
-  renameWorkspaceEntry,
   copyWorkspaceEntry,
-  moveWorkspaceEntry,
   trashWorkspaceEntry,
   storageResolveProject,
   type WorkspaceEntryKind,
@@ -689,8 +687,10 @@ export const useProjectStore = defineStore('project', () => {
   }
 
   async function renameEntry(source: string, newName: string) {
-    const root = requireRoot()
-    const destination = await renameWorkspaceEntry(root.pathname, source, newName)
+    requireRoot()
+    const destination = `${parentDirOf(source)}/${newName}`
+    const { useNotebookStore } = await import('./notebook')
+    await useNotebookStore().moveWithReferences(source, destination)
     remapOpenTabs(source, destination)
     relocateCachedEntry(source, destination)
     await refreshAfterMutation([source, destination])
@@ -705,8 +705,10 @@ export const useProjectStore = defineStore('project', () => {
   }
 
   async function moveEntry(source: string, destinationDir: string) {
-    const root = requireRoot()
-    const destination = await moveWorkspaceEntry(root.pathname, source, destinationDir)
+    requireRoot()
+    const destination = `${destinationDir}/${basename(source)}`
+    const { useNotebookStore } = await import('./notebook')
+    await useNotebookStore().moveWithReferences(source, destination)
     remapOpenTabs(source, destination)
     relocateCachedEntry(source, destination)
     await refreshAfterMutation([source, destination])

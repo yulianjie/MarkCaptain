@@ -1,6 +1,9 @@
 {
   "version": 1,
   "actions": [
+    { "id": "file.quickOpen", "display": "Quick open note", "scope": "application", "availability": "always", "dispatch": "application", "remappable": true, "default": "Ctrl+K", "reserved": false },
+    { "id": "file.dailyNote", "display": "Today's note", "scope": "application", "availability": "always", "dispatch": "application", "remappable": true, "default": "Ctrl+Alt+D", "reserved": false },
+    { "id": "edit.insertTemplate", "display": "Insert template", "scope": "application", "availability": "editor", "dispatch": "application", "remappable": true, "default": "Ctrl+Alt+T", "reserved": false },
     {
       "id": "file.new",
       "display": "New tab",

@@ -38,6 +38,17 @@ const command = (
 })
 
 export const BUILTIN_COMMAND_SPECS: readonly BuiltinCommandSpec[] = [
+  { id: 'view.notes', category: 'view', labelKey: 'notes.panel', availability: 'always' },
+  { id: 'edit.restoreReferences', category: 'edit', labelKey: 'notes.restoreReferences', availability: 'always' },
+  { id: 'view.splitRight', category: 'view', labelKey: 'notes.splitRight', availability: 'document' },
+  { id: 'view.splitDown', category: 'view', labelKey: 'notes.splitDown', availability: 'document' },
+  { id: 'view.closePane', category: 'view', labelKey: 'notes.closePane', availability: 'always' },
+  { id: 'view.layouts', category: 'view', labelKey: 'notes.layouts', availability: 'always' },
+  { id: 'file.localHistory', category: 'file', labelKey: 'notes.history', availability: 'document' },
+  { id: 'file.quickOpen', category: 'file', labelKey: 'notes.quick', availability: 'always' },
+  { id: 'file.dailyNote', category: 'file', labelKey: 'notes.daily', availability: 'always' },
+  { id: 'edit.insertTemplate', category: 'edit', labelKey: 'notes.templates', availability: 'document' },
+  { id: 'file.noteSettings', category: 'file', labelKey: 'notes.settings', availability: 'always' },
   command('file.new', 'file'),
   command('file.newWindow', 'file'),
   command('file.open', 'file'),

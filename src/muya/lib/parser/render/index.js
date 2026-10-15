@@ -178,10 +178,10 @@ class StateRender {
       return this.renderBlock(null, block, activeBlocks, matches, true)
     })
     const newVdom = h(selector, children)
-    const rootDom = document.querySelector(selector) || this.container
+    const rootDom = this.container
     const oldVdom = toVNode(rootDom)
 
-    patch(oldVdom, newVdom)
+    this.container = patch(oldVdom, newVdom).elm
     this.renderMermaid()
     this.renderDiagram()
     this.codeCache.clear()
@@ -198,7 +198,7 @@ class StateRender {
     const needToRemoved = []
     const firstOldDom = startKey
       ? document.querySelector(`#${startKey}`)
-      : document.querySelector(`div#${CLASS_OR_ID.AG_EDITOR_ID}`).firstElementChild
+      : this.container.firstElementChild
     if (!firstOldDom) {
       // TODO@Jocs Just for fix #541, Because I'll rewrite block and render method, it will nolonger have this issue.
       return

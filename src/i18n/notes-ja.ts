@@ -1,0 +1,16 @@
+export default {
+  historyWarning: 'ローカル履歴を保存できませんでした：{error}。通常の保存は続行します。',
+  headingMissing: 'リンク先の見出しが見つかりません。見出しまたはアンカーを確認してください。',
+  indexLimit: '本文索引の上限 128 MiB に達しました。ファイル名での検索は引き続き利用できます。',
+  propertiesHint: '対応する YAML 値を編集します。未知の値、アンカー、複雑なフィールドは保持されます。', edit: '編集', readonly: '保持済み · ソースで編集', addProperty: 'プロパティを追加', propertyName: 'プロパティ名', listHint: '1 行に 1 項目', invalidProperty: 'プロパティ名または値が無効です。', invalidYaml: 'YAML が無効かルートがマッピングではありません。ソース表示で編集してください。', unsupportedProperty: '構造を保持するためこのフィールドはソースで編集してください。', type_text: 'テキスト', type_list: 'リスト', type_number: '数値', type_boolean: '真偽値', type_date: '日付',
+  queryHint: 'tag:work task:open', querySyntax: '検索構文', queryHelp: '空白 / AND で条件を組み合わせ、OR でグループを結合、NOT または - で除外します。フィールド：name:、path:、tag:、prop.key:、task:open|done|any。空白を含む値は引用符で囲みます。例：tag:work prop.priority:>=2 NOT task:done。通常の単語は本文を検索します。', results: '件（最大 1000 件を表示）', taskHint: '文書を横断した未完了タスク。変更は通常の元に戻す操作と保存を使用します。', completeTask: 'タスクを完了', queryQuote: '引用符を閉じてください。', queryField: '不明な検索フィールド：{field}', queryValue: '値がないか無効です：{field}', queryTask: '状態は open、done、any を指定してください。', queryOperator: '演算子には条件が必要です。', queryFailed: '構造化検索が予期せず停止しました。もう一度お試しください。',
+  panel: 'ノート', links: '内部リンク', tags: 'タグ', properties: 'プロパティ', search: '構造化検索', tasks: 'タスク', backlinks: 'バックリンク', mentions: '未リンクの言及', outgoing: 'この文書のリンク', rebuild: '索引を再構築', ambiguous: '名前が曖昧です。完全なパスを選択してください。曖昧な参照は変更されません。', unsupportedNoteTarget: 'このリンク先は Markdown ノートではありません。', references: '参照を更新', movePreview: '{count} 個の参照ファイルを更新し、ローカルバックアップを保存します。', saveBeforeMove: '移動または復元する前に変更した文書を保存または閉じ、外部変更を解決してください。', indexIncomplete: '索引が不完全です。読み込めないファイルを確認して再構築してください。', restoreReferences: '最後の参照更新を復元', updating: '参照を更新中…',
+  splitRight: '左右に分割', splitDown: '上下に分割', closePane: '領域を閉じる', layouts: '保存したレイアウト', paneDocument: 'この領域の文書', source: 'ソース表示を切り替え', resize: '領域のサイズを変更',
+  history: 'ローカル履歴', historyLocal: '履歴はこの端末に保存され、クラウドや Agent 履歴とは別に管理されます。', historySaved: 'ローカル履歴を有効にするには文書をファイルに保存してください。', changed: 'アクティブ文書が変更されました。画面を開き直してください。', restoreConfirm: '現在の内容を置き換えますか？置き換える前の内容はローカル履歴に保存され、操作を元に戻せます。', current: '現在', previous: '以前', copy: '以前の内容をコピー', restoreNew: '新しい文書として復元', restoreCurrent: '現在の文書を復元', interval: '間隔（秒）', retention: '保存期間（日）', space: '容量制限（MiB）', layoutName: 'レイアウト名', saveLayout: 'レイアウトを保存',
+  quick: 'ノートを素早く開く', daily: '今日のノートを開く', templates: '文書テンプレートを挿入', settings: 'ノート設定',
+  quickHint: '名前、パス、別名で検索…', indexing: 'ノートを索引中…', cancel: 'キャンセル', empty: '一致するノートがありません',
+  create: '{name} を作成', openHint: '↑ ↓ 選択 · Enter でタブに開く · Escape で閉じる',
+  templateDirectory: 'テンプレートフォルダー（相対パス）', dailyDirectory: 'デイリーノートフォルダー', dailyFormat: 'ファイル名の日付形式', dailyTemplate: 'デイリーテンプレート',
+  none: 'なし', variables: '変数：{{title}}、{{date}}、{{time}}、{{date:YYYY-MM-DD}}。設定はプロジェクト内に保存されます。',
+  meeting: '会議メモ', reading: '読書メモ', work: '作業日誌', save: '保存', invalidPath: '.. やドライブを含まない有効な Markdown 相対パスを入力してください。',
+}

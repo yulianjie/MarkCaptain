@@ -31,7 +31,13 @@
 import { onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { readText, writeText } from '@tauri-apps/plugin-clipboard-manager'
 import { open as openExternal } from '@tauri-apps/plugin-shell'
-import { useEditorStore } from '@/stores/editor'
+import { usePaneEditor } from '@/services/editor-panes'
+import { useNotebookStore } from '@/stores/notebook'
+import { markdownSelection } from '@/services/agent'
+import { analyzeNote } from '@/services/note-index'
+import { fuzzyScore } from '@/services/notebook'
+import { wikiCompletionOptions } from '@/services/note-completion'
+import { createSearchRevealRequest } from '@/services/search-reveal'
 import type { DocumentState, HistoryStack } from '@/stores/help'
 import { usePreferencesStore } from '@/stores/preferences'
 import { useI18n } from '@/i18n'
@@ -46,6 +52,7 @@ import { applyPreferencesToMuya } from '@/services/muya-preferences-applier'
 import { effectiveThemeId } from '@/services/preferences-applier'
 import { normalizeMarkdown } from '@/services/trailing-newline'
 import { installMuyaContentHistory, stepMuyaHistory } from '@/services/muya-history'
+import { acceptsMuyaViewChange, isMuyaEditBeforeLoadBaseline } from '@/services/muya-view-baseline'
 import { setFormatMenuState } from '@/services/tauri-invoke'
 import { spellchecker } from '@/services/spellchecker'
 import {
@@ -70,7 +77,54 @@ import {
 } from '@/services/search-reveal'
 import { bus } from '@/bus'
 
-const editor = useEditorStore()
+const props = withDefaults(defineProps<{ paneId?: string }>(), { paneId: 'main' })
+const { editor, isActive } = usePaneEditor(props.paneId)
+const notebook = useNotebookStore()
+const wikiCompletion = ref<{ id: string; markdown: string; from: number; to: number; options: string[]; selected: number } | null>(null)
+function refreshWikiCompletion(event: KeyboardEvent) {
+  if (event.isComposing || ['ArrowDown','ArrowUp','Enter','Tab','Escape'].includes(event.key) || editor.sourceCodeMode || !isActive.value) return
+  const tab = editor.currentFile; const muya = muyaRef.value
+  if (!tab || !muya || !notebook.root) return
+  const range = markdownSelection(tab.markdown, muya.getCursor(), true)
+  if (!range || range.from !== range.to) { wikiCompletion.value = null; return }
+  const match = /\[\[([^\]\n]*)$/.exec(tab.markdown.slice(0, range.from))
+  if (!match) { wikiCompletion.value = null; return }
+  const analysis = analyzeNote(notebook.currentNote?.relative ?? '', tab.markdown)
+  if (!analysis.prose.slice(match.index, range.from).includes('[[')) return
+  const query = match[1]
+  const candidates = [...new Set(wikiCompletionOptions(query, analysis.relative, notebook.analyses)
+    .map(option => ({ ...option, score: fuzzyScore(query, option.label) }))
+    .filter(option => option.score >= 0)
+    .sort((a, b) => b.score - a.score)
+    .map(option => option.value))]
+  wikiCompletion.value = { id: tab.id, markdown: tab.markdown, from: match.index + 2, to: range.from + (tab.markdown.slice(range.from, range.from + 2) === ']]' ? 2 : 0), options: candidates.slice(0, 12), selected: 0 }
+}
+function chooseWiki(option: string) {
+  const completion = wikiCompletion.value; wikiCompletion.value = null
+  if (!completion || editor.currentFileId !== completion.id || editor.currentFile?.markdown !== completion.markdown) return
+  const markdown = completion.markdown.slice(0, completion.from) + option + ']]' + completion.markdown.slice(completion.to)
+  editor.applyAgentEdit(completion.id, completion.markdown, markdown)
+  const position = completion.from + option.length + 2
+  bus.emit('reveal-search-hit', createSearchRevealRequest({ tabId: completion.id, path: editor.currentFile?.pathname ?? '', mode: 'wysiwyg', line: 1, column: 1, length: 0, exactRange: { markdown: editor.currentFile!.markdown, from: position, to: position } }))
+}
+function wikiKey(event: KeyboardEvent) {
+  const completion = wikiCompletion.value; if (!completion?.options.length || event.isComposing) return
+  if (event.key === 'Escape') { wikiCompletion.value = null; return }
+  if (['Enter','Tab','ArrowDown','ArrowUp'].includes(event.key)) {
+    event.preventDefault(); event.stopPropagation()
+    if (event.key === 'Enter' || event.key === 'Tab') chooseWiki(completion.options[completion.selected])
+    else completion.selected = (completion.selected + (event.key === 'ArrowDown' ? 1 : completion.options.length - 1)) % completion.options.length
+  }
+}
+function followWiki(event: MouseEvent) {
+  if (!(event.ctrlKey || event.metaKey) || !isActive.value || editor.sourceCodeMode) return
+  const tab = editor.currentFile; if (!tab || !muyaRef.value) return
+  const range = markdownSelection(tab.markdown, muyaRef.value.getCursor(), true)
+  if (!range) return
+  const source = notebook.currentNote?.relative; if (!source) return
+  const link = analyzeNote(source, tab.markdown).links.find(l => l.kind === 'wiki' && range.from >= l.from - 2 && range.from <= l.to + 2)
+  if (link) { event.preventDefault(); void notebook.followLink(source, link).catch(e => { notebook.error = String(e) }) }
+}
 const prefs = usePreferencesStore()
 const { t, locale } = useI18n()
 
@@ -79,6 +133,8 @@ const editorRoot = ref<HTMLDivElement | null>(null)
 const muyaRef = shallowRef<any>(null)
 watch(locale, () => muyaRef.value?.quickInsert?.refresh())
 const activeBoundId = ref<string | null>(null)
+let boundMarkdown: string | null = null
+let renderedBaselineMarkdown: string | null = null
 let disposePrefsApplier: (() => void) | null = null
 const contextMenuRequests = new LatestContextMenuRequest()
 let revealGuard = emptySearchRevealGuard()
@@ -132,8 +188,8 @@ function contextMenuCapabilities(muya: any, selection: ContextSelection) {
   )
   const hasSelection = hasRange || hasSpecialSelection
   return {
-    undo: hasPendingHistory || historyIndex > 0,
-    redo: !hasPendingHistory && historyIndex >= 0 && historyIndex < stackLength - 1,
+    undo: editor.usesSharedHistory ? editor.hasSharedHistoryStep('undo') : hasPendingHistory || historyIndex > 0,
+    redo: editor.usesSharedHistory ? editor.hasSharedHistoryStep('redo') : !hasPendingHistory && historyIndex >= 0 && historyIndex < stackLength - 1,
     cut: hasSelection,
     copy: hasSelection,
     paste: typeof muya.contentState?.pasteHandler === 'function',
@@ -143,6 +199,7 @@ function contextMenuCapabilities(muya: any, selection: ContextSelection) {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function restoreContext(muya: any, cursor: CapturedMuyaCursor, tabId: string): boolean {
+  if (!isActive.value) return false
   if (editor.sourceCodeMode || muyaRef.value !== muya || activeBoundId.value !== tabId) return false
   muya.contentState.cursor = {
     anchor: { ...cursor.anchor },
@@ -227,8 +284,8 @@ function handleEditorContextMenu(muya: any, event: MouseEvent, selection: Contex
 
   const restore = () => restoreContext(muya, cursor, tabId)
   const actions: EditorContextMenuActions = {
-    undo: () => { if (restore()) stepMuyaHistory(muya, 'undo') },
-    redo: () => { if (restore()) stepMuyaHistory(muya, 'redo') },
+    undo: () => { if (restore()) editor.usesSharedHistory ? editor.stepSharedHistory('undo') : stepMuyaHistory(muya, 'undo') },
+    redo: () => { if (restore()) editor.usesSharedHistory ? editor.stepSharedHistory('redo') : stepMuyaHistory(muya, 'redo') },
     cut: () => copyOrCut(muya, cursor, tabId, 'cut'),
     copy: () => copyOrCut(muya, cursor, tabId, 'copy'),
     paste: () => pasteFromClipboard(muya, cursor, tabId),
@@ -410,17 +467,27 @@ async function construct() {
     toc?: unknown
   }) => {
     const id = activeBoundId.value
-    if (!id) return
+    if (!id || editor.sourceCodeMode) return
+    const tab = editor.tabs.find(candidate => candidate.id === id)
+    if (!tab || !acceptsMuyaViewChange(tab.markdown, boundMarkdown, changes.markdown)) return
+    // A real keystroke may arrive before Muya's scheduled round-trip baseline.
+    // Do not let that first edit be mistaken for a clean load normalization.
+    if (isMuyaEditBeforeLoadBaseline(tab.pendingBaselineUpdate, renderedBaselineMarkdown, changes.markdown)) tab.pendingBaselineUpdate = false
     editor.applyContentChange(id, changes.markdown, {
       wordCount: changes.wordCount as never,
       cursor: changes.cursor,
       history: changes.history,
       toc: changes.toc as { lvl: number; content: string; slug?: string }[] | undefined,
     })
+    boundMarkdown = editor.tabs.find(candidate => candidate.id === id)?.markdown ?? null
   })
 
   // ── selectionChange: typewriter scroll + cursor-stay-in-view ───
   muya.on('selectionChange', (changes: { cursorCoords?: { y: number } }) => {
+    if (isActive.value && activeBoundId.value === editor.currentFileId) {
+      const tab = editor.currentFile
+      if (tab) tab.cursor = muya.getCursor()
+    }
     const container = editorRoot.value?.parentElement
     const y = changes?.cursorCoords?.y
     if (!container || typeof y !== 'number') return
@@ -443,6 +510,7 @@ async function construct() {
   // type names so both the renderer toolbar and the Rust menu see a flat
   // list of strings.
   muya.on('selectionFormats', (formats: Array<{ type: string }>) => {
+    if (!isActive.value) return
     const types = Array.isArray(formats) ? formats.map(f => f?.type).filter(Boolean) : []
     editor.setSelectionFormats(types)
     void setFormatMenuState(types).catch(() => {
@@ -461,6 +529,11 @@ async function construct() {
     const ctrlOrMeta = (isOsx && event.metaKey) || (!isOsx && event.ctrlKey)
     if (!ctrlOrMeta) return
     if (formatType === 'link' && typeof data === 'object' && data.href) {
+      if (!/^(?:[\w+.-]+:|\/\/)/.test(data.href)) {
+        const notebook = useNotebookStore(); const source = notebook.currentNote?.relative
+        if (source) void notebook.followLink(source, { kind: 'markdown', target: data.href }).catch(e => { notebook.error = String(e) })
+        return
+      }
       void openExternal(data.href)
     } else if (formatType === 'image' && typeof data === 'string' && data) {
       bus.emit('image-preview/open', { src: data })
@@ -474,7 +547,23 @@ async function construct() {
   })
 
   muyaRef.value = muya
+  if (muya.linkTools) {
+    const selectItem = muya.linkTools.selectItem.bind(muya.linkTools)
+    muya.linkTools.selectItem = (event: MouseEvent, item: unknown) => { editor.activatePane(props.paneId); selectItem(event, item) }
+    muya.linkTools.options.jumpClick = (linkInfo: { href?: string }) => {
+      const href = linkInfo.href; if (!href) return
+      if (/^(?:[\w+.-]+:|\/\/)/.test(href)) { void openExternal(href); return }
+      editor.activatePane(props.paneId)
+      const source = notebook.currentNote?.relative
+      if (source) void notebook.followLink(source, { kind: 'markdown', target: href }).catch(e => { notebook.error = String(e) })
+    }
+  }
   editor.setMuyaInstance(muya)
+  busUnsubs.push(editor.registerInsertHandler('wysiwyg', async text => {
+    muya.focus()
+    await muya.contentState.pasteHandler({ preventDefault() {}, stopPropagation() {}, clipboardData: { items: [], getData: (format: string) => format === 'text/plain' ? text : '' } }, 'normal', text, '')
+    muya.dispatchChange()
+  }))
   busUnsubs.push(installMuyaContentHistory(muya.contentState.history))
   busUnsubs.push(editor.registerAgentEditHandler('wysiwyg', markdown => {
     const state = muya.contentState
@@ -521,6 +610,7 @@ function persistActiveSession() {
   // Source mode may have updated the shared document while Muya was hidden.
   // Never attach an old block history to that newer Markdown snapshot.
   if (typeof markdown !== 'string' || !matchesDocument(markdown, tab)) return
+  boundMarkdown = tab.markdown
   muya.contentState?.history?.commitPending?.()
   const history = muya.getHistory?.()
   if (history) tab.history = cloneMuyaHistory(history)
@@ -544,14 +634,16 @@ function loadFile(tab: DocumentState, persistCurrent = true) {
   // Suspend `change` writes until the new tab is bound — otherwise the
   // setMarkdown round-trip's dispatchChange fires under the *old* tab id.
   activeBoundId.value = null
+  boundMarkdown = tab.markdown
   muya.setOptions({ baseUrl: tab.pathname })
   muya.clearHistory()
   if (tab.cursor) {
-    muya.setMarkdown(tab.markdown, tab.cursor, true)
+    muya.setMarkdown(tab.markdown, tab.cursor, isActive.value && !editor.sourceCodeMode && persistCurrent)
   } else {
-    muya.setMarkdown(tab.markdown)
+    muya.setMarkdown(tab.markdown, undefined, isActive.value && !editor.sourceCodeMode && persistCurrent)
   }
-  if (tab.historyMarkdown === tab.markdown && tab.history.stack.length) {
+  renderedBaselineMarkdown = tab.pendingBaselineUpdate ? muya.getMarkdown?.() ?? null : null
+  if (!editor.usesSharedHistory && editor.panes.length === 1 && tab.historyMarkdown === tab.markdown && tab.history.stack.length) {
     muya.setHistory(cloneMuyaHistory(tab.history))
   } else {
     tab.history = { stack: [], index: -1 }
@@ -563,6 +655,8 @@ function loadFile(tab: DocumentState, persistCurrent = true) {
 function clearFile() {
   persistActiveSession()
   activeBoundId.value = null
+  boundMarkdown = null
+  renderedBaselineMarkdown = null
   contextMenuRequests.invalidate()
   const muya = muyaRef.value
   if (!muya) return
@@ -570,7 +664,7 @@ function clearFile() {
   muya.setOptions({ baseUrl: '' })
   muya.setMarkdown('', undefined, false)
   muya.clearHistory()
-  void setFormatMenuState([]).catch(() => { /* no native menu in browser mode */ })
+  if (isActive.value) void setFormatMenuState([]).catch(() => { /* no native menu in browser mode */ })
 }
 
 // React to current-tab changes — content swap only, never destroy/recreate.
@@ -592,7 +686,7 @@ function syncActiveMarkdownFromStore() {
   // Saving can change only the on-disk trailing-newline representation.
   // Re-parsing that equivalent content resets history/cursor and Muya adds
   // its synthetic newline again, making the just-saved file dirty forever.
-  if (matchesDocument(muya.getMarkdown(), tab)) return
+  if (matchesDocument(muya.getMarkdown(), tab)) { boundMarkdown = tab.markdown; return }
   // Disk reloads and source-mode edits deliberately reset Muya's incompatible
   // block history rather than allowing an undo to resurrect stale content.
   loadFile(tab, false)
@@ -643,6 +737,7 @@ function withMuya(fn: (muya: any) => void) {
 // is hidden would write stale Markdown back into the active tab.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function withVisibleMuya(fn: (muya: any) => void) {
+  if (!isActive.value) return
   if (!editor.currentFile || editor.sourceCodeMode) return
   withMuya(fn)
 }
@@ -657,6 +752,7 @@ function centerMuyaSelection() {
 }
 
 function tryRevealSearchHit() {
+  if (!isActive.value) return
   const settlement = settleSearchReveal(revealGuard, {
     currentTabId: editor.currentFileId,
     boundTabId: activeBoundId.value,
@@ -683,8 +779,8 @@ function installBusHandlers() {
   // ── paragraph / format / clipboard ────────────────────────────
   busUnsubs.push(bus.on('paragraph', (type) => withVisibleMuya(m => m.updateParagraph(type))))
   busUnsubs.push(bus.on('format', (type) => withVisibleMuya(m => m.format(type))))
-  busUnsubs.push(bus.on('undo', () => withVisibleMuya(m => stepMuyaHistory(m, 'undo'))))
-  busUnsubs.push(bus.on('redo', () => withVisibleMuya(m => stepMuyaHistory(m, 'redo'))))
+  busUnsubs.push(bus.on('undo', () => withVisibleMuya(m => editor.usesSharedHistory ? editor.stepSharedHistory('undo') : stepMuyaHistory(m, 'undo'))))
+  busUnsubs.push(bus.on('redo', () => withVisibleMuya(m => editor.usesSharedHistory ? editor.stepSharedHistory('redo') : stepMuyaHistory(m, 'redo'))))
   busUnsubs.push(bus.on('selectAll', () => withVisibleMuya(m => m.selectAll())))
   busUnsubs.push(bus.on('copyAsMarkdown', () => withVisibleMuya(m => m.copyAsMarkdown?.())))
   busUnsubs.push(bus.on('copyAsHtml', () => withVisibleMuya(m => m.copyAsHtml?.())))
@@ -766,8 +862,8 @@ onBeforeUnmount(() => {
   try { disposePrefsApplier?.() } catch { /* ignore */ }
   disposePrefsApplier = null
   editor.clearMuyaInstance()
-  // Clear any leftover ✓ marks before the window/menu may be GC'd.
-  void setFormatMenuState([]).catch(() => { /* ignore */ })
+  // Only the active pane owns the global native-menu state.
+  if (isActive.value) void setFormatMenuState([]).catch(() => { /* ignore */ })
   try { muyaRef.value?.destroy?.() } catch (err) {
     console.warn('[Muya destroy] non-fatal:', err)
   }
@@ -775,7 +871,10 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="muya-host" data-editor-shortcut-scope="true" :style="{ '--muya-quick-insert-hint': JSON.stringify(t('quickInsert.hint')) }">
+  <div class="muya-host" data-editor-shortcut-scope="true" :style="{ '--muya-quick-insert-hint': JSON.stringify(t('quickInsert.hint')) }" @keyup="refreshWikiCompletion" @keydown.capture="wikiKey" @click="followWiki">
+    <div v-if="wikiCompletion?.options.length" class="wiki-options" role="listbox">
+      <button v-for="(option, i) in wikiCompletion.options" :key="option" role="option" :aria-selected="wikiCompletion.selected === i" @pointerdown.prevent="chooseWiki(option)">{{ option }}</button>
+    </div>
     <div ref="editorRoot" class="muya-container">
       <div></div>
     </div>
@@ -784,6 +883,7 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .muya-host {
+  position: relative;
   flex: 1;
   overflow: auto;
   background: var(--mt-bg, #fff);
@@ -830,4 +930,9 @@ onBeforeUnmount(() => {
   font-family: var(--mt-code-font);
   font-size: var(--mt-code-font-size);
 }
+</style>
+<style scoped>
+.wiki-options { position: absolute; right: 10px; top: 8px; z-index: 30; max-width: 80%; max-height: 240px; overflow: auto; background: var(--mt-bg); border: 1px solid var(--mt-border); border-radius: 6px; box-shadow: 0 4px 16px #0002; }
+.wiki-options button { display: block; width: 100%; border: 0; text-align: left; background: transparent; color: var(--mt-fg); padding: 7px; cursor: pointer; }
+.wiki-options button[aria-selected="true"] { background: var(--mt-row-active); }
 </style>

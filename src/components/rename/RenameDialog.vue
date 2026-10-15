@@ -9,6 +9,7 @@
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { bus } from '@/bus'
 import { useEditorStore } from '@/stores/editor'
+import { useProjectStore, pathIsInsideRoot } from '@/stores/project'
 import { useNotificationStore } from '@/stores/notification'
 import { t } from '@/i18n'
 
@@ -37,7 +38,9 @@ async function apply() {
     const sep = tab.pathname.includes('\\') ? '\\' : '/'
     const next = `${dir}${sep}${name}`
     try {
-      await editor.renameTab(tab.id, next)
+      const project = useProjectStore()
+      if (project.projectTree && pathIsInsideRoot(project.projectTree.pathname, tab.pathname)) await project.renameEntry(tab.pathname, name)
+      else await editor.renameTab(tab.id, next)
     } catch (err) {
       notify.pushToast({ type: 'error', title: 'Rename failed', message: err instanceof Error ? err.message : String(err) })
       return

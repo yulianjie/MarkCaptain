@@ -1,5 +1,7 @@
 # MarkCaptain User Guide
 
+For everyday notebook features in the current source, see the [Everyday notes guide](https://github.com/yulianjie/MarkCaptain/blob/master/docs/NOTEBOOK.md). Availability depends on the installed version.
+
 [Wiki home](Home) · [简体中文](使用指南) · [Download](https://github.com/yulianjie/MarkCaptain/releases/latest) · [Report an issue](https://github.com/yulianjie/MarkCaptain/issues)
 
 This guide covers the Tauri edition published from [`yulianjie/MarkCaptain`](https://github.com/yulianjie/MarkCaptain).

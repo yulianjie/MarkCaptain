@@ -516,12 +516,16 @@ export const useAgentStore = defineStore('agent', () => {
 
   async function locateSource(snapshot: DocumentSnapshot) {
     try {
+      const requestedPaneId = editor.activePaneId
+      const requestedTabId = editor.currentFileId
       let tab = editor.tabs.find(tab => tab.id === snapshot.tabId) ?? (snapshot.path ? editor.tabs.find(tab => pathsReferToSameFile(tab.pathname, snapshot.path!)) : undefined)
       if (tab && tab.markdown !== snapshot.markdown) throw new Error('agent:sourceChanged')
       if (!tab && snapshot.path) {
         const loaded = await readMarkdown(snapshot.path)
+        if (editor.activePaneId !== requestedPaneId || editor.currentFileId !== requestedTabId) throw new Error('agent:conflict')
         if (loaded.hadDecodeErrors || loaded.markdown.replace(/\r\n?/g, '\n') !== snapshot.markdown) throw new Error('agent:sourceChanged')
         tab = await editor.openFile(snapshot.path)
+        if (editor.activePaneId !== requestedPaneId || editor.currentFileId !== tab.id) throw new Error('agent:conflict')
         if (tab.markdown !== snapshot.markdown) throw new Error('agent:sourceChanged')
       }
       if (!tab) {
@@ -530,6 +534,7 @@ export const useAgentStore = defineStore('agent', () => {
       }
       editor.setCurrent(tab.id)
       await nextTick()
+      if (editor.activePaneId !== requestedPaneId || editor.currentFileId !== tab.id) return
       bus.emit('reveal-search-hit', createSearchRevealRequest({ tabId: tab.id, path: tab.pathname ?? '',
         mode: editor.sourceCodeMode ? 'source' : 'wysiwyg', line: 1, column: 1, length: 0,
         exactRange: { markdown: snapshot.markdown, from: snapshot.from, to: snapshot.to } }))

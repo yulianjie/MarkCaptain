@@ -7,6 +7,7 @@ function readSource(relativePath: string): string {
 }
 
 const exportDialog = readSource('../../src/components/exportSettings/ExportSettingsDialog.vue')
+const editorPage = readSource('../../src/pages/EditorPage.vue')
 const updaterDialog = readSource('../../src/components/updater/UpdaterDialog.vue')
 const updaterConfig = JSON.parse(readSource('../../src-tauri/tauri.conf.json')) as {
   plugins: {
@@ -71,14 +72,27 @@ describe('export dialog workflow contract', () => {
 
   it('retains all existing Pandoc layout and document options', () => {
     for (const option of [
-      'paperSize: paperSize.value',
-      'orientation: orientation.value',
-      'title: includeTitle.value ? base : undefined',
-      'toc: enableToc.value',
+      'paperSize: exportOptions.paperSize',
+      'orientation: exportOptions.orientation',
+      'title: exportOptions.includeTitle ? base : undefined',
+      'toc: exportOptions.enableToc',
     ]) {
       expect(exportDialog).toContain(option)
     }
+    const doExport = functionBody(exportDialog, 'async function doExport()', 'let unsub:')
+    expect(doExport.indexOf('const exportOptions = {')).toBeLessThan(doExport.indexOf('const target = await saveAsDialog'))
+    for (const option of ['paperSize: paperSize.value', 'orientation: orientation.value', 'includeTitle: includeTitle.value', 'enableToc: enableToc.value']) {
+      expect(doExport).toContain(option)
+    }
     expect(exportDialog).toContain("v-if=\"format === 'pandoc-pdf'\"")
+  })
+
+  it('captures the active document and Muya instance before the HTML save dialog', () => {
+    const doExport = functionBody(editorPage, 'async function doExportHtml()', 'function doPrint()')
+    const targetDialog = doExport.indexOf('await saveAsDialog')
+    expect(doExport.indexOf('const markdown = tab.markdown')).toBeLessThan(targetDialog)
+    expect(doExport.indexOf('const muya = editor.getMuyaInstance()')).toBeLessThan(targetDialog)
+    expect(doExport).toContain('new ExportHtml(markdown, muya)')
   })
 })
 

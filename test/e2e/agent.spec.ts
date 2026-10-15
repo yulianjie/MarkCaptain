@@ -34,7 +34,7 @@ export const agentTransport = {
 };`
 
 async function setup(page: Page, source = false) {
-  await page.route('**/src/services/agent-transport.ts', route => route.fulfill({ contentType: 'text/javascript', body: transportFixture }))
+  await page.route('**/src/services/agent-transport.ts*', route => route.fulfill({ contentType: 'text/javascript', body: transportFixture }))
   await page.goto('/')
   await page.locator('.muya-host [contenteditable="true"]').waitFor()
   await page.evaluate(async source => {

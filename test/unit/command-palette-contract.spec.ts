@@ -74,6 +74,8 @@ describe('command palette action contract', () => {
       'edit.copyAsMarkdown',
       'edit.copyAsHtml',
       'edit.pasteAsPlainText',
+      'view.notes', 'edit.restoreReferences',
+      'view.splitRight', 'view.splitDown', 'view.closePane', 'view.layouts', 'file.localHistory',
     ])
     const predefinedOsOwnedItems = [
       'app.quit',

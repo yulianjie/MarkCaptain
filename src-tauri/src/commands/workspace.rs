@@ -51,7 +51,10 @@ fn canonicalize(path: &Path) -> AppResult<PathBuf> {
 /// Resolve a renderer-supplied root against the workspaces registered in
 /// [`AppState`]. Merely passing an arbitrary directory as `root` must never
 /// grant filesystem access.
-fn resolve_open_workspace(state: &AppState, requested_root: &Path) -> AppResult<PathBuf> {
+pub(crate) fn resolve_open_workspace(
+    state: &AppState,
+    requested_root: &Path,
+) -> AppResult<PathBuf> {
     let requested = canonicalize(requested_root)?;
     let is_open = state.workspace_roots().into_iter().any(|registered| {
         canonicalize(&registered)
@@ -68,7 +71,11 @@ fn resolve_open_workspace(state: &AppState, requested_root: &Path) -> AppResult<
 /// Canonicalization resolves `..` and every symlink in the existing path;
 /// `Path::starts_with` then compares path components rather than vulnerable
 /// string prefixes such as `notes` versus `notes-old`.
-fn resolve_existing_inside(root: &Path, candidate: &Path, allow_root: bool) -> AppResult<PathBuf> {
+pub(crate) fn resolve_existing_inside(
+    root: &Path,
+    candidate: &Path,
+    allow_root: bool,
+) -> AppResult<PathBuf> {
     let resolved = canonicalize(candidate)?;
     if !resolved.starts_with(root) {
         return Err(invalid_argument("path is outside the open workspace"));

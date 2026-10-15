@@ -28,12 +28,23 @@ export function publishSourceDocumentChange(
   if (tabId && update.docChanged) publish(tabId, update.state.doc.toString())
 }
 
-function buildState(doc: string, extensions: Extension, selection?: unknown): EditorState {
-  let restoredSelection: EditorSelection | undefined
-  if (selection) {
-    try { restoredSelection = EditorSelection.fromJSON(selection) } catch { /* invalid legacy selection */ }
+function isDocumentBoundary(markdown: string, offset: number): boolean {
+  return offset >= 0 && offset <= markdown.length
+    && !(offset > 0 && offset < markdown.length
+      && markdown.charCodeAt(offset - 1) >= 0xd800 && markdown.charCodeAt(offset - 1) <= 0xdbff
+      && markdown.charCodeAt(offset) >= 0xdc00 && markdown.charCodeAt(offset) <= 0xdfff)
+}
+
+function paneSelection(markdown: string, value: unknown): EditorSelection {
+  if (value !== null) {
+    try {
+      const selection = EditorSelection.fromJSON(value)
+      if (selection.ranges.every(range => isDocumentBoundary(markdown, range.anchor) && isDocumentBoundary(markdown, range.head))) {
+        return selection
+      }
+    } catch { /* malformed or stale per-pane selection */ }
   }
-  return EditorState.create({ doc, selection: restoredSelection, extensions })
+  return EditorSelection.single(0)
 }
 
 /**
@@ -50,18 +61,21 @@ export function restoreSourceEditorState(
   try {
     state = tab.sourceEditorState
       ? EditorState.fromJSON(tab.sourceEditorState, { extensions }, fields)
-      : buildState(tab.markdown, extensions, tab.sourceSelection)
+      : EditorState.create({ doc: tab.markdown, extensions })
   } catch {
-    // `EditorSelection.fromJSON` accepts offsets without knowing the document
-    // length. `EditorState.create/fromJSON` performs that check, so retrying
-    // with the same selection would simply throw again.
-    state = buildState(tab.markdown, extensions)
+    state = EditorState.create({ doc: tab.markdown, extensions })
   }
   if (state.doc.toString() !== tab.markdown) {
     state = state.update({
       changes: { from: 0, to: state.doc.length, insert: tab.markdown },
       annotations: Transaction.addToHistory.of(false),
     }).state
+  }
+  // The lightweight pane selection is authoritative over the selection
+  // embedded in a shared/older CodeMirror state. Keep the serialized history
+  // field while replacing only this pane's caret or selection.
+  if (tab.sourceSelection !== undefined) {
+    state = state.update({ selection: paneSelection(tab.markdown, tab.sourceSelection) }).state
   }
   return state
 }

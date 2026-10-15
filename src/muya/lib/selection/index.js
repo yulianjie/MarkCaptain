@@ -516,8 +516,8 @@ class Selection {
       focusNode = anchorNode
       focusOffset = anchorOffset
     } else if (!isAnchorValid && !isFocusValid) {
-      const editor = document.querySelector('#ag-editor-id').parentNode
-      editor.blur()
+      const editor = this.doc.activeElement?.closest('[contenteditable="true"]')
+      editor?.blur()
 
       return new Cursor({
         start: null,

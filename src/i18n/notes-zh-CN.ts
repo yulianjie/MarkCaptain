@@ -1,0 +1,16 @@
+export default {
+  historyWarning: '本地历史无法记录快照：{error}。仍将继续正常保存。',
+  headingMissing: '没有找到链接的标题，请检查标题文字或锚点。',
+  indexLimit: '已达到 128 MiB 项目正文索引上限，仍可按文件名搜索。',
+  propertiesHint: '编辑支持的 YAML 值；未知、带锚点及复杂字段保留原样。', edit: '编辑', readonly: '已保留 · 请在源码中编辑', addProperty: '添加属性', propertyName: '属性名称', listHint: '每行一个项目', invalidProperty: '属性名称或值无效。', invalidYaml: 'YAML 无效或根节点不是映射，请在源码模式中修改。', unsupportedProperty: '请在源码模式中编辑此字段，以保留原有结构。', type_text: '文本', type_list: '列表', type_number: '数字', type_boolean: '布尔值', type_date: '日期',
+  queryHint: 'tag:work task:open', querySyntax: '查询语法', queryHelp: '空格 / AND 组合条件；OR 合并条件组；NOT 或 - 排除。字段：name:、path:、tag:、prop.属性:、task:open|done|any。含空格的值加双引号。例如：tag:work prop.priority:>=2 NOT task:done。普通词搜索正文。', results: '个结果（最多显示 1000 个）', taskHint: '跨文档未完成的 Markdown 任务，修改使用正常的撤销和保存流程。', completeTask: '完成任务', queryQuote: '请补齐查询值的双引号。', queryField: '未知查询字段：{field}', queryValue: '缺少或无效的值：{field}', queryTask: '任务状态应为 open、done 或 any。', queryOperator: '查询运算符两侧需要有效条件。', queryFailed: '结构化搜索意外中断，请重试。',
+  panel: '笔记', links: '内部链接', tags: '标签', properties: '属性', search: '结构化搜索', tasks: '任务', backlinks: '反向链接', mentions: '未链接提及', outgoing: '当前文档链接', rebuild: '重建索引', ambiguous: '笔记名称存在歧义，请选择完整路径。有歧义的引用将保留原样。', unsupportedNoteTarget: '此链接目标不是 Markdown 笔记。', references: '维护引用', movePreview: '将更新 {count} 个引用文件，并保留本地备份。', saveBeforeMove: '移动或恢复引用前，请保存或关闭已修改的项目文档，并处理外部变更。', indexIncomplete: '索引不完整，请处理无法读取或过大的文件，重建索引后再移动。', restoreReferences: '恢复上次引用更新事务', updating: '正在更新引用…',
+  splitRight: '左右分屏', splitDown: '上下分屏', closePane: '关闭区域', layouts: '保存的布局', paneDocument: '当前区域的文档', source: '切换源码模式', resize: '调整区域大小',
+  history: '本地历史版本', historyLocal: '版本仅保存在本机，与云端历史及 Agent 历史分开。', historySaved: '请先将文档保存为文件，以启用本地历史。', changed: '活动文档已发生变化，请重新打开此窗口。', restoreConfirm: '替换当前内容？当前版本会先保留在本地历史中，恢复操作可以撤销。', current: '当前内容', previous: '历史内容', copy: '复制旧内容', restoreNew: '恢复为新文档', restoreCurrent: '恢复当前文档', interval: '快照间隔（秒）', retention: '保留期限（天）', space: '空间上限（MiB）', layoutName: '布局名称', saveLayout: '保存布局',
+  quick: '快速打开笔记', daily: '打开今日笔记', templates: '插入文档模板', settings: '笔记项目设置',
+  quickHint: '搜索文件名、路径或别名…', indexing: '正在索引笔记…', cancel: '取消', empty: '没有匹配的笔记',
+  create: '创建 {name}', openHint: '↑ ↓ 选择 · Enter 在标签中打开 · Escape 关闭',
+  templateDirectory: '模板目录（项目相对路径）', dailyDirectory: '每日笔记目录', dailyFormat: '每日笔记文件名日期格式', dailyTemplate: '每日笔记模板',
+  none: '无', variables: '变量：{{title}}、{{date}}、{{time}}、{{date:YYYY-MM-DD}}。设置保存在当前项目内。',
+  meeting: '会议记录', reading: '读书笔记', work: '工作日志', save: '保存', invalidPath: '请输入有效的 Markdown 相对路径，不允许 .. 或盘符。',
+}

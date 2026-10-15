@@ -15,6 +15,7 @@ import { useI18n } from '@/i18n'
 import TreePane from './TreePane.vue'
 import TocPane from './TocPane.vue'
 import SearchPane from './SearchPane.vue'
+import NotebookPanel from '@/components/notebook/NotebookPanel.vue'
 
 const layout = useLayoutStore()
 const { t } = useI18n()
@@ -27,6 +28,7 @@ const rails: RailItem[] = [
   { key: 'files', icon: Folder, titleKey: 'sideBar.files' },
   { key: 'toc', icon: ListTree, titleKey: 'sideBar.toc' },
   { key: 'search', icon: Search, titleKey: 'sideBar.search' },
+  { key: 'notes', icon: ListTree, titleKey: 'notes.panel' },
 ]
 
 function switchTo(key: RightColumn) {
@@ -119,6 +121,7 @@ onBeforeUnmount(endResize)
       <TreePane v-if="layout.rightColumn === 'files'" />
       <TocPane v-else-if="layout.rightColumn === 'toc'" />
       <SearchPane v-else-if="layout.rightColumn === 'search'" />
+      <NotebookPanel v-else-if="layout.rightColumn === 'notes'" />
       <div v-else class="placeholder" />
       <div
         class="resizer"

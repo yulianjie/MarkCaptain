@@ -1,6 +1,6 @@
 {
   "name": "markcaptain",
-  "version": "0.8.2",
+  "version": "0.8.3",
   "private": true,
   "description": "MarkCaptain — an intelligent, local-first Markdown editor with an integrated writing Agent",
   "type": "module",
@@ -18,6 +18,7 @@
     "test:e2e": "playwright test -c test/e2e/playwright.config.ts"
   },
   "dependencies": {
+    "@codemirror/autocomplete": "^6.20.3",
     "@codemirror/commands": "^6.10.3",
     "@codemirror/lang-markdown": "^6.5.0",
     "@codemirror/language": "^6.12.3",
@@ -46,6 +47,7 @@
     "dom-autoscroller": "^2.3.4",
     "dompurify": "^3.2.3",
     "dragula": "^3.7.3",
+    "entities": "^7.0.1",
     "element-plus": "^2.9.1",
     "element-resize-detector": "^1.2.4",
     "execall": "^2.0.0",
@@ -70,7 +72,8 @@
     "vega-lite": "^5.21.0",
     "vue": "^3.5.13",
     "vue-router": "^4.5.0",
-    "webfontloader": "^1.6.28"
+    "webfontloader": "^1.6.28",
+    "yaml": "^2.9.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.1",

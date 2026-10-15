@@ -2,7 +2,9 @@
  * 日本語ロケール文字列。en.ts と同じ構造を保つこと。
  */
 import agent from './agent-ja'
+import notes from './notes-ja'
 export default {
+  notes,
   agent,
   quickInsert: {
     hint: '@ を入力して挿入',

@@ -34,4 +34,11 @@ test.describe('preferences window', () => {
     await page.locator('#prefs-tab-editor').click()
     await expect.poll(() => body.evaluate(element => element.scrollTop)).toBe(0)
   })
+  test('localizes every new notebook shortcut label in all three languages', async ({ page }) => {
+    await page.goto('/#/preferences'); await page.locator('#prefs-tab-keybindings').click()
+    for (const [locale, labels] of [['en', ['Quick open note', "Open today's note", 'Insert document template']], ['zh-CN', ['快速打开笔记', '打开今日笔记', '插入文档模板']], ['ja', ['ノートを素早く開く', '今日のノートを開く', '文書テンプレートを挿入']]] as const) {
+      await page.evaluate(async locale => { const path = '/src/i18n/index.ts'; const prefs = '/src/stores/preferences.ts'; (await import(prefs)).usePreferencesStore().language = locale; (await import(path)).setLocale(locale) }, locale)
+      for (const label of labels) await expect(page.locator('#prefs-panel-keybindings')).toContainText(label)
+    }
+  })
 })

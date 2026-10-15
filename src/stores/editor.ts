@@ -29,6 +29,7 @@ import { usePreferencesStore } from './preferences'
 import { useNotificationStore } from './notification'
 import {
   readMarkdown,
+  localHistoryCapture,
   saveMarkdown,
   saveAsDialog,
   renameFile as renameFileCmd,
@@ -36,6 +37,7 @@ import {
 } from '@/services/tauri-invoke'
 import type { FileWatchEvent } from '@/services/tauri-bridge'
 import type { CleanEditorSessionTab, DirtyEditorSessionTab } from '@/services/editor-session'
+import { invalidatePaneViewState, setPaneViewField } from '@/services/pane-view-state'
 import {
   normalizeMarkdown,
   normalizeMarkdownLineEndings,
@@ -144,6 +146,94 @@ export const useEditorStore = defineStore('editor', () => {
 
   const tabs = ref<DocumentState[]>([])
   const currentFileId = ref<string | null>(null)
+  const panes = ref([{ id: 'main', documentId: null as string | null, sourceMode: false }])
+  const activePaneId = ref('main')
+  const splitDirection = ref<'horizontal' | 'vertical'>('horizontal')
+  const splitRatio = ref(0.5)
+  const paneSizes = ref<Record<string, number>>({})
+  const sharedHistoryDocuments = ref(new Set<string>())
+  const usesSharedHistory = computed(() => Boolean(currentFileId.value && sharedHistoryDocuments.value.has(currentFileId.value)))
+  const fileMutationBusy = ref(false)
+  let fileMutationGeneration = 0
+  const deferredFileEvents: FileWatchEvent[] = []
+  function flushDeferredFileEvents() { for (const event of deferredFileEvents.splice(0)) void handleFileWatchEvent(event) }
+  async function beginFileMutation() {
+    if (fileMutationBusy.value) throw new Error('notes.changed')
+    fileMutationGeneration++
+    fileMutationBusy.value = true
+    for (const tab of tabs.value) clearAutoSave(tab.id)
+    // A clean buffer can still have a manual save in flight. Drain writes and
+    // external reconciliation before a transaction takes its final snapshots.
+    await Promise.allSettled([...saveQueues.values(), ...externalChangeQueues.values()])
+  }
+  function endFileMutation() {
+    fileMutationBusy.value = false
+    flushDeferredFileEvents()
+    for (const tab of tabs.value) scheduleAutoSave(tab)
+  }
+  function activatePane(id: string) {
+    if (activePaneId.value === id) return
+    const pane = panes.value.find(p => p.id === id)
+    if (!pane) return
+    captureCurrentViewState()
+    const previousHistory = currentFileId.value ? sharedHistory.get(currentFileId.value) : undefined
+    if (previousHistory) previousHistory.time = 0
+    // The destination pane may still be mounting. Never expose the previous
+    // pane's cursor through the global Muya handle during that gap.
+    clearMuyaInstance()
+    activePaneId.value = id
+    currentFileId.value = pane.documentId
+    if (pane.documentId && panes.value.length > 1) sharedHistoryDocuments.value.add(pane.documentId)
+    sourceCodeMode.value = pane.sourceMode
+    listToc.value = []; currentSelectionFormats.value = []
+  }
+  function splitPane(direction: 'horizontal' | 'vertical') {
+    splitDirection.value = direction
+    if (panes.value.length >= 4) return
+    if (currentFileId.value) sharedHistoryDocuments.value.add(currentFileId.value)
+    panes.value.push({ id: crypto.randomUUID(), documentId: currentFileId.value, sourceMode: sourceCodeMode.value })
+  }
+  function closePane(id: string) {
+    if (panes.value.length === 1) return
+    panes.value = panes.value.filter(p => p.id !== id)
+    if (activePaneId.value === id) activatePane(panes.value[0].id)
+  }
+  const sharedHistory = new Map<string, { undo: string[]; redo: string[]; last: string; time: number }>()
+  let replayingHistory = false
+  let separateHistoryEdit = false
+  function recordSharedEdit(id: string, before: string, after: string) {
+    if (before === after || replayingHistory) return
+    const history = sharedHistory.get(id) ?? { undo: [], redo: [], last: before, time: 0 }
+    if (separateHistoryEdit || Date.now() - history.time > 500 || history.last !== before) history.undo.push(before)
+    if (history.undo.length > 200) history.undo.shift()
+    history.redo = []; history.last = after; history.time = separateHistoryEdit ? 0 : Date.now(); sharedHistory.set(id, history)
+  }
+  function resetSharedHistory(id: string) {
+    const tab = tabs.value.find(candidate => candidate.id === id)
+    sharedHistory.set(id, { undo: [], redo: [], last: tab?.markdown ?? '', time: 0 })
+    invalidatePaneViewState(id)
+    if (!tab) return
+    tab.history = { stack: [], index: -1 }
+    tab.historyMarkdown = tab.markdown
+    tab.sourceEditorState = null
+    tab.sourceSelection = null
+    tab.cursor = null
+  }
+  function stepSharedHistory(direction: 'undo' | 'redo') {
+    const tab = currentFile.value; if (!tab) return
+    const history = sharedHistory.get(tab.id); if (!history) return
+    const source = direction === 'undo' ? history.undo : history.redo
+    const destination = direction === 'undo' ? history.redo : history.undo
+    const markdown = source.at(-1); if (markdown === undefined) return
+    const handlerKey = `${activePaneId.value}:${sourceCodeMode.value ? 'source' : 'wysiwyg'}`
+    if (!agentEditHandlers.has(handlerKey)) return
+    source.pop()
+    destination.push(tab.markdown); replayingHistory = true
+    try { applyAgentEdit(tab.id, tab.markdown, markdown); history.last = tab.markdown }
+    catch (error) { source.push(markdown); destination.pop(); throw error }
+    finally { replayingHistory = false; history.time = 0 }
+  }
+  function hasSharedHistoryStep(direction: 'undo' | 'redo') { const history = currentFileId.value ? sharedHistory.get(currentFileId.value) : undefined; return Boolean(history?.[direction].length) }
   // Child editors mount before EditorPage's async startup restore. Keep their
   // bootstrap from creating an Untitled placeholder until restoration ends.
   const startupHydrationPending = ref(true)
@@ -162,20 +252,39 @@ export const useEditorStore = defineStore('editor', () => {
    *  Muya without dragging a ref around. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let muyaInstance: any = null
-  const agentEditHandlers = new Map<'source' | 'wysiwyg', (markdown: string) => void>()
+  const agentEditHandlers = new Map<string, (markdown: string) => void>()
+  const insertHandlers = new Map<string, (text: string) => void | Promise<void>>()
+  function registerInsertHandler(mode: 'source' | 'wysiwyg', handler: (text: string) => void | Promise<void>, paneId = 'main') {
+    const key = `${paneId}:${mode}`
+    insertHandlers.set(key, handler)
+    return () => { if (insertHandlers.get(key) === handler) insertHandlers.delete(key) }
+  }
+  async function insertText(id: string, text: string, expectedView?: { paneId: string; sourceMode: boolean }) {
+    if (fileMutationBusy.value) throw new Error('notes.changed')
+    const paneId = expectedView?.paneId ?? activePaneId.value
+    const sourceMode = expectedView?.sourceMode ?? sourceCodeMode.value
+    if (currentFileId.value !== id || activePaneId.value !== paneId || sourceCodeMode.value !== sourceMode) throw new Error('agent:conflict')
+    const handler = insertHandlers.get(`${paneId}:${sourceMode ? 'source' : 'wysiwyg'}`)
+    if (!handler) throw new Error('agent:editorNotReady')
+    separateHistoryEdit = true
+    try { await handler(text) } finally { separateHistoryEdit = false }
+  }
 
-  function registerAgentEditHandler(mode: 'source' | 'wysiwyg', handler: (markdown: string) => void) {
-    agentEditHandlers.set(mode, handler)
-    return () => { if (agentEditHandlers.get(mode) === handler) agentEditHandlers.delete(mode) }
+  function registerAgentEditHandler(mode: 'source' | 'wysiwyg', handler: (markdown: string) => void, paneId = 'main') {
+    const key = `${paneId}:${mode}`
+    agentEditHandlers.set(key, handler)
+    return () => { if (agentEditHandlers.get(key) === handler) agentEditHandlers.delete(key) }
   }
 
   function applyAgentEdit(id: string, expected: string, markdown: string): string {
+    if (fileMutationBusy.value) throw new Error('notes.changed')
     const tab = currentFile.value
     if (!tab || tab.id !== id || tab.markdown !== expected) throw new Error('agent:conflict')
-    const handler = agentEditHandlers.get(sourceCodeMode.value ? 'source' : 'wysiwyg')
+    const handler = agentEditHandlers.get(`${activePaneId.value}:${sourceCodeMode.value ? 'source' : 'wysiwyg'}`)
     if (!handler) throw new Error('agent:editorNotReady')
     tab.pendingBaselineUpdate = false
-    handler(markdown)
+    separateHistoryEdit = true
+    try { handler(markdown) } finally { separateHistoryEdit = false }
     return tab.markdown
   }
   const autoSaveTimers = new Map<string, ReturnType<typeof setTimeout>>()
@@ -204,6 +313,9 @@ export const useEditorStore = defineStore('editor', () => {
     const previous = currentFile.value
     if (previous) previous.sourceMode = sourceCodeMode.value
     currentFileId.value = id
+    if (id && panes.value.length > 1) sharedHistoryDocuments.value.add(id)
+    const pane = panes.value.find(p => p.id === activePaneId.value)
+    if (pane) pane.documentId = id
     const next = tabs.value.find(tab => tab.id === id)
     if (next) sourceCodeMode.value = next.sourceMode
     else {
@@ -226,6 +338,7 @@ export const useEditorStore = defineStore('editor', () => {
       normalized,
     )
     file.trimTrailingNewline = trimTrailingNewline
+    if (normalized !== '') { file.isSaved = false; file.lastSavedMarkdown = '' }
     file.sourceMode = sourceCodeMode.value
     tabs.value.push(file)
     setCurrent(file.id)
@@ -233,6 +346,9 @@ export const useEditorStore = defineStore('editor', () => {
   }
 
   async function openFile(pathname: string) {
+    if (fileMutationBusy.value) throw new Error('notes.changed')
+    const expectedMutation = fileMutationGeneration
+    const expectedPane = activePaneId.value
     const existing = findTabByPath(pathname)
     if (existing) {
       setCurrent(existing.id)
@@ -242,10 +358,14 @@ export const useEditorStore = defineStore('editor', () => {
       autoGuessEncoding: prefs.autoGuessEncoding,
       defaultEncoding: prefs.defaultEncoding,
     })
+    if (fileMutationBusy.value || expectedMutation !== fileMutationGeneration || expectedPane !== activePaneId.value) throw new Error('notes.changed')
     return appendLoadedDocument(doc, pathname)
   }
 
   function appendLoadedDocument(doc: LoadedDocument, requestedPath = doc.path) {
+    if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+      void localHistoryCapture(doc.path, normalizeMarkdownLineEndings(doc.markdown), true).catch(error => notify.pushToast({ type: 'error', message: String(error) }))
+    }
     const existing = findTabByPath(doc.path || requestedPath)
     if (existing) {
       setCurrent(existing.id)
@@ -406,6 +526,9 @@ export const useEditorStore = defineStore('editor', () => {
 
   /** Remove a tab from the list and pick a sensible next active tab. */
   function removeTab(id: string) {
+    sharedHistoryDocuments.value.delete(id)
+    sharedHistory.delete(id)
+    for (const pane of panes.value) if (pane.documentId === id) pane.documentId = null
     clearAutoSave(id)
     removalProbeCounts.delete(id)
     saveQueues.delete(id)
@@ -456,7 +579,8 @@ export const useEditorStore = defineStore('editor', () => {
     clearAutoSave(tab.id)
     // Never open a Save-As dialog merely because the user enabled autosave.
     if (
-      (removalProbeCounts.get(tab.id) ?? 0) > 0
+      fileMutationBusy.value
+      || (removalProbeCounts.get(tab.id) ?? 0) > 0
       || !prefs.autoSave
       || tab.isSaved
       || !tab.pathname
@@ -486,6 +610,7 @@ export const useEditorStore = defineStore('editor', () => {
     // Muya represents an otherwise empty document as one synthetic line.
     // Keep that implementation detail out of the document and disk baseline.
     const nextMarkdown = tab.markdown === '' && normalized === '\n' ? '' : normalized
+    if (!tab.pendingBaselineUpdate) recordSharedEdit(id, tab.markdown, nextMarkdown)
     if (tab.pendingBaselineUpdate) {
       tab.pendingBaselineUpdate = false
       tab.markdown = nextMarkdown
@@ -537,10 +662,7 @@ export const useEditorStore = defineStore('editor', () => {
     tab.adjustLineEndingOnSave = change.lineEnding === 'crlf'
     tab.isSaved = true
     tab.pendingBaselineUpdate = false
-    tab.history = { stack: [], index: -1 }
-    tab.historyMarkdown = change.markdown
-    tab.sourceEditorState = null
-    tab.cursor = null
+    resetSharedHistory(tab.id)
     tab.externalChange = null
     tab.autoSaveBlocked = false
     if (tab.id === currentFileId.value) listToc.value = []
@@ -742,6 +864,7 @@ export const useEditorStore = defineStore('editor', () => {
 
   /** Safely reconcile watcher events for documents that are already open. */
   async function handleFileWatchEvent(event: FileWatchEvent): Promise<void> {
+    if (fileMutationBusy.value) { deferredFileEvents.push(event); return }
     if (event.kind === 'created') return
 
     if (event.kind === 'renamed') {
@@ -843,6 +966,7 @@ export const useEditorStore = defineStore('editor', () => {
   }
 
   function queueTabSave(tab: DocumentState, targetPath?: string): Promise<boolean> {
+    if (fileMutationBusy.value) return Promise.resolve(false)
     clearAutoSave(tab.id)
     const previous = saveQueues.get(tab.id) ?? Promise.resolve(true)
     const operation = previous.then(
@@ -893,6 +1017,7 @@ export const useEditorStore = defineStore('editor', () => {
   }
 
   async function saveTabNow(tab: DocumentState, requestedPath?: string): Promise<boolean> {
+    if (fileMutationBusy.value) return false
     try {
       if (!await resolveExternalChangeBeforeSave(tab)) return false
       const originalPath = tab.pathname
@@ -911,6 +1036,12 @@ export const useEditorStore = defineStore('editor', () => {
       )
       inFlightSaveMarkdown.set(tab.id, markdown)
       try {
+        if (tab.pathname && typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+          try {
+            await localHistoryCapture(tab.pathname, tab.lastSavedMarkdown, true)
+            await localHistoryCapture(tab.pathname, markdown, true)
+          } catch (error) { notify.pushToast({ type: 'warning', message: t('notes.historyWarning', { error: String(error) }) }) }
+        }
         await saveMarkdown(path, markdown, {
           encoding: tab.encoding.encoding,
           lineEnding: tab.lineEnding,
@@ -1015,7 +1146,11 @@ export const useEditorStore = defineStore('editor', () => {
     if (!tab) return
     tab.sourceMode = sourceCodeMode.value
     if (sourceCodeMode.value || !muyaInstance) return
-    try { tab.cursor = muyaInstance.getCursor?.() ?? tab.cursor } catch { /* editor is tearing down */ }
+    try {
+      const cursor = muyaInstance.getCursor?.() ?? tab.cursor
+      setPaneViewField(activePaneId.value, tab.id, 'cursor', cursor)
+      tab.cursor = cursor
+    } catch { /* editor is tearing down */ }
   }
 
   /** Forward a Muya search-result blob into the current tab's state so the
@@ -1039,7 +1174,8 @@ export const useEditorStore = defineStore('editor', () => {
     tab.pendingBaselineUpdate = false
     const normalized = normalizeMarkdownLineEndings(markdown)
     if (tab.markdown !== normalized) {
-      tab.markdown = normalized
+      recordSharedEdit(id, tab.markdown, normalizeMarkdownLineEndings(markdown))
+    tab.markdown = normalized
       tab.isSaved = false
       scheduleAutoSave(tab)
     }
@@ -1050,6 +1186,7 @@ export const useEditorStore = defineStore('editor', () => {
     tab: DocumentState,
     snapshot: Pick<CleanEditorSessionTab, 'cursor' | 'sourceSelection' | 'sourceMode'>,
   ) {
+    resetSharedHistory(tab.id)
     tab.cursor = snapshot.cursor ?? null
     tab.sourceSelection = snapshot.sourceSelection ?? null
     tab.sourceEditorState = null
@@ -1141,6 +1278,8 @@ export const useEditorStore = defineStore('editor', () => {
     { immediate: true },
   )
   watch(sourceCodeMode, enabled => {
+    const pane = panes.value.find(p => p.id === activePaneId.value)
+    if (pane) pane.sourceMode = enabled
     if (currentFile.value) currentFile.value.sourceMode = enabled
     prefs.sourceCode = enabled
   }, { immediate: true })
@@ -1163,6 +1302,7 @@ export const useEditorStore = defineStore('editor', () => {
   return {
     // state
     tabs,
+    panes, activePaneId, splitDirection, splitRatio, paneSizes, activatePane, splitPane, closePane, stepSharedHistory, hasSharedHistoryStep, resetSharedHistory, usesSharedHistory, fileMutationBusy, beginFileMutation, endFileMutation, flushDeferredFileEvents,
     currentFileId,
     startupHydrationPending,
     listToc,
@@ -1206,6 +1346,8 @@ export const useEditorStore = defineStore('editor', () => {
     clearMuyaInstance,
     getMuyaInstance,
     registerAgentEditHandler,
+    registerInsertHandler,
+    insertText,
     applyAgentEdit,
     setSelectionFormats,
     captureCurrentViewState,

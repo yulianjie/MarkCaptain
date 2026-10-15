@@ -98,7 +98,7 @@ export const agentTransport = {
 };`
 
 async function setup(page: Page, source: boolean, initial = '# 独立审阅\n\n第一段 🌱\n\n```js\nconst untouched = true\n```\n\n最后一段\n') {
-  await page.route('**/src/services/agent-transport.ts', route => route.fulfill({ contentType: 'text/javascript', body: fixture }))
+  await page.route('**/src/services/agent-transport.ts*', route => route.fulfill({ contentType: 'text/javascript', body: fixture }))
   await page.goto('/')
   await page.locator('.muya-host [contenteditable="true"]').waitFor()
   await page.evaluate(async ({ source, initial }) => {
@@ -123,6 +123,25 @@ async function propose(page: Page) {
   await page.getByRole('button', {name:'发送',exact:true}).click()
   await expect(page.locator('.agent-working')).toHaveCount(0)
   await expect(page.getByText('两处独立修改', {exact:true}).last()).toBeVisible()
+}
+for (const source of [false, true]) {
+  test(`split Agent apply, undo and continued review feedback in ${source ? 'source' : 'wysiwyg'}`, async ({ page }) => {
+    await setup(page, source)
+    const original = await markdown(page)
+    await page.evaluate(async () => { const path = '/src/stores/editor.ts'; (await import(path)).useEditorStore().splitPane('horizontal') })
+    const input = page.locator('.editing-region').nth(1).locator(source ? '.cm-content' : '.muya-host [contenteditable="true"]')
+    await input.click(); await propose(page)
+    await page.getByRole('button', { name: '应用此处', exact: true }).first().click()
+    await page.getByRole('button', { name: '忽略此处', exact: true }).click()
+    await input.click(); await page.keyboard.press('Control+z')
+    await expect.poll(() => markdown(page)).toBe(original)
+    await page.getByRole('textbox', { name: '发送给写作助手的消息' }).fill('continue after undo')
+    await page.getByRole('button', { name: '发送', exact: true }).click()
+    await expect(page.locator('.agent-working')).toHaveCount(0)
+    const request = await page.evaluate(() => (window as any).__workflowRequest)
+    const feedback = JSON.parse(request.messages[1].content.split('[User review feedback]\n')[1])
+    expect(feedback.changes.map((c: any) => c.status)).toEqual(['reverted', 'dismissed'])
+  })
 }
 
 for (const source of [false, true]) {
@@ -481,7 +500,7 @@ test('opt-in history survives reload, exports, restores safely and deletes witho
   expect(exported).toContain('这是一份可以保存的摘要。')
   expect(exported).toContain('首尾段落')
   await page.reload()
-  await page.locator('.muya-host [contenteditable="true"]').waitFor()
+  await page.locator('.editing-region [contenteditable="true"]:visible').first().waitFor()
   await page.evaluate(async()=>{
     const lp='/src/i18n/index.ts',pp='/src/stores/preferences.ts';(await import(lp)).setLocale('zh-CN');(await import(pp)).usePreferencesStore().language='zh-CN'
   })
@@ -521,7 +540,7 @@ test('saved stopped summaries resume after reload without processing completed c
   await expect(page.getByRole('button',{name:'继续分章总结',exact:true})).toBeEnabled()
   await page.getByRole('button',{name:'新对话',exact:true}).click()
   await page.reload()
-  await page.locator('.muya-host [contenteditable="true"]').waitFor()
+  await page.locator('.editing-region [contenteditable="true"]:visible').first().waitFor()
   await page.evaluate(async()=>{const lp='/src/i18n/index.ts',pp='/src/stores/preferences.ts';(await import(lp)).setLocale('zh-CN');(await import(pp)).usePreferencesStore().language='zh-CN'})
   await page.getByRole('button', { name: /^AI 助手(?: \(.+\))?$/ }).click()
   await page.getByRole('button',{name:'历史对话',exact:true}).click()

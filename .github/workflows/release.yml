@@ -126,7 +126,7 @@ jobs:
         with:
           tag_name: ${{ env.RELEASE_TAG }}
           name: 'MarkCaptain ${{ env.RELEASE_TAG }}'
-          body: 'See the assets below to download and install MarkCaptain for your platform.'
+          body_path: docs/releases/${{ env.RELEASE_TAG }}.md
           draft: false
           prerelease: false
           fail_on_unmatched_files: false

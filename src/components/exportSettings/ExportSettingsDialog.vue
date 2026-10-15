@@ -130,27 +130,36 @@ async function doExport() {
     return
   }
 
-  const ext = format.value === 'pandoc-pdf' ? 'pdf' : 'html'
-  const base = tab.filename.replace(/\.md$/i, '') || 'untitled'
+  const exportFormat = format.value
+  const markdown = tab.markdown
+  const filename = tab.filename
+  const exportMuya = exportFormat === 'html' ? editor.getMuyaInstance() : null
+  const exportOptions = {
+    paperSize: paperSize.value,
+    orientation: orientation.value,
+    includeTitle: includeTitle.value,
+    enableToc: enableToc.value,
+  }
+  const ext = exportFormat === 'pandoc-pdf' ? 'pdf' : 'html'
+  const base = filename.replace(/\.md$/i, '') || 'untitled'
   const target = await saveAsDialog(`${base}.${ext}`)
   if (!target) return
   visible.value = false
   try {
-    if (format.value === 'pandoc-pdf') {
-      await pandocPdfExport(tab.markdown, target, {
-        paperSize: paperSize.value,
-        orientation: orientation.value,
-        title: includeTitle.value ? base : undefined,
-        toc: enableToc.value,
+    if (exportFormat === 'pandoc-pdf') {
+      await pandocPdfExport(markdown, target, {
+        paperSize: exportOptions.paperSize,
+        orientation: exportOptions.orientation,
+        title: exportOptions.includeTitle ? base : undefined,
+        toc: exportOptions.enableToc,
       })
     } else {
-      const muya = editor.getMuyaInstance()
-      if (!muya) throw new Error(t('toast.editorNotReady'))
+      if (!exportMuya) throw new Error(t('toast.editorNotReady'))
       const { default: ExportHtml } = await import('muya/lib/utils/exportHtml')
-      const exporter = new ExportHtml(tab.markdown, muya)
+      const exporter = new ExportHtml(markdown, exportMuya)
       const html = await exporter.generate({
-        title: includeTitle.value ? base : '',
-        toc: enableToc.value,
+        title: exportOptions.includeTitle ? base : '',
+        toc: exportOptions.enableToc,
         printOptimization: true,
         extraCss: '',
       })
@@ -158,7 +167,7 @@ async function doExport() {
     }
     notify.pushToast({ type: 'success', message: t('toast.exportedTo', { path: target }) })
   } catch (err) {
-    if (format.value === 'pandoc-pdf') {
+    if (exportFormat === 'pandoc-pdf') {
       await offerSystemPrintFallback(err)
     } else {
       showExportError(err)

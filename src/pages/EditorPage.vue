@@ -14,11 +14,13 @@ import AgentPanel from '@/components/agent/AgentPanel.vue'
 import { useAgentStore } from '@/stores/agent'
 import TabsBar from '@/components/editorWithTabs/TabsBar.vue'
 import EditorToolbar from '@/components/editorToolbar/EditorToolbar.vue'
-import MuyaEditor from '@/components/editorWithTabs/MuyaEditor.vue'
-import SourceCodePane from '@/components/editorWithTabs/SourceCodePane.vue'
+import EditorPanes from '@/components/notebook/EditorPanes.vue'
 import StatusBar from '@/components/statusBar/StatusBar.vue'
 import SideBar from '@/components/sideBar/SideBar.vue'
 import CommandPalette from '@/components/commandPalette/CommandPalette.vue'
+import NotebookDialogs from '@/components/notebook/NotebookDialogs.vue'
+import HistoryLayouts from '@/components/notebook/HistoryLayouts.vue'
+import { useNotebookStore } from '@/stores/notebook'
 import AboutDialog from '@/components/about/AboutDialog.vue'
 import RenameDialog from '@/components/rename/RenameDialog.vue'
 import RecentDialog from '@/components/recent/RecentDialog.vue'
@@ -92,8 +94,10 @@ const cc = useCommandCenterStore()
 const notify = useNotificationStore()
 const keys = useKeybindingsStore()
 const project = useProjectStore()
+const notebook = useNotebookStore()
 
 const dragOver = ref(false)
+const restoredSessionTabIdsByIndex = ref<Record<number, string>>({})
 const rendererHandlesRemappableShortcuts = typeof window !== 'undefined'
   && rendererOwnsApplicationShortcuts('__TAURI_INTERNALS__' in window, navigator.platform)
 let closeWindowPromise: Promise<void> | null = null
@@ -287,6 +291,7 @@ async function restoreSessionTabs(
   includeDirty: boolean,
   signal?: AbortSignal,
 ) {
+  restoredSessionTabIdsByIndex.value = {}
   const { probes, loaded } = await probeSessionFiles(session, includeDirty, signal)
   if (signal?.aborted) return
   const plan = createEditorSessionRestorePlan(
@@ -370,6 +375,7 @@ async function restoreSessionTabs(
     }
   }
 
+  restoredSessionTabIdsByIndex.value = Object.fromEntries(restoredIds)
   const requested = session.activeTabIndex === undefined
     ? undefined
     : restoredIds.get(session.activeTabIndex)
@@ -469,18 +475,20 @@ function installSessionPersistence() {
 async function doExportHtml() {
   const tab = editor.currentFile
   if (!tab) return
-  const target = await saveAsDialog((tab.filename.replace(/\.md$/i, '') || 'untitled') + '.html')
-  if (!target) return
+  const markdown = tab.markdown
+  const filename = tab.filename
   const muya = editor.getMuyaInstance()
   if (!muya) {
     notify.pushToast({ type: 'error', title: t('toast.exportFailed'), message: t('toast.editorNotReady') })
     return
   }
+  const target = await saveAsDialog((filename.replace(/\.md$/i, '') || 'untitled') + '.html')
+  if (!target) return
   try {
     const { default: ExportHtml } = await import('muya/lib/utils/exportHtml')
-    const exporter = new ExportHtml(tab.markdown, muya)
+    const exporter = new ExportHtml(markdown, muya)
     const html = await exporter.generate({
-      title: tab.filename.replace(/\.md$/i, ''),
+      title: filename.replace(/\.md$/i, ''),
       toc: false,
       printOptimization: false,
       extraCss: '',
@@ -512,6 +520,17 @@ async function doExportPandoc(format: 'docx' | 'odt' | 'epub') {
 
 /* ── menu action router ─────────────────────────────────────── */
 const MENU_ACTIONS: Record<string, () => void | Promise<void>> = {
+  'file.quickOpen': () => { notebook.dialog = 'quick' },
+  'file.dailyNote': () => notebook.daily(),
+  'edit.insertTemplate': () => { notebook.dialog = 'templates' },
+  'file.noteSettings': () => { notebook.dialog = 'settings' },
+  'view.splitRight': () => { editor.splitPane('horizontal') },
+  'view.splitDown': () => { editor.splitPane('vertical') },
+  'view.closePane': () => { editor.closePane(editor.activePaneId) },
+  'view.layouts': () => { notebook.dialog = 'layouts' },
+  'file.localHistory': () => { notebook.dialog = 'history' },
+  'view.notes': () => { layout.showSideBar = true; layout.rightColumn = 'notes' },
+  'edit.restoreReferences': () => notebook.restoreReferences(),
   'file.new': () => { editor.newUntitledTab() },
   'file.newWindow': async () => { const { newWindow } = await import('@/services/tauri-invoke'); await newWindow() },
   'file.open': doOpen,
@@ -841,8 +860,7 @@ onBeforeUnmount(() => {
         <TabsBar v-if="layout.showTabBar" />
         <EditorToolbar v-if="layout.showToolBar" />
         <div class="editor-stage">
-          <MuyaEditor v-show="editor.currentFile && !editor.sourceCodeMode" />
-          <SourceCodePane v-show="editor.currentFile && editor.sourceCodeMode" />
+          <EditorPanes :restored-session-tab-ids-by-index="restoredSessionTabIdsByIndex" />
           <FindReplaceBar />
         </div>
       </div>
@@ -850,6 +868,8 @@ onBeforeUnmount(() => {
     </div>
     <StatusBar v-if="layout.showStatusBar" />
     <CommandPalette />
+    <NotebookDialogs />
+    <HistoryLayouts />
     <AboutDialog />
     <RenameDialog />
     <RecentDialog />
@@ -859,6 +879,7 @@ onBeforeUnmount(() => {
     <ContextMenu />
     <ImagePreview />
     <div v-if="dragOver" class="drop-veil">Drop to open</div>
+    <div v-if="notebook.mutating" class="drop-veil">{{ t('notes.updating') }}</div>
   </div>
 </template>
 

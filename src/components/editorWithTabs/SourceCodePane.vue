@@ -7,7 +7,7 @@
  * focus). Edits flow back into the editor store via `setMarkdownExternal`.
  */
 import { onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
-import { EditorState, Transaction, type Extension } from '@codemirror/state'
+import { EditorSelection, EditorState, Transaction, type Extension } from '@codemirror/state'
 import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter } from '@codemirror/view'
 import {
   history,
@@ -23,7 +23,7 @@ import {
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { HighlightStyle, syntaxHighlighting, indentOnInput, bracketMatching } from '@codemirror/language'
 import { tags } from '@lezer/highlight'
-import { useEditorStore } from '@/stores/editor'
+import { usePaneEditor } from '@/services/editor-panes'
 import type { DocumentState } from '@/stores/help'
 import { bus, type SearchOpt } from '@/bus'
 import {
@@ -39,8 +39,12 @@ import {
   settleSearchReveal,
 } from '@/services/search-reveal'
 import { publishSourceDocumentChange, restoreSourceEditorState } from '@/services/source-editor-state'
+import { noteCompletions } from '@/services/note-completion'
+import { useNotebookStore } from '@/stores/notebook'
+import { analyzeNote } from '@/services/note-index'
 
-const editor = useEditorStore()
+const props = withDefaults(defineProps<{ paneId?: string }>(), { paneId: 'main' })
+const { editor, isActive } = usePaneEditor(props.paneId)
 const hostRef = ref<HTMLDivElement | null>(null)
 const viewRef = shallowRef<EditorView | null>(null)
 /** Last id the view's content was synced with — used to detect tab swaps. */
@@ -72,6 +76,16 @@ const mdHighlight = HighlightStyle.define([
 ])
 
 const baseExtensions = (): Extension[] => [
+  noteCompletions(),
+  EditorView.domEventHandlers({ click(event, view) {
+    if (!(event.ctrlKey || event.metaKey)) return false
+    const position = view.posAtCoords({ x: event.clientX, y: event.clientY })
+    const notebook = useNotebookStore(); const source = notebook.currentNote?.relative
+    if (position === null || !source) return false
+    const link = analyzeNote(source, view.state.doc.toString()).links.find(l => position >= (l.sourceFrom ?? l.from) && position <= (l.sourceTo ?? l.to))
+    if (!link) return false
+    event.preventDefault(); void notebook.followLink(source, link).catch(e => { notebook.error = String(e) }); return true
+  } }),
   lineNumbers(),
   highlightActiveLine(),
   highlightActiveLineGutter(),
@@ -224,30 +238,31 @@ function replaceSearchMatch(replacement: string) {
 
 function installBusHandlers() {
   busUnsubs.push(bus.on('undo', () => {
-    if (editor.sourceCodeMode && viewRef.value) undo(viewRef.value)
+    if (isActive.value && editor.sourceCodeMode && viewRef.value) editor.usesSharedHistory ? editor.stepSharedHistory('undo') : undo(viewRef.value)
   }))
   busUnsubs.push(bus.on('redo', () => {
-    if (editor.sourceCodeMode && viewRef.value) redo(viewRef.value)
+    if (isActive.value && editor.sourceCodeMode && viewRef.value) editor.usesSharedHistory ? editor.stepSharedHistory('redo') : redo(viewRef.value)
   }))
   busUnsubs.push(bus.on('selectAll', () => {
-    if (editor.sourceCodeMode && viewRef.value) selectAll(viewRef.value)
+    if (isActive.value && editor.sourceCodeMode && viewRef.value) selectAll(viewRef.value)
   }))
   busUnsubs.push(bus.on('find', ({ value, opt }) => {
-    if (editor.sourceCodeMode) refreshSearch(value, opt)
+    if (isActive.value && editor.sourceCodeMode) refreshSearch(value, opt)
   }))
   busUnsubs.push(bus.on('findNext', () => {
-    if (editor.sourceCodeMode) moveSearch('next')
+    if (isActive.value && editor.sourceCodeMode) moveSearch('next')
   }))
   busUnsubs.push(bus.on('findPrev', () => {
-    if (editor.sourceCodeMode) moveSearch('previous')
+    if (isActive.value && editor.sourceCodeMode) moveSearch('previous')
   }))
   busUnsubs.push(bus.on('find-action', action => {
-    if (editor.sourceCodeMode && action === 'replaceAll') replaceAllPending = true
+    if (isActive.value && editor.sourceCodeMode && action === 'replaceAll') replaceAllPending = true
   }))
   busUnsubs.push(bus.on('replace', ({ value }) => {
-    if (editor.sourceCodeMode) replaceSearchMatch(value)
+    if (isActive.value && editor.sourceCodeMode) replaceSearchMatch(value)
   }))
   busUnsubs.push(bus.on('reveal-search-hit', (request) => {
+    if (!isActive.value) return
     revealGuard = enqueueSearchReveal(revealGuard, request)
     tryRevealSearchHit()
   }))
@@ -256,6 +271,13 @@ function installBusHandlers() {
 onMounted(() => {
   mountView(editor.currentFile)
   installBusHandlers()
+  busUnsubs.push(editor.registerInsertHandler('source', text => {
+    const view = viewRef.value
+    if (!view || boundId.value !== editor.currentFileId) throw new Error('agent:editorNotReady')
+    const { from, to } = view.state.selection.main
+    view.dispatch({ changes: { from, to, insert: text }, selection: { anchor: from + text.length }, annotations: isolateHistory.of('full') })
+    view.focus()
+  }))
   busUnsubs.push(editor.registerAgentEditHandler('source', markdown => {
     const view = viewRef.value
     if (!view || boundId.value !== editor.currentFileId) throw new Error('agent:editorNotReady')
@@ -324,6 +346,25 @@ watch(
       refreshSearch(currentQuery, currentOptions, false)
     }
   },
+)
+
+watch(
+  () => editor.currentFile?.sourceSelection,
+  selection => {
+    const view = viewRef.value
+    if (!view || !boundId.value || boundId.value !== editor.currentFileId) return
+    const serialized = selection && typeof selection === 'object'
+      ? selection as { ranges: Array<{ anchor: number; head: number }>; main: number }
+      : { ranges: [{ anchor: 0, head: 0 }], main: 0 }
+    try {
+      const next = EditorSelection.fromJSON(serialized)
+      if (JSON.stringify(view.state.selection.toJSON()) === JSON.stringify(next.toJSON())) return
+      view.dispatch({ selection: next })
+    } catch {
+      view.dispatch({ selection: EditorSelection.cursor(0) })
+    }
+  },
+  { deep: true, flush: 'post' },
 )
 
 onBeforeUnmount(() => {

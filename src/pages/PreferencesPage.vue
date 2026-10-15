@@ -173,6 +173,9 @@ let menuAcceleratorTransition: Promise<void> = Promise.resolve()
 
 const keybindingActionKeys: Record<string, string> = {
   'file.new': 'prefs.keybindings.actions.fileNew',
+  'file.quickOpen': 'notes.quick',
+  'file.dailyNote': 'notes.daily',
+  'edit.insertTemplate': 'notes.templates',
   'file.open': 'prefs.keybindings.actions.fileOpen',
   'file.openFolder': 'prefs.keybindings.actions.fileOpenFolder',
   'file.save': 'prefs.keybindings.actions.fileSave',

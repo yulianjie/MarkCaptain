@@ -9,6 +9,25 @@
  */
 
 import { invoke } from '@tauri-apps/api/core'
+export interface NoteFile { path: string; relative: string; modified: number; size: number }
+export interface LocalVersion { id: string; path: string; timestamp: number; markdown: string }
+export interface LocalVersionMetadata { id: string; path: string; timestamp: number; size: number; contentId: string }
+export interface HistorySettings { intervalSeconds: number; retentionDays: number; maxMegabytes: number }
+export const localHistoryCapture = (path: string, markdown: string, force = false) => invoke<void>('cmd_local_history_capture', { path, markdown, force })
+export const localHistoryList = (path: string) => invoke<LocalVersionMetadata[]>('cmd_local_history_list', { path })
+export const localHistoryRead = (path: string, id: string) => invoke<LocalVersion>('cmd_local_history_read', { path, id })
+export const localHistorySettings = (value?: HistorySettings) => invoke<HistorySettings>('cmd_local_history_settings', { value })
+export interface NotesConfig { templateDirectory: string; dailyDirectory: string; dailyFormat: string; dailyTemplate: string }
+export const notesList = (root: string, requestId: string = crypto.randomUUID()) => invoke<NoteFile[]>('cmd_notes_list', { root, requestId })
+export const notesCancel = (requestId: string) => invoke<void>('cmd_notes_cancel', { requestId })
+export const notesRead = (root: string, relative: string) => invoke<LoadedDocument & { fingerprint: string }>('cmd_notes_read', { root, relative })
+export interface ReferenceRewrite { relative: string; expected: string; markdown: string }
+export interface ReferenceCheck { relative: string; expected: string }
+export interface NotesRestoreResult { source: string; destination: string; files: { relative: string; markdown: string }[] }
+export const notesMove = (root: string, source: string, destination: string, changes: ReferenceRewrite[], checks: ReferenceCheck[]) => invoke<string>('cmd_notes_move', { root, source, destination, changes, checks })
+export const notesRestoreTransaction = (root: string, id: string) => invoke<NotesRestoreResult>('cmd_notes_restore_transaction', { root, id })
+export const notesCreate = (root: string, relative: string, content: string) => invoke<string>('cmd_notes_create', { root, relative, content })
+export const notesConfig = (root: string, config?: NotesConfig) => invoke<NotesConfig>('cmd_notes_config', { root, config })
 import type { ExternalConnection, ExternalRequest } from './agent-external'
 import type { HistoryRecord, HistoryMetadata } from './agent-history'
 import type { AgentConfig, AgentHeader, AgentRequest, AgentSettings, AgentSkill, AgentSkillDetail } from './agent'

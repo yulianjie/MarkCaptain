@@ -34,9 +34,12 @@ function keyEvent(key: string, code: string, extra: Partial<KeyboardEvent> = {})
 }
 
 describe('shortcut registry contract', () => {
-  it('is the sole source for the eleven remappable application defaults', () => {
+  it('is the sole source for remappable application defaults including notebook commands', () => {
     const remappable = findShortcutActions({ remappable: true })
-    expect(remappable).toHaveLength(11)
+    expect(remappable).toHaveLength(14)
+    expect(getShortcutDefault('file.quickOpen')).toBe('Ctrl+K')
+    expect(getShortcutDefault('file.dailyNote')).toBe('Ctrl+Alt+D')
+    expect(getShortcutDefault('edit.insertTemplate')).toBe('Ctrl+Alt+T')
     expect(Object.fromEntries(remappable.map(action => [action.id, action.default]))).toEqual(defaultKeybindings)
     expect(remappable.every(action => action.scope === 'application' && action.dispatch === 'application')).toBe(true)
     expect(getShortcutDefault('file.save')).toBe('Ctrl+S')

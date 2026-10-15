@@ -198,3 +198,22 @@ The writing agent is native to the Tauri edition (no legacy Electron channel).
 
 
 Agent requests may include `references: [{documentId, name, markdown}]` (up to 8 read-only snapshots, 2 MB each / 4 MB combined). `read_document`, `search_document`, and `cite_document` accept `documentId`; omitted or `current` targets the current attachment. Unknown IDs and attempts to edit references are rejected. Citation event JSON includes `documentId`, exact lines, label and quote. The initial model payload contains reference metadata only; bodies are demand-loaded. History records use schemaVersion 1 and stable UUID/revision metadata; full immutable snapshots are interned with per-use ranges. Keys and image bytes are never stored in history.
+
+
+## Notebook and independent local versions
+
+All wrappers are in `src/services/tauri-invoke.ts`; none is exposed as an Agent tool.
+
+| Command | Contract |
+| --- | --- |
+| `cmd_notes_list`, `cmd_notes_cancel` | Scan only an open canonical workspace on a blocking worker; cancellation scoped by window and request UUID |
+| `cmd_notes_read` | Bounded, canonical in-project read with decoded document and SHA-256 fingerprint |
+| `cmd_notes_create` | Project-relative `.md`, durable temporary write then exclusive publication, no overwrite or partial target |
+| `cmd_notes_config` | Read/write project template and daily settings |
+| `cmd_notes_move` | `changes` plus complete `checks: [{relative, expected}]` Markdown manifest; validate path set and byte hashes, journal original bytes, atomic reference writes and move, rollback on failure |
+| `cmd_notes_restore_transaction` | UUID journal, matching open root, preflight subsequent changes; returns `{source, destination, files: [{relative, markdown}]}` for deterministic renderer synchronization; original disk bytes preserved |
+| `cmd_local_history_capture` | Separate local content-addressed Markdown versions |
+| `cmd_local_history_list`, `cmd_local_history_read` | Metadata-only list; bounded selected body with checksum validation |
+| `cmd_local_history_settings` | Personal interval, retention and global space limit |
+
+Parsing and structured queries use background workers and one shared notebook parser. Existing `mt://fs/change` events invalidate disk entries. Agent attachment and review contracts are unchanged.

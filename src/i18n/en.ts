@@ -4,7 +4,9 @@
  * Keys are nested by feature area. Mirror the same shape in `zh-CN.ts` and `ja.ts`.
  */
 import agent from './agent-en'
+import notes from './notes-en'
 export default {
+  notes,
   agent,
   quickInsert: {
     hint: 'Type @ to insert',

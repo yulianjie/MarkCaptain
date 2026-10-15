@@ -2,7 +2,9 @@
  * 简体中文 locale 字符串。结构必须与 en.ts 一致。
  */
 import agent from './agent-zh-CN'
+import notes from './notes-zh-CN'
 export default {
+  notes,
   agent,
   quickInsert: {
     hint: '输入 @ 插入内容',

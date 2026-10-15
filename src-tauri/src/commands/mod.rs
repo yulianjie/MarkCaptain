@@ -16,7 +16,10 @@ pub mod debug;
 pub mod export;
 pub mod file;
 pub mod image;
+pub mod local_history;
 pub mod menu;
+pub mod note_transactions;
+pub mod notes;
 pub mod prefs;
 pub mod search;
 pub mod spellcheck;
@@ -120,6 +123,17 @@ macro_rules! markcaptain_handler {
             $crate::commands::image::cmd_search_unsplash,
             // search
             $crate::commands::search::cmd_search_in_folder,
+            $crate::commands::notes::cmd_notes_list,
+            $crate::commands::notes::cmd_notes_cancel,
+            $crate::commands::notes::cmd_notes_read,
+            $crate::commands::notes::cmd_notes_create,
+            $crate::commands::notes::cmd_notes_config,
+            $crate::commands::note_transactions::cmd_notes_move,
+            $crate::commands::note_transactions::cmd_notes_restore_transaction,
+            $crate::commands::local_history::cmd_local_history_capture,
+            $crate::commands::local_history::cmd_local_history_list,
+            $crate::commands::local_history::cmd_local_history_read,
+            $crate::commands::local_history::cmd_local_history_settings,
             // spellcheck
             $crate::commands::spellcheck::cmd_spellcheck_words,
             $crate::commands::spellcheck::cmd_spellcheck_suggest,

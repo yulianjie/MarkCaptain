@@ -3,6 +3,7 @@ import { createPinia, setActivePinia } from 'pinia'
 
 const invokeMocks = vi.hoisted(() => ({
   readMarkdown: vi.fn(),
+  localHistoryCapture: vi.fn(),
   saveMarkdown: vi.fn(),
   saveAsDialog: vi.fn(),
   renameFile: vi.fn(),
@@ -51,6 +52,60 @@ function loaded(markdown: string) {
 }
 
 describe('editor reliability', () => {
+  it('rejects a file read that outlives a completed reference mutation or its initiating pane', async () => {
+    const editor = useEditorStore(); const tab = openedFile()
+    editor.tabs = [tab]; editor.setCurrent(tab.id)
+    let finishRead!: (value: ReturnType<typeof loaded>) => void
+    invokeMocks.readMarkdown.mockImplementation(() => new Promise(resolve => { finishRead = resolve }))
+    const opening = editor.openFile('C:/notes/ref.md')
+    await editor.beginFileMutation(); editor.endFileMutation()
+    finishRead({ ...loaded('old reference'), path: 'C:/notes/ref.md' })
+    await expect(opening).rejects.toThrow('notes.changed')
+    expect(editor.tabs).toHaveLength(1)
+    const anotherOpening = editor.openFile('C:/notes/ref.md')
+    editor.splitPane('horizontal'); editor.activatePane(editor.panes[1].id)
+    finishRead({ ...loaded('old reference'), path: 'C:/notes/ref.md' })
+    await expect(anotherOpening).rejects.toThrow('notes.changed')
+    expect(editor.tabs).toHaveLength(1)
+  })
+  it('drains in-flight saves and rejects new writes and Agent edits during a file transaction', async () => {
+    const editor = useEditorStore(); const tab = openedFile()
+    editor.tabs = [tab]; editor.setCurrent(tab.id)
+    let finishWrite!: () => void
+    invokeMocks.saveMarkdown.mockImplementationOnce(() => new Promise<void>(resolve => { finishWrite = resolve }))
+    const saving = editor.saveTab(tab)
+    await vi.waitFor(() => expect(finishWrite).toBeTypeOf('function'))
+    let acquired = false
+    const mutation = editor.beginFileMutation().then(() => { acquired = true })
+    expect(editor.fileMutationBusy).toBe(true)
+    expect(await editor.saveTabAs(tab, 'C:/notes/copy.md')).toBe(false)
+    expect(() => editor.applyAgentEdit(tab.id, tab.markdown, 'unsafe')).toThrow('notes.changed')
+    await expect(editor.insertText(tab.id, 'unsafe')).rejects.toThrow('notes.changed')
+    expect(acquired).toBe(false)
+    finishWrite(); expect(await saving).toBe(true); await mutation
+    expect(acquired).toBe(true); expect(invokeMocks.saveMarkdown).toHaveBeenCalledOnce()
+    editor.endFileMutation(); expect(editor.fileMutationBusy).toBe(false)
+    expect(await editor.saveTab(tab)).toBe(true)
+  })
+  it('keeps initial restored content dirty and lets Cancel prevent closing it', async () => {
+    const editor = useEditorStore(); const tab = editor.newUntitledTab('restored history content')
+    expect(tab.isSaved).toBe(false); expect(tab.lastSavedMarkdown).toBe('')
+    confirm.mockRejectedValue('close')
+    expect(await editor.closeTab(tab.id)).toBe(false)
+    expect(editor.tabs[0].markdown).toBe('restored history content')
+  })
+  it('does not block a normal file save when independent history storage fails', async () => {
+    vi.stubGlobal('window', { __TAURI_INTERNALS__: {} })
+    try {
+      const editor = useEditorStore(); const tab = openedFile(); editor.tabs = [tab]; editor.setCurrent(tab.id)
+      tab.markdown = 'updated content'; tab.isSaved = false
+      invokeMocks.readMarkdown.mockResolvedValue(loaded('disk baseline'))
+      invokeMocks.localHistoryCapture.mockRejectedValue(new Error('history snapshot exceeds 4 MiB'))
+      invokeMocks.saveMarkdown.mockResolvedValue(undefined)
+      expect(await editor.saveTab(tab)).toBe(true)
+      expect(invokeMocks.saveMarkdown).toHaveBeenCalledOnce()
+    } finally { vi.unstubAllGlobals() }
+  })
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()

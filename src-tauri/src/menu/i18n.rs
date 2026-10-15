@@ -17,6 +17,10 @@ pub struct MenuStrings {
     // file
     pub new_tab: &'static str,
     pub new_window: &'static str,
+    pub quick_open: &'static str,
+    pub daily_note: &'static str,
+    pub insert_template: &'static str,
+    pub note_settings: &'static str,
     pub open_file: &'static str,
     pub open_folder: &'static str,
     pub open_recent: &'static str,
@@ -112,6 +116,10 @@ pub const EN: MenuStrings = MenuStrings {
 
     new_tab: "New Tab",
     new_window: "New Window",
+    quick_open: "Quick Open Note…",
+    daily_note: "Today’s Note",
+    insert_template: "Insert Document Template…",
+    note_settings: "Notebook Settings…",
     open_file: "Open File…",
     open_folder: "Open Folder…",
     open_recent: "Open Recent",
@@ -200,6 +208,10 @@ pub const ZH_CN: MenuStrings = MenuStrings {
 
     new_tab: "新建标签",
     new_window: "新建窗口",
+    quick_open: "快速打开笔记…",
+    daily_note: "今日笔记",
+    insert_template: "插入文档模板…",
+    note_settings: "笔记项目设置…",
     open_file: "打开文件…",
     open_folder: "打开文件夹…",
     open_recent: "打开最近",
@@ -288,6 +300,10 @@ pub const JA: MenuStrings = MenuStrings {
 
     new_tab: "新しいタブ",
     new_window: "新しいウィンドウ",
+    quick_open: "ノートを素早く開く…",
+    daily_note: "今日のノート",
+    insert_template: "文書テンプレートを挿入…",
+    note_settings: "ノート設定…",
     open_file: "ファイルを開く…",
     open_folder: "フォルダーを開く…",
     open_recent: "最近使った項目を開く",

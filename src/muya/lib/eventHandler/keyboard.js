@@ -97,6 +97,7 @@ class Keyboard {
   keydownBinding () {
     const { container, eventCenter, contentState } = this.muya
     const docHandler = event => {
+      if (!container.contains(event.target)) return
       switch (event.code) {
         case EVENT_KEYS.Enter:
           return contentState.docEnterHandler(event)

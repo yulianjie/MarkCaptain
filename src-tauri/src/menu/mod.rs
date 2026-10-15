@@ -824,6 +824,25 @@ fn build_menu(
                 unclaimed_fixed_accel(new_window_accel.as_deref(), &keybindings),
             )?,
             &PredefinedMenuItem::separator(app)?,
+            &mi(
+                app,
+                "file.quickOpen",
+                s.quick_open,
+                custom_accel("file.quickOpen"),
+            )?,
+            &mi(
+                app,
+                "file.dailyNote",
+                s.daily_note,
+                custom_accel("file.dailyNote"),
+            )?,
+            &mi(
+                app,
+                "edit.insertTemplate",
+                s.insert_template,
+                custom_accel("edit.insertTemplate"),
+            )?,
+            &mi(app, "file.noteSettings", s.note_settings, None)?,
             &mi(app, "file.open", s.open_file, custom_accel("file.open"))?,
             &mi(
                 app,
@@ -1213,7 +1232,7 @@ mod tests {
                 .iter()
                 .filter(|action| action.remappable)
                 .count(),
-            11
+            14
         );
 
         assert!(is_remappable_action("file.save"));
@@ -1254,7 +1273,7 @@ mod tests {
         let bindings = logical_keybindings_from_value(Some(&partial));
         assert_eq!(bindings["file.new"], "Ctrl+O");
         assert_eq!(bindings["file.open"], "Ctrl+T");
-        assert_eq!(bindings.len(), 11);
+        assert_eq!(bindings.len(), 14);
         assert!(bindings.values().all(|accelerator| !accelerator.is_empty()));
 
         let renderer_value = normalize_keybindings_value(&partial);
