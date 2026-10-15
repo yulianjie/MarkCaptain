@@ -1,4 +1,9 @@
 {
+  "autoCheckUpdates": {
+    "description": "General--Automatically check for signed updates on startup and every four hours.",
+    "type": "boolean",
+    "default": true
+  },
   "autoSave": {
     "description": "General--Automatically save the content being edited.",
     "type": "boolean",

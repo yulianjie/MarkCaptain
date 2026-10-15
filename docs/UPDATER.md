@@ -1,82 +1,79 @@
-# Auto-update signing
+# Automatic updates
 
-Tauri's `tauri-plugin-updater` verifies downloaded update bundles with an
-Ed25519 public key. The public key ships in `tauri.conf.json`; the private key
-must remain outside the repository and be available only to the release job.
+MarkCaptain uses the registered Tauri v2 updater plugin and its mandatory
+Minisign/Ed25519 verification. The public key is bundled in
+`src-tauri/tauri.conf.json`. Update metadata comes from:
 
-## Current state: deliberately disabled
+`https://github.com/yulianjie/MarkCaptain/releases/latest/download/latest.json`
 
-The updater currently fails closed:
+## User experience
 
-- The Rust plugin **is registered** in
-  [`src-tauri/src/lib.rs`](../src-tauri/src/lib.rs), and the default window has
-  the `updater:default` capability. No Rust change is needed to register it.
-- `plugins.updater.active` is `false` and `plugins.updater.pubkey` is empty in
-  [`src-tauri/tauri.conf.json`](../src-tauri/tauri.conf.json).
-- The configured endpoint belongs to this repository:
-  `https://github.com/yulianjie/MarkCaptain/releases/latest/download/latest.json`.
-- `UpdaterDialog.vue` treats `plugins.updater.active` as a project-level UI
-  gate and checks for a non-empty public key plus HTTPS endpoints before it
-  calls the updater plugin. It explains the disabled or unsafe configuration
-  instead of reporting that an unchecked build is up to date.
-- The current release workflow does not sign updater artifacts or publish a
-  `latest.json` manifest, so automatic updates must remain disabled.
+- General preferences → **Automatically check for updates** is enabled by default.
+  The main editor checks ten seconds after startup and every four hours while
+  running. Turning the preference off cancels scheduled checks. Manual checking
+  remains available from Help → Check for Updates.
+- Automatic checks only open a dialog when an update is available. Network
+  failures stay quiet; a manual check shows errors and offers a retry.
+- Updates are downloaded and installed only after clicking **Download & Install**.
+  Progress is shown even if the server does not provide a content length.
+- Before installation, close other editor windows. MarkCaptain saves all open
+  documents, flushes Agent data and persists the editor session. Cancelling Save
+  As or a failed save pauses installation. Windows installers can exit the entire
+  process; other platforms offer Relaunch after installation succeeds.
+- Download completion is distinct from installation completion. A failed
+  signature or installation never displays the restart-ready state.
 
-`active` is a MarkCaptain renderer gate, not a native field consumed by the
-Tauri updater crate. The crate ignores that unknown field; therefore the
-renderer readiness check must not be removed.
+An installed version from before this feature must be upgraded manually once.
+Until the first signed release publishes `latest.json`, checking the public
+endpoint reports an error; it must never claim that an unchecked build is current.
 
-## Enabling updates safely
+## Signing keys
 
-Do not set `active` to `true` until every step below is complete.
+Only the public key belongs in Git. Release builds read
+`TAURI_SIGNING_PRIVATE_KEY` and optionally `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`
+from protected GitHub Actions secrets. Never print a private key or place it in
+command arguments, repository files, or release assets. Keep a recoverable backup;
+losing the key prevents updates to already installed versions.
 
-1. Generate the signing keypair on a trusted release machine. Keep the private
-   key and its password out of Git, build logs, command arguments, and release
-   assets.
+The initial release-machine backup is outside the repository under
+`~/.tauri/markcaptain/updater-private-key.dpapi`, encrypted with Windows DPAPI for
+the Windows account that created it. The corresponding public key is in
+`updater-public-key.txt`. The encrypted file alone is not a portable backup;
+DPAPI recovery requires the original Windows account and its encryption keys.
 
-   ```bash
-   npx tauri signer generate -w ~/.tauri/markcaptain.key
-   ```
+For a local signed bundle, load the DPAPI backup into the environment in memory,
+build, and remove the environment variable afterwards. Do not write a decrypted
+key to disk. Use `npx tauri signer generate --ci` with captured output only when
+initializing a new project; do not replace this project's existing key casually.
 
-2. Put only the generated public key in `plugins.updater.pubkey`. Keep the
-   endpoint on the `yulianjie/MarkCaptain` release origin (or another explicitly
-   controlled HTTPS update service).
+## Release pipeline
 
-3. Enable updater artifact generation in the bundle configuration:
+`bundle.createUpdaterArtifacts` is enabled. Each release target builds with the
+signing secret. `scripts/updater-release.mjs stage` verifies the artifact and both
+Minisign signatures against the bundled public key, then copies the artifact and
+signature with a unique version/platform name. A tag/application version mismatch
+also fails before uploading. The macOS archive is Tauri's signed
+archive, preserved byte-for-byte; never re-tar it after signing.
 
-   ```jsonc
-   "bundle": {
-     "createUpdaterArtifacts": true
-   }
-   ```
+After **all** build jobs succeed, the manifest job reads the same release's assets
+and signatures and publishes `latest.json`. It requires Windows x64 NSIS, Linux
+x64 AppImage, macOS arm64 and macOS x64. Missing/empty artifacts or signatures and
+foreign download origins fail the job before manifest publication. The
+macOS-only retry mode uses existing signed Windows/Linux artifacts from the same
+release and fails if those are absent. Update signatures are separate from Apple
+code signing/notarization and Windows Authenticode.
 
-4. Store `TAURI_SIGNING_PRIVATE_KEY` and
-   `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` as protected CI secrets. Build every
-   release with those variables so Tauri emits the updater archives and
-   signatures.
+`plugins.updater.active` is a MarkCaptain renderer gate. A disabled gate, empty
+public key, or missing/non-HTTPS endpoint blocks checks before calling the native
+plugin. The native plugin independently verifies downloaded bytes.
 
-5. Extend `.github/workflows/release.yml` to publish the signed updater
-   artifacts and a valid `latest.json` whose platform URLs and signatures point
-   to the same release. See the
-   [Tauri v2 updater documentation](https://v2.tauri.app/plugin/updater/).
+## Verification
 
-6. Verify a staged release end to end: the manifest resolves, its version is
-   newer than the installed build, every URL is HTTPS, the signature validates,
-   and a tampered artifact is rejected.
+Run `npm run test:unit`, `npm run build`, `npm run lint` and Rust checks. Verify
+the signed-release helpers with actual Tauri signatures, including changed bytes
+and a mismatched public key. Before calling a public release verified, check its
+manifest, every platform's signature and download URL, and test an installed old
+version upgrading to the newer signed release on the target OS. Unit tests and
+browser checks do not prove that an OS installer completed successfully.
 
-7. Set `plugins.updater.active` to `true` only after the staged verification
-   passes. A missing key, missing endpoint, or non-HTTPS endpoint will still be
-   blocked by the dialog before any update request is made.
-
-## UI state matrix
-
-| Configuration | Dialog result | Network check |
-| --- | --- | --- |
-| `active: false` | Clearly reports automatic updates are disabled | No |
-| Active, but key/HTTPS endpoint missing | Reports unsafe/incomplete configuration | No |
-| Active and safely configured | Checks signed release metadata | Yes |
-| Safely configured and `check()` returns `null` | Reports latest version | Yes |
-
-This separation keeps the updater command available for a future signed
-release without allowing an unsigned or partially configured build to imply
-that an update check succeeded.
+Reference: [Tauri v2 updater documentation](https://v2.tauri.app/plugin/updater/).

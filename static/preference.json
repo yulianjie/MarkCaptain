@@ -1,4 +1,5 @@
 {
+  "autoCheckUpdates": true,
   "autoSave": false,
   "autoSaveDelay": 5000,
   "titleBarStyle": "custom",

@@ -587,6 +587,10 @@ watchEffect(() => {
       >
         <h3>{{ t('prefs.sections.general') }}</h3>
         <el-form label-width="220px" label-position="left">
+          <el-form-item :label="t('prefs.general.autoCheckUpdates')">
+            <el-switch :model-value="prefs.autoCheckUpdates" @update:model-value="v => prefs.set('autoCheckUpdates', !!v)" />
+            <span class="hint inline-hint">{{ t('prefs.general.autoCheckUpdatesHint') }}</span>
+          </el-form-item>
           <el-form-item :label="t('prefs.general.autoSave')">
             <el-switch :model-value="prefs.autoSave" @update:model-value="v => prefs.set('autoSave', !!v)" />
           </el-form-item>

@@ -25,6 +25,7 @@ export type AutoSwitchTheme = 1 | 2
 
 interface PersistedPreferences {
   // General
+  autoCheckUpdates: boolean
   autoSave: boolean
   autoSaveDelay: number
   titleBarStyle: 'custom' | 'native'
@@ -155,6 +156,7 @@ const recentKeys = new Set(['recentFiles', 'recentFolders'])
  * development while a schema migration is being applied. Schema defaults
  * always override these values below. */
 const fallbackPreferences: PersistedPreferences = {
+  autoCheckUpdates: true,
   autoSave: false,
   autoSaveDelay: 5000,
   titleBarStyle: 'custom',

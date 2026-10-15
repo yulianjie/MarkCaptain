@@ -66,18 +66,23 @@ jobs:
       # ---- Windows / Linux: build every default bundle (msi+nsis / deb+rpm+appimage) ----
       - name: Build (Windows / Linux)
         if: runner.os != 'macOS'
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npm run tauri:build -- --target ${{ matrix.platform.target }}
 
       # ---- macOS: build .app + .dmg, but treat .dmg as best-effort ----
       # The GitHub macOS runner image (Provisioner 2025xxxx) removed Finder, which
       # breaks bundle_dmg.sh's AppleScript window-styling step. The .app is built
-      # fine; we tar it as a guaranteed download and keep the .dmg if it succeeds.
+      # fine; Tauri's signed updater archive is the guaranteed download.
       - name: Build (macOS)
         if: runner.os == 'macOS'
         shell: bash
         env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           # Optional Apple code-signing / notarization (same vars clash-verge-rev uses).
-          # tauri reads these automatically; leaving them empty produces an unsigned build.
+          # Tauri reads these automatically; unset empty optional Apple values below.
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
@@ -116,9 +121,19 @@ jobs:
             rm -rf "$base/dmg"
           fi
 
-          # Always ship a tarball of the .app as a reliable, Finder-free artifact.
-          tar -czf "$base/macos/MarkCaptain_${RELEASE_TAG}_${{ matrix.platform.name }}.app.tar.gz" \
-            -C "$base/macos" "$(basename "$app")"
+          # Keep Tauri's signed .app.tar.gz byte-for-byte; repacking breaks its signature.
+
+      - name: Stage signed updater artifact
+        shell: bash
+        run: |
+          case "${{ matrix.platform.target }}" in
+            aarch64-apple-darwin) platform=darwin-aarch64 ;;
+            x86_64-apple-darwin) platform=darwin-x86_64 ;;
+            x86_64-unknown-linux-gnu) platform=linux-x86_64 ;;
+            x86_64-pc-windows-msvc) platform=windows-x86_64 ;;
+            *) exit 1 ;;
+          esac
+          node scripts/updater-release.mjs stage "src-tauri/target/${{ matrix.platform.target }}/release/bundle" "updater-assets" "$RELEASE_TAG" "$platform"
 
       # ---- Upload all produced bundles to the GitHub Release ----
       - name: Publish to GitHub Release
@@ -132,9 +147,29 @@ jobs:
           fail_on_unmatched_files: false
           files: |
             src-tauri/target/${{ matrix.platform.target }}/release/bundle/dmg/*.dmg
-            src-tauri/target/${{ matrix.platform.target }}/release/bundle/macos/*.app.tar.gz
+            updater-assets/*
             src-tauri/target/${{ matrix.platform.target }}/release/bundle/msi/*.msi
             src-tauri/target/${{ matrix.platform.target }}/release/bundle/nsis/*.exe
             src-tauri/target/${{ matrix.platform.target }}/release/bundle/appimage/*.AppImage
             src-tauri/target/${{ matrix.platform.target }}/release/bundle/deb/*.deb
             src-tauri/target/${{ matrix.platform.target }}/release/bundle/rpm/*.rpm
+
+  updater-manifest:
+    name: Publish complete updater manifest
+    needs: build
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Generate manifest from all four signed release platforms
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/updater-release.mjs manifest "$RELEASE_TAG" updater-manifest
+      - name: Publish manifest after every platform succeeds
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$RELEASE_TAG" updater-manifest/latest.json --repo yulianjie/MarkCaptain --clobber

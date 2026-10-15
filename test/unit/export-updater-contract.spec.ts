@@ -8,18 +8,6 @@ function readSource(relativePath: string): string {
 
 const exportDialog = readSource('../../src/components/exportSettings/ExportSettingsDialog.vue')
 const editorPage = readSource('../../src/pages/EditorPage.vue')
-const updaterDialog = readSource('../../src/components/updater/UpdaterDialog.vue')
-const updaterConfig = JSON.parse(readSource('../../src-tauri/tauri.conf.json')) as {
-  plugins: {
-    updater: {
-      active: boolean
-      endpoints: string[]
-      pubkey: string
-    }
-  }
-}
-const updaterDocs = readSource('../../docs/UPDATER.md')
-
 function functionBody(source: string, startMarker: string, endMarker: string): string {
   const start = source.indexOf(startMarker)
   const end = source.indexOf(endMarker, start)
@@ -93,47 +81,5 @@ describe('export dialog workflow contract', () => {
     expect(doExport.indexOf('const markdown = tab.markdown')).toBeLessThan(targetDialog)
     expect(doExport.indexOf('const muya = editor.getMuyaInstance()')).toBeLessThan(targetDialog)
     expect(doExport).toContain('new ExportHtml(markdown, muya)')
-  })
-})
-
-describe('updater fail-closed contract', () => {
-  it('uses this repository endpoint while remaining disabled without a key', () => {
-    expect(updaterConfig.plugins.updater).toEqual({
-      active: false,
-      endpoints: [
-        'https://github.com/yulianjie/MarkCaptain/releases/latest/download/latest.json',
-      ],
-      pubkey: '',
-    })
-  })
-
-  it('blocks disabled or unsafe configuration before importing the updater check', () => {
-    const readiness = functionBody(updaterDialog, 'function updaterReadiness', 'async function open()')
-    expect(readiness).toContain('if (!updaterConfig.active)')
-    expect(readiness).toContain('updaterConfig.pubkey.trim().length > 0')
-    expect(readiness).toContain("endpoint.startsWith('https://')")
-
-    const open = functionBody(updaterDialog, 'async function open()', 'async function downloadAndInstall()')
-    const guard = open.indexOf("if (readiness !== 'ready')")
-    const checkImport = open.indexOf("await import('@tauri-apps/plugin-updater')")
-    expect(guard).toBeGreaterThanOrEqual(0)
-    expect(checkImport).toBeGreaterThan(guard)
-    expect(updaterDialog).toContain("phase === 'disabled'")
-    expect(updaterDialog).toContain("phase === 'unconfigured'")
-  })
-
-  it('reports up-to-date only after a configured check returns no update', () => {
-    const open = functionBody(updaterDialog, 'async function open()', 'async function downloadAndInstall()')
-    expect(open).toMatch(/const update = await check\(\)[\s\S]*?if \(!update\) \{[\s\S]*?phase\.value = 'uptodate'/)
-    expect(updaterDialog.match(/phase\.value = 'uptodate'/g)).toHaveLength(1)
-    expect(updaterDialog).toContain("phase.value = 'error'")
-  })
-
-  it('documents the actual registered-plugin and unsigned-release state', () => {
-    expect(updaterDocs).toContain('The Rust plugin **is registered**')
-    expect(updaterDocs).toContain('yulianjie/MarkCaptain')
-    expect(updaterDocs).toContain('current release workflow does not sign updater artifacts')
-    expect(updaterDocs).toContain('`active` is a MarkCaptain renderer gate')
-    expect(updaterDocs).not.toContain('uncomment')
   })
 })

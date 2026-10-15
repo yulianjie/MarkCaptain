@@ -119,6 +119,21 @@ function currentEditorSessionSnapshot(flags: { cleanShutdown: boolean; excludeDi
   })
 }
 
+async function prepareUpdateInstall(): Promise<boolean> {
+  if (startupReady) await startupReady
+  if (!await editor.saveAllTabs() || editor.tabs.some(tab => !tab.isSaved)) return false
+  await agent.flushForClose()
+  if (ownsDefaultSession) {
+    await persistCleanEditorSession({
+      writer: sessionWriter,
+      excludeDirty: false,
+      snapshot: currentEditorSessionSnapshot,
+      write: setEditorSession,
+    })
+  }
+  return editor.tabs.every(tab => tab.isSaved)
+}
+
 function requestWindowClose(): Promise<void> {
   if (closeWindowPromise) return closeWindowPromise
   closeWindowPromise = (async () => {
@@ -874,7 +889,7 @@ onBeforeUnmount(() => {
     <RenameDialog />
     <RecentDialog />
     <TableDialog />
-    <UpdaterDialog />
+    <UpdaterDialog :prepare-install="prepareUpdateInstall" />
     <ExportSettingsDialog />
     <ContextMenu />
     <ImagePreview />

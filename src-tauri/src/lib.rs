@@ -119,10 +119,7 @@ pub fn run() {
             };
             let _ = app.emit("mt://second-instance", payload);
         }));
-        // Updater plugin: registered so the renderer can call check()/
-        // downloadAndInstall(). With `pubkey` empty in tauri.conf.json the
-        // check itself gracefully fails until release signing is set up —
-        // the UI just reports "no update available".
+        // Native updater verifies signed artifacts with the bundled public key.
         builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
     }
 
