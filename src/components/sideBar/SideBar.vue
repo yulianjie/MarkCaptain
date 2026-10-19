@@ -8,7 +8,7 @@
  * pointermove/pointerup.
  */
 import { computed, onBeforeUnmount, ref } from 'vue'
-import { Folder, ListTree, Search, Settings as Setting } from '@lucide/vue'
+import { Folder, ListTree, NotebookTabs, Search, Settings as Setting } from '@lucide/vue'
 import { useLayoutStore, SIDEBAR_MIN, SIDEBAR_MAX, type RightColumn } from '@/stores/layout'
 import { openSettings } from '@/services/tauri-invoke'
 import { useI18n } from '@/i18n'
@@ -28,7 +28,7 @@ const rails: RailItem[] = [
   { key: 'files', icon: Folder, titleKey: 'sideBar.files' },
   { key: 'toc', icon: ListTree, titleKey: 'sideBar.toc' },
   { key: 'search', icon: Search, titleKey: 'sideBar.search' },
-  { key: 'notes', icon: ListTree, titleKey: 'notes.panel' },
+  { key: 'notes', icon: NotebookTabs, titleKey: 'notes.panel' },
 ]
 
 function switchTo(key: RightColumn) {
