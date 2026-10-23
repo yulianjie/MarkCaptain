@@ -1,142 +1,148 @@
 # MarkCaptain User Guide
 
-For everyday notebook features in the current source, see the [Everyday notes guide](https://github.com/yulianjie/MarkCaptain/blob/master/docs/NOTEBOOK.md). Availability depends on the installed version.
+[Home](https://github.com/yulianjie/MarkCaptain/wiki/Home) · [简体中文指南](https://github.com/yulianjie/MarkCaptain/wiki/%E4%BD%BF%E7%94%A8%E6%8C%87%E5%8D%97) · [Feature catalogue / 功能总览](https://github.com/yulianjie/MarkCaptain/wiki/%E5%8A%9F%E8%83%BD%E6%80%BB%E8%A7%88)
 
-[Wiki home](Home) · [简体中文](使用指南) · [Download](https://github.com/yulianjie/MarkCaptain/releases/latest) · [Report an issue](https://github.com/yulianjie/MarkCaptain/issues)
+MarkCaptain is a desktop Markdown editor with visual and source editing, project notes, a writing Agent with human review, and document/project export. Your documents remain normal local files.
 
-This guide covers the Tauri edition published from [`yulianjie/MarkCaptain`](https://github.com/yulianjie/MarkCaptain).
+This guide describes the workspace source inspected on **2026-10-24**, whose application version is **0.8.5**. An installed package may differ, including earlier builds with the same version. This documentation update does not establish fresh installer or cross-platform acceptance evidence.
 
-## 1. Install and launch
+## Install and start
 
-Download the package for your platform from [GitHub Releases](https://github.com/yulianjie/MarkCaptain/releases/latest):
+Choose a version and architecture from [Releases](https://github.com/yulianjie/MarkCaptain/releases). The release workflow targets Windows x64 (NSIS/MSI), Linux x64 (AppImage/DEB/RPM), and macOS ARM64/x64 (`.app.tar.gz`, plus DMG when available). Check the assets attached to your chosen release.
 
-| Platform | Package |
-| --- | --- |
-| Windows x64 | NSIS `.exe` or MSI |
-| Linux x64 | AppImage, DEB, or RPM |
-| macOS Apple Silicon | ARM64 `.app.tar.gz` |
-| macOS Intel | x64 `.app.tar.gz` |
+Windows uses WebView2. Follow operating-system prompts for independently distributed apps. Updater signatures and `latest.json` are verification files, not installers.
 
-Windows 11 normally includes WebView2. Windows 10 may need the Microsoft WebView2 Runtime. On macOS, follow the normal Gatekeeper prompts for an independently distributed app.
+No MarkCaptain account is required for local editing. Model and storage services may require their own credentials. The UI supports English, Simplified Chinese, and Japanese.
 
-MarkCaptain saves documents to paths you choose and does not require an account. Save all open documents before updating the app.
+1. Create a tab with `Ctrl/Cmd+T`, or open a file with `Ctrl/Cmd+O`.
+2. Write in the visual editor; toggle source mode with `Ctrl/Cmd+Alt+S`.
+3. Save with `Ctrl/Cmd+S` and choose a path for a new document.
+4. Open a project folder with `Ctrl/Cmd+Shift+O` for project navigation and notes.
+5. Use `Ctrl/Cmd+Shift+P` to find commands.
 
-## 2. Open documents and projects
+Here `Ctrl/Cmd` means Ctrl on Windows/Linux and Cmd on macOS. Some shortcuts can be changed in Preferences; native, system, and editor-reserved actions are not all remappable.
 
-- **New document** creates an unsaved Markdown tab. Choose a path when you first save it.
-- **Open file** opens one or more Markdown files. Recently used files are available from the recent-files dialog.
-- **Open folder** treats a folder as a project and enables the project tree, open-files list, outline, and project search.
-- **Tabs** let you edit several documents at once. Closing a dirty tab or window asks for confirmation.
-- **External changes** are watched on disk. When another program changes an open document, follow the prompt before reloading it.
+## Editing and workspace
 
-The files remain ordinary Markdown, so you can keep using Git, sync folders, and your normal backup tools.
+The Muya visual editor supports headings, emphasis, lists, tasks, tables, quotes, code, links, images, formulas, and diagram fences. Some Markdown extensions, including footnotes and superscript/subscript, require enabling their settings. Source mode is useful for exact YAML, link, and diagram edits.
 
-## 3. Edit Markdown
+Use Find/Replace for the active document and the search sidebar for project full-text/regex search. The outline navigates headings. The right inspector switches between outline, links, and Agent; links can be pinned beside the Agent.
 
-Muya provides the default WYSIWYG editing surface. Headings, lists, tables, tasks, code, quotes, links, images, footnotes, math, and other Markdown constructs render in place.
+Open multiple tabs and windows. Split right or down through the command palette, up to four panes in one orientation. Panes showing the same document share content, save state, and undo history, but keep their own cursors and display modes. The active pane determines editing and Agent targets. Closing a pane does not close its document.
 
-- Use **View → Source Code Mode** to switch between WYSIWYG and raw Markdown.
-- Use **Edit → Find** or **Edit → Replace** in the current document.
-- Use project search in the sidebar to search Markdown files in the open folder.
-- Use the outline to jump between headings.
-- Enable focus or typewriter mode for a quieter writing surface.
-- Formatting actions are available from the toolbar, native menus, context menu, and command palette.
+Named layouts save paths, orientation, proportions, active pane, modes, and cursor/selection positions. They do not save document bodies or full undo histories. Untitled documents cannot be restored by persistent path.
 
-### Diagrams and code
+The status bar shows document statistics, encoding/BOM, line endings, save state, mode, and separate cloud state. Automatic encoding detection is supported. Auto save is off by default; enabling it uses a default five-second delay and requires a previously saved path. External changes can pause auto save and require conflict handling.
 
-Fenced code blocks support syntax highlighting. Diagram blocks include Mermaid, Flowchart, Sequence, and PlantUML formats; use the appropriate language identifier for each block.
+Images may reference their original paths, be copied into a folder, or use a configured GitHub/PicGo/script uploader. Keep project-relative assets with your Markdown when moving devices. The GitHub image-upload token is session-only; it is separate from Agent credential storage.
 
-### Images
+See [Editing and workspace / 编辑与工作区](https://github.com/yulianjie/MarkCaptain/wiki/%E7%BC%96%E8%BE%91%E4%B8%8E%E5%B7%A5%E4%BD%9C%E5%8C%BA).
 
-Insert images by selecting, pasting, or dropping them. The result depends on the image preference: keep the source path, copy into a configured folder, or use a configured uploader. After moving documents or images, verify that relative references still resolve.
+## Everyday notes and relations
 
-## 4. Command palette and shortcuts
+- **Quick open** (`Ctrl/Cmd+K`) searches names, relative paths, and YAML aliases. Empty queries show recent notes; unmatched names can create Markdown notes without overwriting existing files.
+- **Templates** (`Ctrl/Cmd+Alt+T`) insert at the active cursor and support <code>&#123;&#123;title&#125;&#125;</code>, <code>&#123;&#123;date&#125;&#125;</code>, <code>&#123;&#123;time&#125;&#125;</code>, and <code>&#123;&#123;date:YYYY/MM/DD&#125;&#125;</code>.
+- **Today's note** (`Ctrl/Cmd+Alt+D`) creates the dated note only when missing; existing content and unsaved buffers are preserved.
+- **Wiki links** support names, paths, aliases, and headings, such as `[[Plan]]`, `[[folder/Plan]]`, `[[Plan|label]]`, and `[[Plan#Milestones]]`.
+- **Navigation** uses `Ctrl/Cmd+click` or the link popup. Markdown paths resolve from the source file; the current workspace also supports relative document navigation without an open project.
+- **Backlinks and unlinked mentions** show source context and navigation. Ambiguous names need explicit paths.
+- **Rename/move reference maintenance** previews affected references, checks versions, and retains transaction backups. External moves do not automatically rewrite links.
+- **Tags and properties** combine body tags and YAML, support nested tags, and edit supported scalar/list values while preserving unrelated content. Complex YAML belongs in source mode.
+- **Tasks** aggregate actual Markdown tasks outside code examples; toggling uses normal editor undo/save behavior.
 
-The command palette exposes file, edit, paragraph, format, view, window, and help actions. Inspect, record, customize, or reset shortcuts under **Preferences → Shortcuts**.
+Project note settings live in `.markcaptain/notes.json`; default template/daily directories are `Templates` and `Daily`. Note indexing is bounded, skips symlinks and generated/internal directories, and uses open unsaved project buffers in preference to disk.
 
-Native menus, the command palette, and the editor use one shortcut registry. Because shortcuts are customizable, treat Preferences as the authoritative list for your installation.
+Structured queries support `name:`, `path:`, `tag:`, `prop.key:`, and `task:open|done|any`. Spaces/AND combine terms, OR combines groups, and NOT or a field prefix `-` excludes. AND binds more tightly than OR; parentheses are not supported. Quote values containing spaces.
 
-## 5. Export and print
+```text
+tag:work prop.priority:>=2 NOT task:done
+tag:reading OR tag:research
+```
 
-- **HTML** exports a styled HTML file.
-- **Print / Save as PDF** opens the system print dialog and can use the operating system's PDF destination.
-- **Pandoc export** can create PDF, DOCX, ODT, or EPUB after Pandoc and any required document engine are installed.
+Indexing permits up to 4 MiB per document and 128 MiB of project bodies; task/search displays are capped at 1000 results. Incomplete indexing must not be interpreted as an absence of links or tasks. See [Notes / 笔记与知识管理](https://github.com/yulianjie/MarkCaptain/wiki/%E7%AC%94%E8%AE%B0%E4%B8%8E%E7%9F%A5%E8%AF%86%E7%AE%A1%E7%90%86).
 
-Pandoc is not bundled. If export fails, confirm that `pandoc` is on the system path, then check the PDF engine, fonts, and image references.
+## Configure and use the writing Agent
 
-## 6. Writing Agent
+Open AI Assistant from the title bar, inspector, View menu, command palette, or `Ctrl/Cmd+Shift+A`. Configure a DeepSeek/OpenAI preset, another OpenAI-compatible service, or local Ollama with its base URL and model ID. Choose system credential authentication or no authentication, then save and test.
 
-Open **AI Assistant** from the title bar, View menu, or command palette, or use the shortcut shown in Preferences.
+Keys and custom headers use the OS credential store, isolated by normalized base URL. Saved secrets are not returned to the UI. Linux needs an available, unlocked Secret Service. HTTP sends content and credentials without transport encryption. Text connection tests do not establish image support or full tool compatibility.
 
-### Configure a model
+Writing actions include polish, shorten, continue, translate, explain, and terminology/structure assistance. They fill a draft for inspection before sending. Attach the intended document, selection, or read-only references; verify the active pane and scope. Full-document reference and selection editing can be separated.
 
-1. Open Agent settings.
-2. Choose the DeepSeek preset, a custom OpenAI-compatible endpoint, or local Ollama.
-3. Enter the endpoint, model ID, and required credentials.
-4. Save and send a short test message.
+Normal requests begin with attachment metadata, and tools read authorized body segments as needed. Explicit whole-document checks and chapter summaries send the corresponding snapshot/chunks. A remote model receives the content actually used; local files do not imply offline AI. Disabling an attachment does not erase prior conversation messages.
 
-HTTP endpoints are allowed on trusted local networks, but prompts and credentials are not transport-encrypted. Prefer HTTPS outside a controlled network.
+Answers can be copied, inserted at the cursor, appended, used to replace a selection, or opened as a new unsaved document. Citations can locate original evidence. Chapter summaries show progress and can resume only when the required original scope still matches.
 
-### Work with the Agent
+Image input accepts pasted or selected PNG/JPEG/WebP: up to four per message, 5 MiB each, and twelve/20 MiB per conversation. Images stay in window memory and are sent to the configured model when requested. They are not persisted in history. The model must support vision, streaming, and tools.
 
-- The Agent reads only the current document, selection, images, or read-only Markdown references that you explicitly attach.
-- Ask it to polish, continue, explain, compare, outline, or summarize long documents in sections.
-- Proposed edits appear as diffs. You decide whether to apply, dismiss, locate, or revert each change.
-- Reuse an answer at the cursor, at the end of the document, over the selection, or in a new unsaved note.
-- Optional conversation history is local and disabled by default. It does not store API keys or images.
+### Review edits
 
-The Agent cannot scan the general filesystem, run a shell, commit Git changes, search the web, or bypass review to save a document. See the [Writing Agent guide](https://github.com/yulianjie/MarkCaptain/blob/master/docs/AI_AGENT.md) for the complete safety model.
+Proposals show Markdown differences, source locations, and per-change decisions. Chinese text, link destinations, tables, code, and frontmatter receive review aids. Inline previews are read-only and do not enter saves or exports.
 
-## 7. Local projects and remote storage
+Apply, dismiss, revert, and editor undo/redo remain connected. Identity, exact source text, scope, and conflicts are checked again before changes. Conflicting or ambiguous proposals require a new comparison/request. Ordinary single-document edits may subsequently be written by normal auto save if enabled; the model cannot save directly.
 
-MarkCaptain saves the local working copy first. Optional remote storage keeps local save status separate from remote sync status.
+### Revise multiple documents
 
-- **MarkCaptain Sync** connects to a self-hosted service.
-- **Git** supports repository validation, fetch, fast-forward pull, and non-force push. It does not reset, auto-commit, or force-push.
-- **WebDAV** uses ETags for safe conditional writes and refuses unsafe automatic overwrites when the remote version cannot be checked reliably.
-- **Storage plugins** are trusted native programs; install only providers you understand.
+Use **Revise multiple documents** to explicitly select 1–8 open tabs, including unsaved and untitled documents. Each snapshot is limited to 2,000,000 UTF-8 bytes, with 4,000,000 bytes total. Unselected documents and read-only references do not become targets.
 
-When the app reports offline state, divergence, or a conflict, preserve the local copy before choosing how to reconcile local and remote content.
+The task freezes the selected set, pauses those tabs' auto save, and reads bodies through tools. Review/apply/dismiss/revert per document, then save manually. There is no cross-file Apply All transaction or global undo. Disk bytes and buffer/tab identities are checked; external changes and saves can invalidate old proposals.
 
-## 8. Preferences
+Original copies and review records exist only for the current task/session, are replaced by a new request, and are not stored in ordinary conversation history. Stop or closing the dialog during generation cancels the request; already validated proposals may remain for review.
 
-Preferences cover appearance, editing, images, spellcheck, shortcuts, Agent providers, the app icon, and desktop behavior. The interface supports English, Simplified Chinese, and Japanese, with automatic light/dark mode and several built-in themes.
+### Skills and local history
 
-After changing a shortcut, image folder, or external tool path, test it with a temporary document. Agent keys and custom authentication headers are stored in the operating-system credential store rather than ordinary preferences.
+Six built-in skills cover ELI5 explanations, Mermaid, concise writing, Markdown documentation, team communications, and Markdown coauthoring. Enable/disable them, choose one explicitly, or let the model load instructions as needed. Importing `SKILL.md` copies allowed text resources; skills do not execute scripts or add permissions.
 
-## 9. Updates, help, and issue reports
+Conversation persistence is off by default. Enabling it permits local history browsing, Markdown export, and deletion. Images, API keys, project grants, and Web permissions are not restored. Restored review cards are read-only; explicitly reassociate and validate pending edits against a selected current Markdown file to create new review cards. Existing decisions are never replayed automatically.
 
-- **Help → Open Documentation** opens this project's Wiki.
-- **Help → Report an Issue** opens this project's issue tracker.
-- **Help → Check for Updates** is available only when a release has a verifiable updater feed. You can always check [Releases](https://github.com/yulianjie/MarkCaptain/releases/latest) directly.
+### External MCP
 
-Before filing an issue, collect:
+Authorize one current buffer in **External Agent (MCP)** and use the displayed Node.js stdio adapter with temporary environment credentials. Node.js 18+ is required. The whole document is shared; selection metadata does not narrow read access.
 
-1. the MarkCaptain version, operating system, and package type;
-2. the shortest reliable reproduction steps;
-3. expected and actual behavior;
-4. screenshots or logs with private documents, API keys, authentication headers, and other secrets removed.
+The bridge only reads that document, submits reviewed proposals, and polls outcomes. It offers no arbitrary file access, direct apply/save, network, or Shell. Document/panel/window changes or revocation invalidate access. Keep tokens out of URLs, command arguments, persistent project files, and Git. The external client's own capabilities remain outside this bridge's control.
 
-Search [GitHub Issues](https://github.com/yulianjie/MarkCaptain/issues) before opening a new report.
+See [Writing Agent / AI 写作助手](https://github.com/yulianjie/MarkCaptain/wiki/AI%E5%86%99%E4%BD%9C%E5%8A%A9%E6%89%8B).
 
-## 10. Troubleshooting
+## Project research and document checks
 
-### MarkCaptain does not start on Windows
+Project retrieval requires an explicit session/window grant over the current project's include/exclude globs. It is bounded literal search, not vector retrieval. Candidates are distinct from actually read sources; all retrieved project content remains read-only. Changes to scope, relevant configuration, or project require renewed authorization.
 
-Install or repair the WebView2 Runtime and retry the latest release. Managed devices may also have application execution policies.
+`.markcaptain/agent.json` stores language, audience, tone, glossary, and search preferences. These settings are not permissions. Writing rules are sent only when enabled for the request.
 
-### Images disappear on another computer
+Local checks do not call a model: they inspect heading jumps, allowed local link/image existence, and discouraged terminology. They do not verify external URLs, heading anchors, or semantics. Model read-only checks send the document snapshot without edit/project/Web tools. Generating a revision from an issue starts a separate reviewed request.
 
-Prefer relative paths and sync the image folder with the Markdown files. Absolute paths normally work only on the original computer.
+Web research is off by default and resets after sending. Review/edit and approve exact query strings before Bing RSS search, or explicitly supply public URLs. It accepts public HTTP/HTTPS on ports 80/443, not private-network endpoints or authenticated pages; it does not use the system proxy. Optional Cloudflare public DNS discloses target domains, does not change system DNS, and fails explicitly rather than silently falling back.
 
-### PDF or document export fails
+Per task, project research permits up to eight searches and forty successfully read sources. Web research permits eight approved queries, eight direct URLs, and twenty-four sources; each search returns up to five results. Budget limits and read failures are reported as incomplete, not as proof that nothing else exists. History does not restore grants or live webpage bodies.
 
-System printing does not require Pandoc. Pandoc exports do require a separate Pandoc installation and the engine needed by the target format; diagnose the two paths independently.
+See [Project research / 项目检索与联网研究](https://github.com/yulianjie/MarkCaptain/wiki/%E9%A1%B9%E7%9B%AE%E6%A3%80%E7%B4%A2%E4%B8%8E%E8%81%94%E7%BD%91%E7%A0%94%E7%A9%B6).
 
-### Agent requests fail
+## Export documents and projects
 
-Check the endpoint, model ID, authentication mode, and network reachability. Local Ollama normally needs no API key; remote compatible endpoints may require a bearer key or custom header. Never paste credentials into an issue.
+Export menus open one workflow: choose format/theme/layout, freeze the current buffer, review resources and warnings, and export that reviewed snapshot. Editing or changing settings makes the preview stale. Export does not save the source document.
 
-### A file changed outside MarkCaptain
+HTML and system printing do not need Pandoc. DOCX/ODT/EPUB need Pandoc; direct PDF also needs an available engine. Opening the system print dialog is not proof that a PDF was saved. Technical, simple-reading, and formal-report themes are separate from editor themes.
 
-Compare the disk version with your unsaved content before overwriting either one. Save a separate copy first when the difference is unclear.
+Local resources are checked against source paths and authorized scope. Remote resources are not automatically downloaded; HTML retaining external URLs still needs network access. Diagrams requiring external resources may remain readable source with warnings. Office/ebook previews approximate content; verify the actual file in its reader.
+
+From **Export project…**, choose individual document outputs or an explicitly ordered book. Select up to 64 documents, review frozen source versions and names, and export. Open dirty buffers take precedence over disk. Books process each chapter's resources separately and remap headings, footnotes, and included links; missing chapters block the book.
+
+Outputs do not overwrite existing files by default. Explicit replacement requires a new frozen review. Results remain per item; retry revalidates sources and preserves successful outputs. Cancel retains already completed files. Project settings and chapters live in `.markcaptain/export.json`; saving them does not launch export or persist untitled text.
+
+See [Export / 导出与成册](https://github.com/yulianjie/MarkCaptain/wiki/%E5%AF%BC%E5%87%BA%E4%B8%8E%E6%88%90%E5%86%8C).
+
+## Storage, recovery, and updates
+
+Optional providers are self-hosted MarkCaptain Sync, Git, WebDAV, and trusted native storage plugins. Configure/test connections in Preferences, then use manual synchronization and inspect results. Local save success is separate from remote success. Do not assume a complete background retry scheduler or general remote-version browser from design plans.
+
+Git supports fetch, fast-forward pull, and non-force push without auto-commit/reset. Divergence can enter an explicitly requested review merge. Agent-assisted conflict editing remains reviewed; the Agent cannot commit/push. WebDAV relies on version/ETag checks and refuses unsafe overwrites. A native plugin runs with your OS account's permissions.
+
+Independent local history records named document snapshots on open/save/changed-content checks: default 60-second interval, 30 days, and 256 MiB total. Compare, copy, restore as a new tab, or restore the current buffer after preserving its prior content. Restoration is undoable and still needs saving. History is path-based, bounded, and separate from crash drafts, Agent history, and transient multi-document originals.
+
+Automatic update checking defaults to about ten seconds after startup and every four hours. Automatic failures stay quiet; manual checks report errors. Download/install requires a click and signature verification. Save work and close other editor windows before installation; failed/cancelled saves pause installation. Download completion is distinct from installation success.
+
+See [Storage and recovery / 同步与数据安全](https://github.com/yulianjie/MarkCaptain/wiki/%E5%90%8C%E6%AD%A5%E4%B8%8E%E6%95%B0%E6%8D%AE%E5%AE%89%E5%85%A8), [Preferences / 快捷键与偏好设置](https://github.com/yulianjie/MarkCaptain/wiki/%E5%BF%AB%E6%8D%B7%E9%94%AE%E4%B8%8E%E5%81%8F%E5%A5%BD%E8%AE%BE%E7%BD%AE), and [Troubleshooting / 常见问题](https://github.com/yulianjie/MarkCaptain/wiki/%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98).
+
+## Report a problem
+
+Use [Issues](https://github.com/yulianjie/MarkCaptain/issues) with the app version, OS/architecture, package type, minimal reproduction, expected/actual result, editing mode, and relevant dependency details. Distinguish browser preview, native app, and exported-reader behavior. Remove private text, keys, authentication headers, and temporary MCP credentials from examples and screenshots.
