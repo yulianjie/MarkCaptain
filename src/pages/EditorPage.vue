@@ -49,6 +49,7 @@ import {
   type LoadedDocument,
 } from '@/services/tauri-invoke'
 import { listenTyped } from '@/services/tauri-bridge'
+import { installExternalFileOpener } from '@/services/external-file-opener'
 import { resolveEditorMenuCommand } from '@/services/editor-menu-actions'
 import { PROJECT_ISSUES_URL, PROJECT_WIKI_URL } from '@/services/project-links'
 import { handleApplicationShortcut, rendererOwnsApplicationShortcuts } from '@/services/application-shortcuts'
@@ -774,16 +775,6 @@ onMounted(async () => {
     })
   }
 
-  // File-association launches forward to a custom DOM event.
-  const handler = (e: Event) => {
-    const detail = (e as CustomEvent<{ path: string }>).detail
-    void editor.openFile(detail.path).catch(err => {
-      notify.pushToast({ type: 'error', title: t('toast.openFailed'), message: err instanceof Error ? err.message : String(err) })
-    })
-  }
-  window.addEventListener('mt:open-file', handler)
-  unsubOpenFile = () => window.removeEventListener('mt:open-file', handler)
-
   // Native menu actions.
   unsubMenu = await listenTyped('mt://menu/action', id => { void executeMenuAction(id) })
 
@@ -792,15 +783,25 @@ onMounted(async () => {
   // print dialog so the OS handles "Save as PDF".
   unsubPrint = await listenTyped('mt://export/print', () => { window.print() })
 
-  // Install external-open and menu listeners before potentially slow folder
-  // restoration so startup events cannot fall into another listener gap.
+  // Explicit OS opens remain queued in Rust throughout session restoration.
   const startupController = new AbortController()
   startupAbortController = startupController
   const ready = (async () => {
     try {
       await restoreStartupState(startupController.signal)
+    } catch (error) {
+      if (!startupController.signal.aborted) {
+        notify.pushToast({ type: 'error', title: t('session.loadFailed'), message: sessionErrorMessage(error) })
+      }
     } finally {
       if (editor.startupHydrationPending) editor.finishStartupHydration()
+    }
+    if (!startupController.signal.aborted) {
+      unsubOpenFile = await installExternalFileOpener({
+        openFile: path => editor.openFile(path),
+        onError: error => notify.pushToast({ type: 'error', title: t('toast.openFailed'), message: sessionErrorMessage(error) }),
+        signal: startupController.signal,
+      })
     }
   })()
   startupReady = ready

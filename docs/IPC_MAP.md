@@ -54,7 +54,7 @@ Channel naming convention:
 
 | Original | New |
 |---|---|
-| `mt::open-file` (open into target window) | event `mt://window/open-file` to that window |
+| `mt::open-file` (open into target window) | Per-window Rust queue; `mt://window/open-file` wakes the target editor, which invokes `cmd_take_pending_open_files` |
 | `mt::close-window` | `invoke('cmd_close_window')` |
 | `mt::window-toggle-always-on-top` | `invoke('cmd_set_always_on_top')` |
 | `app-create-editor-window` | `invoke('cmd_new_window')` |
@@ -65,6 +65,12 @@ Channel naming convention:
 | `mt::app-try-quit` | `invoke('process:plugin:exit')` from `@tauri-apps/plugin-process` |
 
 Opening Preferences reuses its existing window on the invoking editor's monitor.
+File-association launches and second-instance forwards enqueue paths before
+notifying the target editor. After session restoration, the editor subscribes
+and immediately drains its queue; later notifications trigger serialized drains.
+Startup does not rely on a fixed delay or transient DOM events, and an explicit
+file open selects its tab after restored tabs. Relative second-instance paths
+resolve against the launching process's working directory.
 Rust checks title-bar/content visibility against monitor work areas before showing
 or refocusing windows, and after display layout changes. Background recovery
 preserves minimized windows and does not take focus.

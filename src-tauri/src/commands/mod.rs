@@ -85,6 +85,7 @@ macro_rules! markcaptain_handler {
             $crate::commands::window::cmd_set_menu_accelerators_enabled,
             $crate::commands::window::cmd_open_settings,
             $crate::commands::window::cmd_show_window,
+            $crate::commands::window::cmd_take_pending_open_files,
             // prefs
             $crate::commands::prefs::cmd_get_preferences,
             $crate::commands::prefs::cmd_get_preference,

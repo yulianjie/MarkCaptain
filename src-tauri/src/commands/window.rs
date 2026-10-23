@@ -43,9 +43,19 @@ fn ensure_editor_window(label: &str) -> AppResult<()> {
         Ok(())
     } else {
         Err(AppError::InvalidArgument(
-            "only an editor window may invoke cmd_destroy_editor_window".into(),
+            "only an editor window may invoke this command".into(),
         ))
     }
+}
+
+/// Called after session restoration and installation of the file-open listener.
+#[tauri::command]
+pub fn cmd_take_pending_open_files(
+    window: WebviewWindow,
+    state: State<'_, crate::file_open::PendingFileOpens>,
+) -> AppResult<Vec<std::path::PathBuf>> {
+    ensure_editor_window(window.label())?;
+    Ok(state.take(window.label()))
 }
 
 /// Release all workspace ownership leases even when renderer teardown cannot

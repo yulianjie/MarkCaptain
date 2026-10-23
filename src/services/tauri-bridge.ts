@@ -51,7 +51,7 @@ export interface EventRegistry {
   'mt://editor/selection-changed': EditorSelectionChange
   'mt://palette/show': null
   'mt://view/toggle': { entry: string }
-  'mt://window/open-file': { path: string }
+  'mt://window/open-file': null
   'mt://export/print': null
   'mt://updater/available': UpdaterAvailable
 }
@@ -72,7 +72,7 @@ export async function listenTyped<K extends EventName>(
     // without throwing and downstream setup keeps running.
     return () => {}
   }
-  const options = name === 'mt://agent/event'
+  const options = name === 'mt://agent/event' || name === 'mt://window/open-file'
     ? { target: { kind: 'WebviewWindow' as const, label: getCurrentWebviewWindow().label } }
     : undefined
   const fn = await listen<EventRegistry[K]>(name, e => handler(e.payload), options)
@@ -86,10 +86,6 @@ export function initTauriBridge(_app: App): void {
     // Running outside Tauri (e.g. Vitest); skip silently.
     return
   }
-  // Example: forward file-association launches to the editor store.
-  void listenTyped('mt://window/open-file', payload => {
-    window.dispatchEvent(new CustomEvent('mt:open-file', { detail: payload }))
-  })
   void listenTyped('mt://second-instance', payload => {
     window.dispatchEvent(new CustomEvent('mt:second-instance', { detail: payload }))
   })

@@ -9,6 +9,7 @@ pub mod app;
 pub mod cli;
 pub mod commands;
 pub mod error;
+mod file_open;
 pub mod filesystem;
 pub mod ipc;
 pub mod menu;
@@ -102,17 +103,9 @@ pub fn run() {
                     let _ = window_placement::show(&window, None);
                 });
             }
-            for arg in argv.iter().skip(1) {
-                if arg.starts_with("--") || arg.starts_with('-') {
-                    continue;
-                }
-                let p = std::path::PathBuf::from(arg);
-                if p.exists() && p.is_file() {
-                    if let Some(win) = app.get_webview_window(&target) {
-                        let _ = win.emit("mt://window/open-file", serde_json::json!({ "path": p }));
-                    }
-                }
-            }
+            let files =
+                file_open::launch_files(argv.iter().skip(1).cloned(), std::path::Path::new(&cwd));
+            file_open::enqueue(app, &target, files);
             let payload = ipc::events::SecondInstance {
                 argv,
                 cwd: cwd.into(),
@@ -125,6 +118,7 @@ pub fn run() {
 
     builder
         .manage(app::AppState::default())
+        .manage(file_open::PendingFileOpens::default())
         .manage(commands::agent::AgentState::default())
         .manage(commands::agent_external::ExternalAgentState::default())
         .on_window_event(|window, event| {

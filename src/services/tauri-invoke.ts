@@ -181,6 +181,13 @@ export interface SearchHit {
 
 export const openFiles = () => invoke<string[]>('cmd_open_files')
 
+export const takePendingOpenFiles = () => {
+  if (typeof window === 'undefined' || !('__TAURI_INTERNALS__' in window)) {
+    return Promise.resolve<string[]>([])
+  }
+  return invoke<string[]>('cmd_take_pending_open_files')
+}
+
 export const readMarkdown = (path: string, options?: ReadOptions) =>
   invoke<LoadedDocument>('cmd_read_markdown', { path, options })
 
