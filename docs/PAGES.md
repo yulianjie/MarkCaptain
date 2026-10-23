@@ -6,6 +6,8 @@
 
 首页由 `jekyll-readme-index` 从现有 README 生成。中文 README、docs 文档与 img 图片也参与站点发布，Markdown 内部链接由 `jekyll-relative-links` 转换。
 
+`docs/releases/README.md` 为版本说明目录生成索引，让 README 中的目录链接在站点和 GitHub 上都可访问。新增版本说明时同步更新这个索引。
+
 根目录的 `index.html` 属于 Tauri/Vite 开发入口，引用尚未构建的 TypeScript，不作为静态站点首页。配置仅在 Pages 构建时排除它，桌面开发与打包继续使用原文件。
 
 应用源码、内置技能、测试夹具、脚本、依赖和构建目录不属于站点内容。尤其不能把 src-tauri 下的技能参考资料送入 Jekyll：其中的维基模板示例包含双花括号及竖线，会被 Liquid 当成变量和过滤器执行。修复放在发布范围配置中，内置技能原文保持完整。
