@@ -1,4 +1,4 @@
-import { computed, onScopeDispose, ref, shallowRef, watch } from 'vue'
+import { computed, nextTick, onScopeDispose, ref, shallowRef, watch } from 'vue'
 import { defineStore } from 'pinia'
 import dayjs from 'dayjs'
 import { notesList, notesRead, notesCreate, notesConfig, notesCancel, type NoteFile, type NotesConfig } from '@/services/tauri-invoke'
@@ -16,6 +16,28 @@ import type { IndexResponse } from '@/services/note-index.worker'
 import { bus } from '@/bus'
 import { createSearchRevealRequest } from '@/services/search-reveal'
 import { localHistoryCapture, localHistorySettings } from '@/services/tauri-invoke'
+import { getPaneViewState, restorePaneViewState, type PaneViewState } from '@/services/pane-view-state'
+import { normalizePaneViewState } from '@/services/pane-layouts'
+
+interface RelationNavigationFrame {
+  paneId: string
+  documentId: string
+  path: string
+  sourceMode: boolean
+  viewState: PaneViewState
+}
+
+const RELATION_TARGETS_STORAGE_KEY = 'mt:document-inspector-fixed-targets:v1'
+const MAX_RELATION_NAVIGATION_HISTORY = 40
+function readFixedTargets(): Record<string, string> {
+  try {
+    const value: unknown = JSON.parse(localStorage.getItem(RELATION_TARGETS_STORAGE_KEY) ?? '{}')
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+    return Object.fromEntries(Object.entries(value).filter(([root, relative]) =>
+      root.length > 0 && root.length < 32768 && typeof relative === 'string' && relative.length > 0 && relative.length < 32768,
+    ))
+  } catch { return {} }
+}
 
 export interface IndexedNote extends NoteFile { markdown: string; aliases: string[]; fingerprint?: string; error?: string }
 export const useNotebookStore = defineStore('notebook', () => {
@@ -143,13 +165,56 @@ export const useNotebookStore = defineStore('notebook', () => {
   }, { immediate: true })
   const currentNote = computed(() => liveNotes.value.find(n => pathsReferToSameFile(n.path, editor.currentFile?.pathname ?? '')) ?? null)
   const currentAnalysis = computed(() => analyses.value.find(n => n.relative === currentNote.value?.relative) ?? null)
+  const fixedRelationTargets = ref(readFixedTargets())
+  const relationTargetRootKey = computed(() => root.value ? normalizeComparablePath(root.value) : '')
+  const fixedRelationTargetRelative = computed(() => relationTargetRootKey.value ? fixedRelationTargets.value[relationTargetRootKey.value] ?? '' : '')
+  const relationTargetPinned = computed(() => Boolean(fixedRelationTargetRelative.value))
+  const relationTargetRelative = computed(() => fixedRelationTargetRelative.value || currentNote.value?.relative || '')
+  const relationTarget = computed(() => liveNotes.value.find(note => note.relative === relationTargetRelative.value) ?? null)
+  const relationTargetAnalysis = computed(() => analyses.value.find(note => note.relative === relationTargetRelative.value) ?? null)
+  const relationTargetStatus = computed(() => {
+    if (!root.value) return 'noWorkspace'
+    const isIndexing = busy.value || indexing.value || relationsBusy.value
+    if (relationTargetPinned.value) {
+      if (!relationTarget.value) return isIndexing ? 'indexing' : 'pinnedMissing'
+      if (relationTarget.value.error) return 'targetError'
+      if (!relationTargetAnalysis.value || relationsBusy.value) return isIndexing ? 'indexing' : 'notIndexed'
+      return notes.value.some(note => note.error) ? 'partial' : 'ready'
+    }
+    const active = editor.currentFile
+    if (!active) return 'noDocument'
+    if (!active.pathname) return 'noPath'
+    if (!pathIsInsideRoot(root.value, active.pathname)) return 'outsideWorkspace'
+    if (!relationTarget.value) return isIndexing ? 'indexing' : 'notIndexed'
+    if (relationTarget.value.error) return 'targetError'
+    if (!relationTargetAnalysis.value || relationsBusy.value) return isIndexing ? 'indexing' : 'notIndexed'
+    return notes.value.some(note => note.error) ? 'partial' : 'ready'
+  })
+  function persistFixedTargets() {
+    try { localStorage.setItem(RELATION_TARGETS_STORAGE_KEY, JSON.stringify(fixedRelationTargets.value)) } catch { /* local preference unavailable */ }
+  }
+  function fixRelationTarget(relative = relationTarget.value?.relative ?? '') {
+    const rootKey = relationTargetRootKey.value
+    if (!rootKey || !relative) return false
+    fixedRelationTargets.value = { ...fixedRelationTargets.value, [rootKey]: relative }
+    persistFixedTargets()
+    return true
+  }
+  function followActiveRelationTarget() {
+    const rootKey = relationTargetRootKey.value
+    if (!rootKey || !fixedRelationTargets.value[rootKey]) return
+    const next = { ...fixedRelationTargets.value }
+    delete next[rootKey]
+    fixedRelationTargets.value = next
+    persistFixedTargets()
+  }
   const relations = shallowRef<NoteRelations>({ backlinks: [], mentions: [] })
   const relationsBusy = ref(false)
   const relationsWorker = typeof Worker !== 'undefined' ? new Worker(new URL('../services/note-relations.worker.ts', import.meta.url), { type: 'module' }) : null
   let relationGeneration = 0
   if (relationsWorker) relationsWorker.onmessage = event => { if (event.data.id === relationGeneration) { relations.value = event.data.result; relationsBusy.value = false } }
   if (relationsWorker) relationsWorker.onerror = event => { error.value = event.message; relationsBusy.value = false }
-  watch(() => [analyses.value, currentNote.value?.relative] as const, ([documents, current]) => {
+  watch(() => [analyses.value, relationTargetRelative.value] as const, ([documents, current]) => {
     const id = ++relationGeneration
     relationsBusy.value = Boolean(current && relationsWorker)
     relations.value = { backlinks: [], mentions: [] }
@@ -159,10 +224,96 @@ export const useNotebookStore = defineStore('notebook', () => {
   }, { immediate: true })
   const backlinks = computed(() => relations.value.backlinks)
   const mentions = computed(() => relations.value.mentions)
+  const relationNavigationHistory = ref<RelationNavigationFrame[]>([])
+  const canReturnFromRelation = computed(() => relationNavigationHistory.value.length > 0)
+  function captureRelationNavigationFrame(): RelationNavigationFrame | null {
+    const tab = editor.currentFile
+    const paneId = editor.activePaneId
+    if (!tab) return null
+    editor.captureCurrentViewState()
+    const view = getPaneViewState(paneId, tab.id) ?? {}
+    return {
+      paneId,
+      documentId: tab.id,
+      path: tab.pathname,
+      sourceMode: editor.sourceCodeMode,
+      viewState: {
+        ...view,
+        ...(tab.cursor !== undefined ? { cursor: tab.cursor } : {}),
+        ...(tab.sourceSelection !== undefined ? { sourceSelection: tab.sourceSelection } : {}),
+      },
+    }
+  }
+  function revealRelationTarget(tab: { id: string; pathname: string; markdown: string }, from: number, to: number) {
+    bus.emit('reveal-search-hit', createSearchRevealRequest({
+      tabId: tab.id, path: tab.pathname, mode: editor.sourceCodeMode ? 'source' : 'wysiwyg',
+      line: 1, column: 1, length: 0, exactRange: { markdown: tab.markdown, from, to },
+    }))
+  }
+  async function navigateToRelation(relative: string, from: number, to = from, options: { openInOtherPane?: boolean } = {}) {
+    const note = liveNotes.value.find(candidate => candidate.relative === relative)
+    if (!note) throw new Error(t('notes.changed'))
+    const origin = captureRelationNavigationFrame()
+    const expectedRoot = root.value
+    let createdPaneId = ''
+    try {
+      if (options.openInOtherPane) {
+        let destination = editor.panes.find(pane => pane.id !== editor.activePaneId)
+        if (!destination) {
+          if (editor.panes.length >= 4) throw new Error(t('notes.changed'))
+          editor.splitPane(editor.splitDirection)
+          destination = editor.panes.at(-1)
+          if (destination) createdPaneId = destination.id
+        }
+        if (!destination) throw new Error(t('notes.changed'))
+        editor.activatePane(destination.id)
+      }
+      const tab = await editor.openFile(note.path)
+      if (root.value !== expectedRoot) throw new Error(t('notes.changed'))
+      if (origin) relationNavigationHistory.value = [...relationNavigationHistory.value, origin].slice(-MAX_RELATION_NAVIGATION_HISTORY)
+      revealRelationTarget(tab, from, to)
+    } catch (cause) {
+      if (createdPaneId) editor.closePane(createdPaneId)
+      else if (origin && editor.panes.some(pane => pane.id === origin.paneId)) editor.activatePane(origin.paneId)
+      throw cause
+    }
+  }
+  function updateFixedRelationTargetAfterMove(workspaceRoot: string, source: string, destination: string) {
+    const rootKey = normalizeComparablePath(workspaceRoot)
+    const relative = fixedRelationTargets.value[rootKey]
+    if (!relative) return
+    const remapped = remapPathWithinRoot(nativePath(workspaceRoot, source), nativePath(workspaceRoot, destination), nativePath(workspaceRoot, relative))
+    if (!remapped) return
+    const nextRelative = relativeNative(remapped, workspaceRoot)
+    if (nextRelative === relative) return
+    fixedRelationTargets.value = { ...fixedRelationTargets.value, [rootKey]: nextRelative }
+    persistFixedTargets()
+  }
+  async function returnFromRelation() {
+    const frame = relationNavigationHistory.value.at(-1)
+    if (!frame) return false
+    let pane = editor.panes.find(candidate => candidate.id === frame.paneId)
+    if (!pane) pane = editor.panes.find(candidate => candidate.documentId === frame.documentId) ?? editor.panes[0]
+    if (!pane) return false
+    try {
+      editor.activatePane(pane.id)
+      let tab = editor.tabs.find(candidate => candidate.id === frame.documentId)
+      if (!tab && frame.path) tab = await editor.openFile(frame.path)
+      if (!tab) return false
+      editor.setCurrent(tab.id)
+      pane.sourceMode = frame.sourceMode
+      editor.sourceCodeMode = frame.sourceMode
+      restorePaneViewState(pane.id, tab.id, normalizePaneViewState(tab.markdown, frame.viewState))
+      await nextTick()
+      relationNavigationHistory.value = relationNavigationHistory.value.slice(0, -1)
+      return true
+    } catch (cause) {
+      error.value = String(cause)
+      return false
+    }
+  }
   async function reveal(relative: string, from: number, to = from) {
-    const note = liveNotes.value.find(n => n.relative === relative); if (!note) return
-    const tab = await editor.openFile(note.path)
-    bus.emit('reveal-search-hit', createSearchRevealRequest({ tabId: tab.id, path: tab.pathname, mode: editor.sourceCodeMode ? 'source' : 'wysiwyg', line: 1, column: 1, length: 0, exactRange: { markdown: tab.markdown, from, to } }))
+    await navigateToRelation(relative, from, to)
   }
   async function followLink(source: string, link: Pick<NoteLink, 'target' | 'kind'>) {
     const expectedRoot = root.value
@@ -182,11 +333,14 @@ export const useNotebookStore = defineStore('notebook', () => {
         throw e
       }
       if (root.value !== expectedRoot) throw new Error(t('notes.changed'))
-      await create(target, '', expectedRoot); return
+      const origin = captureRelationNavigationFrame()
+      await create(target, '', expectedRoot)
+      if (origin) relationNavigationHistory.value = [...relationNavigationHistory.value, origin].slice(-MAX_RELATION_NAVIGATION_HISTORY)
+      return
     }
     const note = candidates[0]; const h = heading ? resolveNoteHeading(note, heading) : undefined
     if (heading && !h) throw new Error(t('notes.headingMissing'))
-    await reveal(note.relative, h?.from ?? 0)
+    await navigateToRelation(note.relative, h?.from ?? 0)
   }
   function relativeNative(path: string, workspaceRoot = root.value) {
     const normalizedRoot = workspaceRoot.replace(/\\/g, '/').replace(/\/$/, '')
@@ -264,6 +418,7 @@ export const useNotebookStore = defineStore('notebook', () => {
         return { relative: note.relative, expected: note.fingerprint }
       })
       const transaction = await notesMove(expectedRoot, source, destination, changes, checks)
+      updateFixedRelationTargetAfterMove(expectedRoot, source, destination)
       lastTransaction.value = transaction; lastTransactionRoot = transactionRootKey(expectedRoot)
       try { localStorage.setItem(transactionStorageKey(expectedRoot), transaction) } catch { /* storage unavailable */ }
       for (const snapshot of snapshots) {
@@ -300,6 +455,7 @@ export const useNotebookStore = defineStore('notebook', () => {
       const snapshots = workspaceTabs(expectedRoot).map(tab => ({ tab, markdown: tab.markdown, path: tab.pathname! }))
       requireCleanWorkspaceTabs(snapshots.map(snapshot => snapshot.tab))
       const restored = await notesRestoreTransaction(expectedRoot, id)
+      updateFixedRelationTargetAfterMove(expectedRoot, restored.destination, restored.source)
       const from = nativePath(expectedRoot, restored.destination); const to = nativePath(expectedRoot, restored.source)
       for (const snapshot of snapshots) {
         if (!editor.tabs.some(tab => tab.id === snapshot.tab.id)) continue
@@ -392,5 +548,5 @@ export const useNotebookStore = defineStore('notebook', () => {
     clearTimeout(refreshTimer); refreshTimer = setTimeout(() => { void rebuild() }, 500)
   }).then(fn => { off = fn }).catch(() => {})
   onScopeDispose(() => { disposed = true; clearTimeout(historyTimer); cancel(); relationsWorker?.terminate(); worker?.terminate(); clearTimeout(refreshTimer); off?.() })
-  return { root, notes, liveNotes, busy, indexing, relationsBusy, error, dialog, config, templates, rebuild, cancel, quickResults, create, daily, templateContent, saveConfig, analyses, panel, currentNote, currentAnalysis, backlinks, mentions, reveal, followLink, mutating, moveWithReferences, restoreReferences }
+  return { root, notes, liveNotes, busy, indexing, relationsBusy, error, dialog, config, templates, rebuild, cancel, quickResults, create, daily, templateContent, saveConfig, analyses, panel, currentNote, currentAnalysis, relationTarget, relationTargetRelative, relationTargetPinned, relationTargetStatus, relationTargetAnalysis, fixRelationTarget, followActiveRelationTarget, backlinks, mentions, canReturnFromRelation, navigateToRelation, returnFromRelation, reveal, followLink, mutating, moveWithReferences, restoreReferences }
 })

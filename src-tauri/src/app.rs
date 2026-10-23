@@ -4,7 +4,7 @@
 //! owns the recent-documents list, file watchers, and any other long-lived
 //! state that outlives a single command invocation.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -15,7 +15,7 @@ use crate::error::AppResult;
 use crate::filesystem::watcher::{WatcherHandle, WorkspaceEventTargets};
 
 /// Long-lived state shared across all command handlers via [`tauri::State`].
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct AppState {
     inner: Arc<RwLock<AppStateInner>>,
 }
@@ -34,6 +34,12 @@ struct AppStateInner {
     /// Secrets must not be persisted in `preferences.json`. The GitHub image
     /// upload token intentionally lives only for the lifetime of this process.
     github_token: Option<String>,
+
+    /// Canonical Markdown documents selected through the file read/save
+    /// commands during this process lifetime. Export helpers use this as a
+    /// source-document capability; workspace membership alone is insufficient
+    /// for single-file editor sessions.
+    authorized_document_sources: HashSet<PathBuf>,
 }
 
 struct RegisteredWorkspace<W> {
@@ -168,6 +174,40 @@ fn renderer_paths_match(first: &Path, second: &Path) -> bool {
 }
 
 impl AppState {
+    /// Grant process-lifetime export-source authority to an existing Markdown
+    /// document that the user has just read or saved through the editor.
+    pub fn authorize_document_source(&self, path: &Path) -> AppResult<()> {
+        let canonical = std::fs::canonicalize(path)?;
+        if !canonical.is_file() || !is_markdown_document(&canonical) {
+            return Err(crate::error::AppError::InvalidArgument(
+                "only existing Markdown documents can be authorized as export sources".into(),
+            ));
+        }
+        self.inner
+            .write()
+            .authorized_document_sources
+            .insert(canonical);
+        Ok(())
+    }
+
+    /// Check an export-source path against the canonical documents authorized
+    /// by successful editor reads/saves in this application process.
+    pub fn is_document_source_authorized(&self, path: &Path) -> bool {
+        if !is_markdown_document(path) {
+            return false;
+        }
+        let Ok(canonical) = std::fs::canonicalize(path) else {
+            return false;
+        };
+        canonical.is_file()
+            && is_markdown_document(&canonical)
+            && self
+                .inner
+                .read()
+                .authorized_document_sources
+                .contains(&canonical)
+    }
+
     pub fn push_recent_file(&self, path: PathBuf) {
         let mut inner = self.inner.write();
         inner.recent_files.retain(|p| p != &path);
@@ -236,6 +276,25 @@ impl AppState {
         self.inner.read().workspaces.roots()
     }
 
+    /// Return only canonical roots currently owned by a particular editor
+    /// window. Long-running Agent tasks use this to revalidate project grants
+    /// after a workspace is closed or ownership changes.
+    pub fn workspace_roots_for_window(&self, owner: &str) -> Vec<PathBuf> {
+        self.inner
+            .read()
+            .workspaces
+            .by_root
+            .iter()
+            .filter_map(|(root, workspace)| {
+                workspace
+                    .targets
+                    .read()
+                    .contains_key(owner)
+                    .then(|| root.clone())
+            })
+            .collect()
+    }
+
     pub fn set_github_token(&self, token: String) {
         let mut inner = self.inner.write();
         inner.github_token = if token.is_empty() { None } else { Some(token) };
@@ -246,12 +305,27 @@ impl AppState {
     }
 }
 
+/// Keep this extension rule local to AppState: `commands::notes` depends on
+/// AppState, so importing its helper here would create an unnecessary module
+/// dependency cycle. Match the note index's accepted Markdown suffixes.
+pub(crate) fn is_markdown_document(path: &Path) -> bool {
+    matches!(
+        path.extension()
+            .and_then(|extension| extension.to_str())
+            .map(str::to_ascii_lowercase)
+            .as_deref(),
+        Some("md" | "markdown" | "mkd" | "mdown" | "mkdn" | "mdtxt" | "mdtext")
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use std::cell::Cell;
     use std::path::PathBuf;
+    use std::sync::Arc;
 
     use super::{AppState, WorkspaceRegistry};
+    use crate::filesystem::watcher::WatcherHandle;
 
     #[test]
     fn github_token_is_process_memory_only_state() {
@@ -261,6 +335,31 @@ mod tests {
         assert_eq!(state.github_token().as_deref(), Some("secret"));
         state.set_github_token(String::new());
         assert_eq!(state.github_token(), None);
+    }
+
+    #[test]
+    fn document_source_authorization_is_canonical_markdown_and_process_scoped() {
+        let tmp = tempfile::tempdir().unwrap();
+        let note = tmp.path().join("项目.MD");
+        let text = tmp.path().join("readme.txt");
+        std::fs::write(&note, "# Note").unwrap();
+        std::fs::write(&text, "not Markdown").unwrap();
+
+        let state = AppState::default();
+        assert!(!state.is_document_source_authorized(&note));
+        state.authorize_document_source(&note).unwrap();
+        assert!(state.is_document_source_authorized(&note));
+        assert!(state.is_document_source_authorized(&tmp.path().join(".").join("项目.MD")));
+        assert!(!state.is_document_source_authorized(&text));
+        assert!(state.authorize_document_source(&text).is_err());
+        assert!(state
+            .authorize_document_source(&tmp.path().join("missing.md"))
+            .is_err());
+
+        // This capability is intentionally retained for the application
+        // process even if the renderer closes its current workspace session.
+        state.unregister_all_workspaces_for_owner("main");
+        assert!(state.is_document_source_authorized(&note));
     }
 
     #[test]
@@ -387,6 +486,55 @@ mod tests {
             .targets
             .read()
             .contains_key("editor-2"));
+    }
+
+    #[test]
+    fn workspace_roots_are_scoped_to_the_owning_window() {
+        let state = AppState::default();
+        let first = PathBuf::from("/canonical/first");
+        let second = PathBuf::from("/canonical/second");
+        state
+            .register_workspace(first.clone(), "main".into(), PathBuf::from("/main"), |_| {
+                Ok::<_, crate::error::AppError>(WatcherHandle {
+                    root: first.clone(),
+                    debouncer: Arc::new(parking_lot::Mutex::new(None)),
+                })
+            })
+            .unwrap();
+        state
+            .register_workspace(
+                first.clone(),
+                "editor-2".into(),
+                PathBuf::from("/editor-2"),
+                |_| {
+                    Ok::<_, crate::error::AppError>(WatcherHandle {
+                        root: first.clone(),
+                        debouncer: Arc::new(parking_lot::Mutex::new(None)),
+                    })
+                },
+            )
+            .unwrap();
+        state
+            .register_workspace(
+                second.clone(),
+                "editor-2".into(),
+                PathBuf::from("/editor-2b"),
+                |_| {
+                    Ok::<_, crate::error::AppError>(WatcherHandle {
+                        root: second.clone(),
+                        debouncer: Arc::new(parking_lot::Mutex::new(None)),
+                    })
+                },
+            )
+            .unwrap();
+
+        let mut main_roots = state.workspace_roots_for_window("main");
+        let mut second_roots = state.workspace_roots_for_window("editor-2");
+        main_roots.sort();
+        second_roots.sort();
+        assert_eq!(main_roots, vec![first.clone()]);
+        assert_eq!(second_roots, vec![first, second]);
+        assert!(state.workspace_roots_for_window("editor-3").is_empty());
     }
 }
 

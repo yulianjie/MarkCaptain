@@ -132,11 +132,16 @@ pub async fn cmd_notes_list(
         .insert(scan_key.clone(), cancellation.clone());
     let result = tokio::task::spawn_blocking(move || {
         let mut notes = Vec::new();
+        let output_directories = super::export_project::output_directories(&canonical);
         let walker = walkdir::WalkDir::new(&canonical)
             .follow_links(false)
             .into_iter()
             .filter_entry(|e| {
-                !e.file_type().is_dir() || !is_excluded_note_directory(e.file_name())
+                !e.file_type().is_dir()
+                    || (!is_excluded_note_directory(e.file_name())
+                        && !output_directories
+                            .iter()
+                            .any(|output| e.path().starts_with(output)))
             });
         for entry in walker {
             if cancellation.load(Ordering::Relaxed) {

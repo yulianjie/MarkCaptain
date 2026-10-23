@@ -6,7 +6,7 @@ export default {
   reviewReason: '审阅意见（可选）', reviewReasonPlaceholder: '说明接受、拒绝或撤回的原因，或希望如何重写',
   rewrite: '按这个意见重写', rewriteDefault: '请提出一种不同的修改方案。',
   rewritePrompt: '请按审阅意见重写修改项 {id}：{reason}。以本轮附加的当前文档为准，保留已接受的修改；不要重新提出其他已拒绝或撤回的修改。只提出新建议供我审阅。',
-  history: { title: '历史对话', enable: '在本地保存对话', detail: '可选的本地历史，不保存图片。关闭后停止保存，已有历史仍可查看和删除。最多 100 条对话 / 128 MB。', search: '搜索对话标题', empty: '暂无已保存的对话', restore: '恢复', export: '导出 Markdown', delete: '删除', restored: '已恢复本地历史。历史修改仅供查阅；原文未变时可继续分章总结。', locked: '历史修改记录 · 已禁用应用与撤销', imagesOmitted: '历史未保存图片。继续询问图片相关内容前，请重新附加图片。' },
+  history: { title: '历史对话', enable: '在本地保存对话', detail: '可选的本地历史，不保存图片。关闭后停止保存，已有历史仍可查看和删除。最多 100 条对话 / 128 MB。', search: '搜索对话标题', empty: '暂无已保存的对话', restore: '恢复', export: '导出 Markdown', delete: '删除', restored: '已恢复本地历史。历史修改仅供查阅；原文未变时可继续分章总结。', locked: '历史修改记录 · 已禁用应用与撤销', revalidateReview: '重新关联并校验待审修改', revalidateNeedsHistory: '请先启用本地历史，才能保存重新校验生成的新审阅卡。', revalidateUnavailable: '此记录没有可重新校验的待审修改。', revalidateChooseOne: '请选择一个 Markdown 文档进行关联。', revalidateChanged: '历史会话已切换，请重新打开这条记录后再试。', revalidateNoPath: '所选文档没有可验证的文件路径。', revalidateTargetBusy: '目标文档已有对话；为避免覆盖，请先切换到没有对话的文档。', imagesOmitted: '历史未保存图片。继续询问图片相关内容前，请重新附加图片。' },
   references: { title: '参考文档', detail: '只读快照，按需读取。最多 8 个文件，单个 2 MB、总计 4 MB。仅可修改当前文档。', openTab: '附加已打开的标签页', files: '选择 Markdown 文件', reading: '正在读取参考文件…', remove: '移除参考文档 {name}' },
 
   referenceDocument: '参考全文，仅修改选区',

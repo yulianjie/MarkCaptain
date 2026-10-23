@@ -10,6 +10,7 @@ import {
   BUILTIN_COMMAND_SPECS,
   COMMAND_CATEGORIES,
 } from '../../src/services/command-palette-actions'
+import { AGENT_WRITING_COMMANDS } from '../../src/services/agent-m1-copy'
 import {
   FORMAT_MENU_COMMANDS,
   PARAGRAPH_MENU_COMMANDS,
@@ -98,6 +99,14 @@ describe('command palette action contract', () => {
     expect(editorPage).toContain('for (const spec of BUILTIN_COMMAND_SPECS)')
     expect(editorPage).toContain("execute: () => routeMenuAction(spec.id, 'palette')")
     expect(editorPage).toContain('when: () => isBuiltinCommandAvailable(spec)')
+  })
+
+  it('registers and unregisters writing actions through the shared Agent draft queue', () => {
+    expect(editorPage).toContain('for (const command of AGENT_WRITING_COMMANDS)')
+    expect(editorPage).toContain('execute: () => agent.queueWritingCommand(command)')
+    expect(editorPage).toContain('for (const id of agentWritingCommandIds) cc.unregister(id)')
+    expect(AGENT_WRITING_COMMANDS).toEqual(['polish', 'shorten', 'continue', 'translate', 'explain', 'terms', 'structure'])
+    expect(editorPage).not.toContain('execute: () => agent.send(')
   })
 
   it('has complete English, Simplified Chinese, and Japanese command labels', () => {

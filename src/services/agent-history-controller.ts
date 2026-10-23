@@ -1,19 +1,21 @@
 import { ref, watch, type Ref, type ComputedRef } from 'vue'
-import type { Conversation } from '@/stores/agent'
+import type { ChatItem, Conversation } from '@/stores/agent'
 import { pathsReferToSameFile, type useEditorStore } from '@/stores/editor'
 import { agentTransport } from './agent-transport'
-import { exportHistory, hydrateHistory, packHistory, type HistoryMetadata, type HistoryRecord } from './agent-history'
+import { exportHistory, hydrateHistory, isArchivedProjectSnapshot, packHistory, type HistoryMetadata, type HistoryRecord } from './agent-history'
 import { referenceSnapshot } from './agent-references'
-import { saveAsDialog, saveMarkdown } from './tauri-invoke'
+import { openFiles, saveAsDialog, saveMarkdown } from './tauri-invoke'
 import { t } from '@/i18n'
-import type { DocumentSnapshot } from './agent'
+import { rebasePendingReview } from './agent-rebase'
+import type { DocumentSnapshot, ReviewedEdit } from './agent'
 
 export function agentHistoryController(options: {
   sessions: Ref<Record<string, Conversation>>; currentKey: ComputedRef<string>; editor: ReturnType<typeof useEditorStore>
   busy: ComputedRef<boolean>; newConversation: () => Conversation; errorText: (error: unknown) => string
+  onHistoryReviewRevalidated?: (edit: ReviewedEdit, markdown: string, request?: ChatItem) => void
 }) {
   const { sessions, currentKey, editor, busy } = options
-  const historyOpen = ref(false), historyEnabled = ref(false), historyLoaded = ref(false), historyLoading = ref(false), historyError = ref('')
+  const historyOpen = ref(false), historyEnabled = ref(false), historyLoaded = ref(false), historyLoading = ref(false), historyError = ref(''), historyReviewError = ref('')
   const historyItems = ref<HistoryMetadata[]>([])
   const queues = new Map<string, Promise<void>>(), removed = new Set<string>()
   let timer: ReturnType<typeof setTimeout> | undefined, disposed = false, initialized: Promise<void> | null = null
@@ -89,6 +91,7 @@ export function agentHistoryController(options: {
         if (!value || typeof value !== 'object') return
         const snapshot = value as DocumentSnapshot
         if (typeof snapshot.tabId === 'string' && typeof snapshot.markdown === 'string') {
+          if (isArchivedProjectSnapshot(snapshot)) return
           if (document && snapshot.tabId === document.tabId) snapshot.tabId = target.id
           else {
             const found = editor.tabs.find(tab => tab.markdown === snapshot.markdown && (snapshot.path ? pathsReferToSameFile(tab.pathname, snapshot.path) : tab.id === snapshot.tabId))
@@ -100,9 +103,96 @@ export function agentHistoryController(options: {
       }
       rebind(chat)
       for (const message of chat.messages) if (message.role === 'assistant') { message.targetTabId = target.id; message.answerTarget = null }
+      // Previously selected document scopes are history, not fresh authorization for the next request.
+      chat.includeDocument = false; chat.referenceDocument = false; chat.references = []; chat.selection = null
       sessions.value[target.id] = { ...options.newConversation(), ...chat, restored: true }
       historyOpen.value = false
     } catch (error) { fail(error) } finally { historyLoading.value = false }
+  }
+  async function revalidateHistoryReview(messageId: string) {
+    if (busy.value || historyLoading.value) return false
+    historyLoading.value = true
+    historyReviewError.value = ''
+    try {
+      await loadHistory()
+      historyEnabled.value = (await agentTransport.historySettings()).enabled
+      historyLoaded.value = true
+      if (!historyEnabled.value) { historyReviewError.value = t('agent.history.revalidateNeedsHistory'); return false }
+      if (busy.value) return false
+
+      const sourceKey = currentKey.value
+      const sourceChat = sessions.value[sourceKey]
+      const sourceMessage = sourceChat?.messages.find(message => message.id === messageId)
+      const oldEdit = sourceMessage?.edit
+      const pending = oldEdit?.changes.filter(change => change.status === 'pending') ?? []
+      if (!sourceChat?.restored || !sourceMessage || !oldEdit?.locked || oldEdit.rebasedTo || !pending.length) {
+        historyReviewError.value = t('agent.history.revalidateUnavailable')
+        return false
+      }
+
+      const selected = await openFiles()
+      if (!selected.length) return false
+      if (selected.length !== 1) { historyReviewError.value = t('agent.history.revalidateChooseOne'); return false }
+      if (busy.value || currentKey.value !== sourceKey || sessions.value[sourceKey] !== sourceChat || !sourceChat.messages.includes(sourceMessage)) {
+        historyReviewError.value = t('agent.history.revalidateChanged')
+        return false
+      }
+
+      // openFile uses the normal filesystem authorization path and selects an already-open live buffer when available.
+      const target = await editor.openFile(selected[0]!)
+      // The file read yields control: never move a replaced session or one that acquired an active request.
+      if (busy.value || sessions.value[sourceKey] !== sourceChat || !sourceChat.messages.includes(sourceMessage)
+        || sourceMessage.edit !== oldEdit || oldEdit.rebasedTo || !oldEdit.locked || currentKey.value !== target.id) {
+        historyReviewError.value = t('agent.history.revalidateChanged')
+        return false
+      }
+      if (!target.pathname || !pathsReferToSameFile(target.pathname, selected[0]!)) {
+        editor.setCurrent(sourceKey)
+        historyReviewError.value = t('agent.history.revalidateNoPath')
+        return false
+      }
+      const result = rebasePendingReview(oldEdit, target.markdown)
+      oldEdit.rebaseConflicts = result.conflicts
+      if (!result.edit) {
+        editor.setCurrent(sourceKey)
+        historyReviewError.value = t('agent.rebaseConflict', { count: result.conflicts.length || pending.length })
+        return false
+      }
+
+      const targetChat = sessions.value[target.id]
+      const hasTargetActivity = !!targetChat && targetChat !== sourceChat
+        && (targetChat.messages.length > 0 || targetChat.references.length > 0 || !!targetChat.draft.trim()
+          || targetChat.images.length > 0 || !!targetChat.selection || !targetChat.includeDocument
+          || targetChat.referenceDocument || !!targetChat.skillId || !!targetChat.dismissedSelection)
+      if (hasTargetActivity) {
+        editor.setCurrent(sourceKey)
+        historyReviewError.value = t('agent.history.revalidateTargetBusy')
+        return false
+      }
+
+      if (target.id !== sourceKey) {
+        delete sessions.value[sourceKey]
+        sessions.value[target.id] = sourceChat
+      }
+      result.edit.snapshot = { ...result.edit.snapshot, tabId: target.id, name: target.filename, path: target.pathname }
+      result.edit.rebasedFrom = sourceMessage.id
+      result.edit.rebaseConflicts = result.conflicts
+      const newMessageId = crypto.randomUUID()
+      oldEdit.locked = true
+      oldEdit.rebasedTo = newMessageId
+      const previousUser = sourceMessage.regenerateFrom
+        ? sourceChat.messages.find(message => message.id === sourceMessage.regenerateFrom && message.role === 'user')
+        : sourceChat.messages.slice(0, sourceChat.messages.indexOf(sourceMessage)).reverse().find(message => message.role === 'user')
+      sourceChat.messages.push({ id: newMessageId, role: 'assistant', content: '', tools: [], completed: true, targetTabId: target.id,
+        edit: result.edit, ...(previousUser ? { regenerateFrom: previousUser.id } : {}) })
+      options.onHistoryReviewRevalidated?.(result.edit, target.markdown, previousUser)
+      if (historyEnabled.value) await persist(target.id, sourceChat)
+      if (result.conflicts.length) historyReviewError.value = t('agent.rebaseConflict', { count: result.conflicts.length })
+      return true
+    } catch (error) {
+      historyReviewError.value = options.errorText(error)
+      return false
+    } finally { historyLoading.value = false }
   }
   async function deleteHistory(item: HistoryMetadata) {
     if (historyLoading.value) return
@@ -135,7 +225,7 @@ export function agentHistoryController(options: {
     timer = setTimeout(() => { void flushHistory().catch(() => {}) }, 900)
   }, { deep: true })
   function disposeHistory() { disposed = true; clearTimeout(timer); off() }
-  return { historyOpen, historyEnabled, historyLoaded, historyLoading, historyError, historyItems, loadHistory, openHistory, setHistoryEnabled,
-    restoreHistory, deleteHistory, exportConversation, flushHistory, disposeHistory,
+  return { historyOpen, historyEnabled, historyLoaded, historyLoading, historyError, historyReviewError, historyItems, loadHistory, openHistory, setHistoryEnabled,
+    restoreHistory, revalidateHistoryReview, deleteHistory, exportConversation, flushHistory, disposeHistory,
     persistCurrent: () => { const chat = sessions.value[currentKey.value]; return chat ? persist(currentKey.value, chat) : Promise.resolve() } }
 }

@@ -183,7 +183,8 @@ The writing agent is native to the Tauri edition (no legacy Electron channel).
 | `cmd_agent_get_config` | Read non-secret settings and key-presence flag |
 | `cmd_agent_save_config` | Save base URL / model and optionally update or remove OS-vault credential |
 | `cmd_agent_test_connection` | Send a test message with the saved model settings |
-| `cmd_agent_start` | Start a bounded writing-agent run on an explicit document snapshot |
+| `cmd_agent_start` | Start a bounded writing-agent run on one attachment or an explicit selected set of editable snapshots |
+| `cmd_agent_document_versions` | Read bounded disk fingerprints/content hashes for already authorized Markdown paths; no writes or new grants |
 | `cmd_agent_history_settings` | Read local-history opt-in (default false) |
 | `cmd_agent_history_set_enabled` | Persist history opt-in; existing records remain until explicitly deleted |
 | `cmd_agent_history_list` | List bounded local archive metadata without broadcasting transcripts |
@@ -203,7 +204,22 @@ The writing agent is native to the Tauri edition (no legacy Electron channel).
 | `mt://agent/event` | Window-targeted delta, tool, proposal and terminal events, correlated by request ID |
 
 
-Agent requests may include `references: [{documentId, name, markdown}]` (up to 8 read-only snapshots, 2 MB each / 4 MB combined). `read_document`, `search_document`, and `cite_document` accept `documentId`; omitted or `current` targets the current attachment. Unknown IDs and attempts to edit references are rejected. Citation event JSON includes `documentId`, exact lines, label and quote. The initial model payload contains reference metadata only; bodies are demand-loaded. History records use schemaVersion 1 and stable UUID/revision metadata; full immutable snapshots are interned with per-use ranges. Keys and image bytes are never stored in history.
+Agent requests may include `references: [{documentId, name, markdown}]` (up to 8 read-only snapshots, 2 MB each / 4 MB combined). `read_document`, `search_document`, and `cite_document` accept `documentId`; in single-document mode omitted or `current` targets the current attachment. Unknown IDs and attempts to edit references are rejected. Citation event JSON includes `documentId`, exact lines, label and quote. The initial model payload contains reference metadata only; bodies are demand-loaded. History records use schemaVersion 1 and stable UUID/revision metadata; full immutable snapshots are interned with per-use ranges. Keys and image bytes are never stored in history.
+
+
+## A07 selected-document revision
+
+`AgentRequest.editableDocuments?: [{documentId, name, markdown, snapshotId, offset}]` selects 1–8 immutable open-document snapshots (2,000,000 UTF-8 bytes each / 4,000,000 total). IDs are `edit-{UUID}`, `snapshotId` must exactly equal `${requestId}:${documentId}`, and `offset` must be zero. Multi-document mode requires `context: null`, no `editRange`, and `readOnly: false`. Unknown/duplicate IDs and malformed task bindings are rejected.
+
+`read_document`, `search_document`, `cite_document`, and `propose_edit` require an explicit `documentId` in this mode. Only the selected catalog IDs may receive edits; `current`, unselected, reference and project IDs cannot. References/project sources remain read-only. The initial catalog contains metadata only. Successful selected-document reads/citations and the context ledger carry their exact document/snapshot identity; proposals carry authoritative `documentId`. Rust removes routing before proposal validation and adds the validated ID to output. That output-only field is rejected in deserialized external proposal bodies. Single-document tool schemas remain unchanged.
+
+Each selected document may emit one proposal with up to 32 validated non-overlapping changes; one task may therefore emit multiple `proposal` events. The renderer binds each to its own frozen target and uses ordinary per-document buffer transactions. No save/delete/rename/create/Git/Shell tool is added. Normal requests retain a 10-round loop; selected tasks use `10 + 3 × (n − 1)` rounds, capped at 31, within the existing 300-second task limit.
+
+Typed wrapper: `agentDocumentVersions(paths: string[], encodings?: Record<string, string>): Promise<AgentDocumentVersion[]>` invokes `cmd_agent_document_versions` with `{paths, encodings}`. Results preserve input order and contain `{path, fingerprint: string|null, contentHash: string|null, error?: string}`. Paths are canonical when available. Optional bounded encoding labels select decoding for corresponding input paths only; omitted labels use the existing detector. They do not authorize additional sources.
+
+The probe requires existing process document-source capability from normal editor reads/saves, accepts at most eight unique Markdown paths, and bounds reads to 2 MB per file / 4 MB total. `fingerprint` is SHA-256 of original disk bytes; `contentHash` is SHA-256 of losslessly decoded Markdown normalized to LF. Missing/unreadable/undecodable paths return null hashes and stable safe errors; invalid scope or limits reject the request. It performs no writes and grants no access. The renderer compares the first content hash against its saved baseline, then rechecks raw fingerprints and editor identities immediately before Apply/Revert. Untitled targets have no disk probe.
+
+Multi-document state/snapshots are session-only, outside ordinary Agent history and without restart replay. See [A07 workflows](A07_WORKFLOWS.md) and [validation status](A07_VALIDATION.md).
 
 
 ## Notebook and independent local versions
@@ -223,3 +239,21 @@ All wrappers are in `src/services/tauri-invoke.ts`; none is exposed as an Agent 
 | `cmd_local_history_settings` | Personal interval, retention and global space limit |
 
 Parsing and structured queries use background workers and one shared notebook parser. Existing `mt://fs/change` events invalidate disk entries. Agent attachment and review contracts are unchanged.
+
+## Frozen document and project export
+
+Typed wrappers remain in `src/services/tauri-invoke.ts`; these are editor workflows, not Agent tools.
+
+| Command/event | Contract |
+| --- | --- |
+| `cmd_export_load_config`, `cmd_export_save_config` | Versioned `.markcaptain/export.json` in an open canonical project; fingerprint conflicts, unknown-field retention by the renderer merge, final serialized size bound; optional `projectExport` explicit plan |
+| `cmd_export_project_list` | Calling-window-owned project only; stable bounded candidate list; reject truncation and invalid config; exclude configured outputs, build/cache and symlinks/junctions |
+| `cmd_export_project_snapshot` | Explicit relative paths plus bounded dirty buffers; immutable ordered content revisions; per-source errors, no source writes; post-worker ownership/path revalidation before granting exact successful sources their existing resource-read capability |
+| `cmd_export_read_resource` | Authorized Markdown source; resolve local resource against its own base, bounded read and optional canonical project fence; no HTTP fetching |
+| `cmd_export_save_dialog` | Native single-file save selection and one-use output grant |
+| `cmd_export_preflight` | Shared snapshot/profile/dependency/resource diagnostics; checks `overwrite=false` without replacing existing files |
+| `cmd_export_start` | Frozen prepared static HTML and source snapshot; HTML or actual Pandoc files; `overwrite=false` publishes without clobbering another writer; project PDF uses Pandoc |
+| `cmd_export_cancel` | Cancel the calling window's task UUID; completed files are not rolled back |
+| `mt://export/progress` | Task UUID, sequence and stage for one backend write; renderer aggregates project per-item results |
+
+Project orchestration freezes all selected source versions first. Each chapter is rendered/resource-prepared independently, then batch links or book DOM are composed. Untitled sources stay in the current renderer task and are omitted from persisted relative plans. Book requests carry a bounded source manifest as snapshot metadata and the composed HTML as output input; Markdown bodies are not concatenated to produce a book. Retry rechecks the source manifest and does not rewrite successful items.

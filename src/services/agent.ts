@@ -1,4 +1,5 @@
 /** Shared IPC contract and deterministic edit validation. */
+import type { AgentContextRead, AgentTaskContext } from './agent-context'
 export type AgentAuthMode = 'system' | 'none'
 export interface AgentSettings { baseUrl: string; model: string; authMode?: AgentAuthMode }
 export interface AgentHeader { name: string; value: string }
@@ -7,6 +8,9 @@ export interface AgentImage { name: string; dataUrl: string }
 export interface AgentMessage { role: 'user' | 'assistant'; content: string; images?: AgentImage[] }
 export interface AgentContext { name: string; markdown: string; snapshotId?: string; offset?: number }
 export interface AgentReference extends AgentContext { documentId: string }
+/** Explicit editable catalog for one bounded multi-document task. */
+export interface AgentEditableDocument extends AgentContext { documentId: string }
+export interface AgentDocumentVersion { path: string; fingerprint: string | null; contentHash: string | null; error?: string }
 export interface ReferenceSnapshot { documentId: string; snapshot: DocumentSnapshot }
 export interface AgentSkill {
   id: string
@@ -18,6 +22,67 @@ export interface AgentSkill {
   enabled: boolean
 }
 export interface AgentSkillDetail { id: string; instructions: string; files: string[] }
+export interface AgentProjectSearchConfig {
+  enabledByDefault?: boolean
+  include?: string[]
+  exclude?: string[]
+  [key: string]: unknown
+}
+export interface AgentProjectWritingConfig {
+  language?: string
+  audience?: string
+  tone?: string
+  glossary?: { preferred: string; avoid: string[]; [key: string]: unknown }[]
+  [key: string]: unknown
+}
+export interface AgentProjectConfig {
+  schemaVersion: number
+  writing?: AgentProjectWritingConfig
+  projectSearch?: AgentProjectSearchConfig
+  [key: string]: unknown
+}
+export interface AgentProjectConfigSnapshot { config: AgentProjectConfig | null; fingerprint: string | null }
+export interface AgentProjectGrant { grantId: string; root: string; include: string[]; exclude: string[] }
+export interface AgentProjectBuffer { path: string; markdown: string }
+export interface AgentProjectSearchRequest { grantId: string; buffers: AgentProjectBuffer[] }
+export interface AgentWebResearchRequest {
+  enabled: boolean
+  topic: string
+  allowDocumentQueries: boolean
+  approvedQueries: string[]
+  urls: string[]
+  publicDns: boolean
+}
+export interface AgentWebSource {
+  sourceId: string
+  title: string
+  url: string
+  fetchedAt: string
+  publishedAt?: string | null
+  excerpt: string
+  status: 'snippet' | 'read' | 'failed'
+  error?: string
+}
+export interface AgentDocumentCheckIssue {
+  id: string
+  kind: string
+  severity: string
+  message: string
+  from: number
+  to: number
+  line: number
+  column: number
+  evidence: string
+  replacement?: string
+}
+export interface AgentDocumentCheckResult {
+  issues: AgentDocumentCheckIssue[]
+  complete: boolean
+  externalLinksUnchecked: number
+  localTargetsChecked: number
+  truncated: boolean
+  scope: string
+}
 export interface AgentRequest {
   requestId: string
   messages: AgentMessage[]
@@ -28,6 +93,14 @@ export interface AgentRequest {
   editRange?: { from: number; to: number }
   readOnly?: boolean
   references?: AgentReference[]
+  /** Selected edit targets; context must be null and each snapshot is task/document-bound. */
+  editableDocuments?: AgentEditableDocument[]
+  /** Explicit project grant. Buffers are frozen copies of dirty open project tabs. */
+  projectSearch?: AgentProjectSearchRequest
+  /** Applies project writing rules; this does not grant project file access. */
+  writingProjectRoot?: string
+  /** Per-request, explicitly enabled web research; omitted means disabled. */
+  webResearch?: AgentWebResearchRequest
   /** Kept in the local Rust task; provider sees text only through read_review_change. */
   reviewChanges?: AgentReviewChange[]
 }
@@ -35,13 +108,14 @@ export interface AgentReviewChange extends AgentChange { id: string; reason?: st
 /** End-exclusive UTF-16 coordinates in the original document, bound to one immutable snapshot. */
 export interface AgentAnchor { snapshotId: string; from: number; to: number }
 export interface AgentChange { oldText: string; newText: string; anchor?: AgentAnchor }
-export interface AgentProposal { title: string; changes?: AgentChange[]; oldText?: string; newText?: string }
+export interface AgentProposal { title: string; changes?: AgentChange[]; oldText?: string; newText?: string; documentId?: string }
 export interface AgentEvent {
   requestId: string
-  kind: 'delta' | 'tool' | 'proposal' | 'source' | 'done' | 'cancelled' | 'error'
+  kind: 'delta' | 'tool' | 'context' | 'proposal' | 'source' | 'project_search' | 'project_source' | 'web_source' | 'done' | 'cancelled' | 'error'
   text?: string
   proposal?: AgentProposal
 }
+export type { AgentContextRead, AgentTaskContext }
 export interface DocumentSnapshot { tabId: string; name: string; markdown: string; from: number; to: number; path?: string; snapshotId?: string }
 export interface AgentSource { label: string; startLine: number; endLine: number; quote: string; snapshot: DocumentSnapshot }
 

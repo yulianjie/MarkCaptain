@@ -67,6 +67,7 @@ export interface EditorContextMenuOptions {
   labels: EditorContextMenuLabels
   capabilities: EditorContextMenuCapabilities
   actions: EditorContextMenuActions
+  agentActions?: Array<{ label: string; action: () => void | Promise<void> }>
   spelling?: EditorContextSpellingState
   shortcuts?: Partial<Record<keyof EditorContextMenuCapabilities, string>>
 }
@@ -137,7 +138,7 @@ export function normalizeSpellingSuggestions(
 }
 
 export function buildEditorContextMenuItems(options: EditorContextMenuOptions): ContextMenuItem[] {
-  const { labels, capabilities, actions, spelling, shortcuts = {} } = options
+  const { labels, capabilities, actions, agentActions = [], spelling, shortcuts = {} } = options
   const items: ContextMenuItem[] = []
 
   if (spelling?.checking) {
@@ -154,6 +155,10 @@ export function buildEditorContextMenuItems(options: EditorContextMenuOptions): 
     }
     items.push({ label: labels.addToDictionary, action: actions.addToDictionary })
     items.push({ divider: true })
+  }
+
+  if (agentActions.length) {
+    items.push({ divider: true }, ...agentActions.map(agentAction => ({ label: agentAction.label, action: agentAction.action })), { divider: true })
   }
 
   items.push(

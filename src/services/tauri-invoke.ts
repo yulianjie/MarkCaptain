@@ -9,6 +9,9 @@
  */
 
 import { invoke } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
+import type { ExportConfigSnapshot, ExportProjectConfig, ExportRequest, ExportPreflightResult, ExportStartResult, ExportProgressEvent, ExportResourceReadResult } from './export/types'
+import type { ProjectExportCandidate, ProjectExportSnapshot } from './export/project-types'
 export interface NoteFile { path: string; relative: string; modified: number; size: number }
 export interface LocalVersion { id: string; path: string; timestamp: number; markdown: string }
 export interface LocalVersionMetadata { id: string; path: string; timestamp: number; size: number; contentId: string }
@@ -30,7 +33,7 @@ export const notesCreate = (root: string, relative: string, content: string) => 
 export const notesConfig = (root: string, config?: NotesConfig) => invoke<NotesConfig>('cmd_notes_config', { root, config })
 import type { ExternalConnection, ExternalRequest } from './agent-external'
 import type { HistoryRecord, HistoryMetadata } from './agent-history'
-import type { AgentConfig, AgentHeader, AgentRequest, AgentSettings, AgentSkill, AgentSkillDetail } from './agent'
+import type { AgentConfig, AgentDocumentVersion, AgentHeader, AgentRequest, AgentSettings, AgentSkill, AgentSkillDetail, AgentProjectConfig, AgentProjectConfigSnapshot, AgentProjectGrant, AgentDocumentCheckResult } from './agent'
 import type {
   GitSyncResult,
   ProjectStorageResolution,
@@ -57,6 +60,8 @@ export const agentHistoryDelete = (id: string, revision: number) => invoke<void>
 export const agentSaveConfig = (settings: AgentSettings, apiKey?: string, headers?: AgentHeader[]) =>
   invoke<AgentConfig>('cmd_agent_save_config', { settings, apiKey, headers })
 export const agentTestConnection = () => invoke<void>('cmd_agent_test_connection')
+export const agentDocumentVersions = (paths: string[], encodings?: Record<string, string>) =>
+  invoke<AgentDocumentVersion[]>('cmd_agent_document_versions', { paths, encodings })
 export const agentStart = (request: AgentRequest) => invoke<void>('cmd_agent_start', { request })
 export const agentCancel = (requestId: string) => invoke<void>('cmd_agent_cancel', { requestId })
 export const agentListSkills = () => invoke<AgentSkill[]>('cmd_agent_list_skills')
@@ -65,6 +70,15 @@ export const agentSetSkillEnabled = (id: string, enabled: boolean) =>
   invoke<AgentSkill[]>('cmd_agent_set_skill_enabled', { id, enabled })
 export const agentRemoveSkill = (id: string) => invoke<AgentSkill[]>('cmd_agent_remove_skill', { id })
 export const agentReadSkill = (id: string) => invoke<AgentSkillDetail>('cmd_agent_read_skill', { id })
+export const agentProjectGrant = (root: string, include: string[], exclude: string[]) =>
+  invoke<AgentProjectGrant>('cmd_agent_project_grant', { root, include, exclude })
+export const agentProjectRevoke = (grantId: string) => invoke<void>('cmd_agent_project_revoke', { grantId })
+export const agentProjectLoadConfig = (root: string) =>
+  invoke<AgentProjectConfigSnapshot>('cmd_agent_project_load_config', { root })
+export const agentProjectSaveConfig = (root: string, config: AgentProjectConfig, expectedFingerprint: string | null) =>
+  invoke<AgentProjectConfigSnapshot>('cmd_agent_project_save_config', { root, config, expectedFingerprint })
+export const agentCheckDocument = (markdown: string, root?: string, sourcePath?: string) =>
+  invoke<AgentDocumentCheckResult>('cmd_agent_check_document', { root, sourcePath, markdown })
 
 /* ─── cloud storage ─────────────────────────────────────────── */
 
@@ -376,6 +390,22 @@ export const clearEditorSession = () => {
 }
 
 /* ─── export ─────────────────────────────────────────────────── */
+
+export const exportLoadConfig = (root: string) => invoke<ExportConfigSnapshot>('cmd_export_load_config', { root })
+export const exportProjectList = (root: string) => invoke<ProjectExportCandidate[]>('cmd_export_project_list', { root })
+export const exportProjectSnapshot = (root: string, paths: string[], buffers: { path: string; markdown: string }[]) =>
+  invoke<ProjectExportSnapshot>('cmd_export_project_snapshot', { root, paths, buffers })
+export const exportSaveDialog = (format: string, defaultName: string, defaultDirectory?: string) =>
+  invoke<string | null>('cmd_export_save_dialog', { format, defaultName, defaultDirectory })
+export const exportSaveConfig = (root: string, config: ExportProjectConfig, expectedFingerprint: string | null) =>
+  invoke<ExportConfigSnapshot>('cmd_export_save_config', { root, config, expectedFingerprint })
+export const exportPreflight = (request: ExportRequest) => invoke<ExportPreflightResult>('cmd_export_preflight', { request })
+export const exportStart = (request: ExportRequest) => invoke<ExportStartResult>('cmd_export_start', { request })
+export const exportCancel = (taskId: string) => invoke<void>('cmd_export_cancel', { taskId })
+export const exportReadResource = (sourcePath: string, resource: string, projectRoot?: string) =>
+  invoke<ExportResourceReadResult>('cmd_export_read_resource', { sourcePath, resource, projectRoot })
+export const onExportProgress = (handler: (event: ExportProgressEvent) => void) =>
+  listen<ExportProgressEvent>('mt://export/progress', event => handler(event.payload))
 
 export const exportHtml = (path: string, html: string) =>
   invoke<void>('cmd_export_html', { path, html })

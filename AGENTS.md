@@ -16,7 +16,7 @@ npm run dev            # Vite only (frontend dev with no Tauri shell)
 npm run build          # Type-check (vue-tsc) + Vite build → dist/
 npm run lint           # ESLint on src/
 npm run test:unit      # Vitest
-npm run test:e2e       # Playwright (drives the built Tauri binary)
+npm run test:e2e       # Playwright renderer tests; native WebView2 scripts live in scripts/
 ```
 
 ## Architecture
@@ -47,7 +47,7 @@ The full Electron-channel → Tauri-command mapping is in `docs/IPC_MAP.md`.
 - **File watcher** uses `notify` + `notify-debouncer-full` (300 ms debounce). Events surface as `mt://fs/change` with a typed `FileWatchEvent` payload.
 - **Muya path shim**: original Muya's `utils/index.js` uses `require('path').resolve()` once (for image-path resolution in non-Electron contexts). This is the **only** Node API call in the entire Muya source; it must be replaced with a browser shim before Phase 4 lands.
 - **Persistence** via `tauri-plugin-store`. The store file `preferences.json` holds prefs at the top level and user-data under the `_userData` key.
-- **PDF export** is stubbed (`cmd_export_pdf` returns an error). Tauri 2 doesn't expose `webContents.printToPDF` natively; final approach TBD between (a) a JS-side `window.print()` driver, (b) a Pandoc subprocess.
+- **Export** uses a frozen document snapshot and shared theme/resource preflight. HTML and system printing use an isolated preview; Pandoc produces optional PDF/DOCX/ODT/EPUB output. System printing opens the OS dialog and must never be reported as a saved PDF. Project presets live in `.markcaptain/export.json`; see `docs/M1_WORKFLOWS.md`.
 
 ## Code style
 

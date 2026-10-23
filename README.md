@@ -4,7 +4,7 @@
 
 > More than a Markdown editor: a modern, local-first writing workspace with an integrated Agent that helps you think, write, review, and revise without taking control of your document.
 
-[Download the latest release](https://github.com/yulianjie/MarkCaptain/releases/latest) · [User guide](https://github.com/yulianjie/MarkCaptain/wiki) · [Writing Agent guide](docs/AI_AGENT.md) · [Release notes](docs/releases/v0.8.0.md)
+[Download the latest release](https://github.com/yulianjie/MarkCaptain/releases/latest) · [User guide](https://github.com/yulianjie/MarkCaptain/wiki) · [Writing Agent guide](docs/AI_AGENT.md) · [M2 workflows](docs/M2_WORKFLOWS.md) · [Multi-document revision](docs/A07_WORKFLOWS.md) · [Release notes](docs/releases/v0.8.5.md)
 
 ![MarkCaptain editor with outline, tabs, and live Markdown preview](img/markcaptain-view-en.png)
 
@@ -39,8 +39,12 @@ Open **AI Assistant** from the title bar, the View menu, the command palette, or
 | On-demand document reading | Starts with metadata and headings, then searches or reads relevant line ranges. Full-document reads are explicit rather than automatic. |
 | Selection-aware editing | Captures selected text from both WYSIWYG and source modes and limits edits to that scope unless you allow full-document reference. |
 | Multi-edit review | Proposes up to 32 non-overlapping replacements with per-change and batch apply, dismiss, locate, and revert actions. |
+| Selected-document revision | Explicitly choose 1–8 open documents (2 MB each / 4 MB total), then apply, dismiss or revert each file independently. Changes stay in buffers with selected-tab autosave paused; original copies are session-only. |
 | Snapshot conflict protection | Rejects stale suggestions, citations, and insertion targets after the underlying document has changed. |
 | Grounded citations | `cite_document` produces clickable, snapshot-backed source cards that locate the cited passage in the editor. |
+| Scoped project search | Separately authorize read-only literal search in the open project. Search candidates are bounded; full passages are read on demand, and no embeddings are used. |
+| Local checks and reviewed repair | Check heading levels, local link/image targets, and project glossary terms. A model check is read-only; repair requests create a review card. |
+| Optional web research | Off by default. Review local query suggestions and approve exact queries before sending them to public search. |
 | Long-document summaries | Splits long text into bounded sections, shows progress and intermediate notes, and can resume unfinished work when the source is unchanged. |
 | Image input | Accepts pasted or selected PNG, JPEG, and WebP images for vision-capable models, including image-only prompts and follow-up questions. |
 | Writing skills | Ships with six inspectable skills for clear writing, Markdown documentation, Mermaid diagrams, plain-language explanations, team communication, and co-writing. Import your own text-only `SKILL.md` package when needed. |
@@ -60,12 +64,14 @@ Open **AI Assistant** from the title bar, the View menu, the command palette, or
 
 - API keys and custom authentication headers are stored in the operating-system credential store, not in the normal preferences file.
 - The Rust backend owns provider requests, streaming, cancellation, request limits, and the tool loop. The webview does not receive reusable secrets.
-- The model only gets snapshots that you attach. It has no general filesystem, shell, workspace scan, web search, Git commit, or direct-save tool.
-- Reference documents are read-only. Only the current document can receive a reviewed edit proposal.
+- The model has no unrestricted filesystem, shell, Git commit, or direct-save tool. Project search requires a separate read-only scope grant; web research is separately opt-in. Neither grants permission to edit files.
+- Reference documents are read-only. Ordinary chat edits the attached document; multi-document revision requires an explicit selected editable set and checks each file independently.
 - Model output is sanitized before rendering. Applying or reverting a suggestion requires matching document identity and content.
 - Remote HTTP endpoints are supported for trusted networks, but they send prompts and credentials without transport encryption; prefer HTTPS outside a controlled local network.
 
-See [docs/AI_AGENT.md](docs/AI_AGENT.md) for setup, limits, protocol details, and the complete privacy model. See [docs/AI_AGENT_SKILLS.md](docs/AI_AGENT_SKILLS.md) for bundled skill sources and the import format.
+See [docs/AI_AGENT.md](docs/AI_AGENT.md) for setup, limits, protocol details, and the complete privacy model. See the [M2 workflow guide](docs/M2_WORKFLOWS.md) for project search, document checks, and optional web research. See [docs/AI_AGENT_SKILLS.md](docs/AI_AGENT_SKILLS.md) for bundled skill sources and the import format.
+
+Multi-document revision uses on-demand bodies, per-file editor undo/redo, disk-version and tab-identity checks, and session-only original copies outside conversation history. See [A07 workflows](docs/A07_WORKFLOWS.md) and [validation results](docs/A07_VALIDATION.md); post-review regression and scoped Windows native acceptance are complete in the current workspace.
 
 ## Editor features
 
@@ -79,6 +85,10 @@ See [docs/AI_AGENT.md](docs/AI_AGENT.md) for setup, limits, protocol details, an
 - English, Simplified Chinese, and Japanese application interfaces.
 
 ## Local-first storage and sync
+
+For the document inspector, reviewed Agent edits, and theme-aware project export, see the [M1 workflow guide](docs/M1_WORKFLOWS.md). For scoped project search, document checks, and optional web research, see the [M2 workflow guide](docs/M2_WORKFLOWS.md).
+
+Project batch exports and ordered books share the existing themes and format writers, with frozen source versions, per-item results, cancellation, and version-checked retries. See the [M3 workflow guide](docs/M3_WORKFLOWS.md) and [validation record](docs/M3_VALIDATION.md) for the current implementation and verified scope.
 
 MarkCaptain always saves to a local working copy first. Optional project storage keeps local save state separate from remote sync state, so a network failure does not turn a successful local save into a failure.
 

@@ -1,6 +1,6 @@
 [package]
 name = "markcaptain"
-version = "0.8.4"
+version = "0.8.5"
 description = "MarkCaptain — an intelligent, local-first Markdown editor with a writing Agent"
 authors = ["Lianjie Yu and MarkCaptain contributors"]
 license = "MIT"
@@ -89,6 +89,8 @@ spellbook = "0.3"
 url = "2"
 percent-encoding = "2"
 quick-xml = "0.37"
+zip = { version = "4", default-features = false, features = ["deflate"] }
+regex = "1"
 sha2 = "0.10"
 tempfile = "3"
 uuid = { version = "1", features = ["v4", "serde"] }

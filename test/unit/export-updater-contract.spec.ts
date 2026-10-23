@@ -6,80 +6,47 @@ function readSource(relativePath: string): string {
   return readFileSync(fileURLToPath(new URL(relativePath, import.meta.url)), 'utf8')
 }
 
-const exportDialog = readSource('../../src/components/exportSettings/ExportSettingsDialog.vue')
-const editorPage = readSource('../../src/pages/EditorPage.vue')
-function functionBody(source: string, startMarker: string, endMarker: string): string {
-  const start = source.indexOf(startMarker)
-  const end = source.indexOf(endMarker, start)
-  expect(start).toBeGreaterThanOrEqual(0)
-  expect(end).toBeGreaterThan(start)
-  return source.slice(start, end)
-}
+const dialog = readSource('../../src/components/exportSettings/ExportSettingsDialog.vue')
+const preview = readSource('../../src/components/export/ExportPreview.vue')
+const config = readSource('../../src/services/export/config.ts')
+const workflow = readSource('../../src/services/export/workflow.ts')
 
-describe('export dialog workflow contract', () => {
-  it('presents system printing, Pandoc PDF, and styled HTML as distinct paths', () => {
-    expect(exportDialog).toContain("type ExportFormat = 'print' | 'pandoc-pdf' | 'html'")
-    expect(exportDialog).toContain('<el-radio value="print"')
-    expect(exportDialog).toContain('<el-radio value="pandoc-pdf"')
-    expect(exportDialog).toContain('<el-radio value="html"')
-    expect(exportDialog).toContain('Pandoc is not required')
-    expect(exportDialog).toContain('Requires Pandoc and a compatible PDF engine')
+describe('unified export workflow contract', () => {
+  it('renders from a frozen active buffer and reuses the same snapshot for output', () => {
+    expect(dialog).toContain('captureExportSnapshot(tab)')
+    expect(dialog).toContain('snapshot: frozen')
+    expect(dialog).toContain('renderExportPreview({')
+    expect(dialog).toContain('outputPath: target')
+    expect(dialog).toContain('previewRequest.value = result.request')
+    expect(dialog).toContain('const frozen = { ...clone(previewRequest.value), renderedHtml: previewHtml.value }')
+    expect(dialog).toMatch(/createExportRequest\(\{\s*\.\.\.frozen,\s*outputPath: target,/)
+    const exportOperation = dialog.slice(dialog.indexOf('async function doExport()'), dialog.indexOf('function operationIsCurrent'))
+    expect(exportOperation).not.toMatch(/profileDraft\.value|format\.value|selectedProfileId\.value|projectRoot\.value/)
   })
 
-  it('opens system printing without requesting a destination path first', () => {
-    const doExport = functionBody(exportDialog, 'async function doExport()', 'let unsub:')
-    const printBranch = doExport.indexOf("if (format.value === 'print')")
-    const savePath = doExport.indexOf('const target = await saveAsDialog')
-
-    expect(printBranch).toBeGreaterThanOrEqual(0)
-    expect(savePath).toBeGreaterThan(printBranch)
-
-    const printRequest = functionBody(
-      exportDialog,
-      'async function requestSystemPrint()',
-      'async function offerSystemPrintFallback',
-    )
-    expect(printRequest).toContain('await nextTick()')
-    expect(printRequest).toContain('await exportPdf(getCurrentWindow().label)')
+  it('routes every automatic format through safe static HTML', () => {
+    expect(dialog).toContain("renderedHtml: frozen.format === 'html' ? restoreExternalImageLinks(frozen.renderedHtml) : frozen.renderedHtml")
+    expect(workflow).toContain('prepareHtmlResources(')
+    expect(workflow).toContain('exportReadResource')
+    expect(workflow).toContain('buildExportThemeCss(input.profile)')
   })
 
-  it('offers an explicit system-print fallback after a Pandoc failure', () => {
-    const fallback = functionBody(
-      exportDialog,
-      'async function offerSystemPrintFallback',
-      'async function doExport()',
-    )
-    expect(fallback).toContain('await ElMessageBox.confirm')
-    expect(fallback).toContain('confirmButtonText: copy.value.fallbackConfirm')
-    expect(fallback).toContain('cancelButtonText: copy.value.fallbackCancel')
-    expect(fallback).toContain('await requestSystemPrint()')
-
-    const doExport = functionBody(exportDialog, 'async function doExport()', 'let unsub:')
-    expect(doExport).toContain('await offerSystemPrintFallback(err)')
+  it('keeps the preview isolated from editor UI and page scripts', () => {
+    expect(preview).toContain('sandbox="allow-same-origin allow-modals"')
+    expect(preview).not.toContain('allow-scripts')
+    expect(preview).toContain('contentWindow.print()')
   })
 
-  it('retains all existing Pandoc layout and document options', () => {
-    for (const option of [
-      'paperSize: exportOptions.paperSize',
-      'orientation: exportOptions.orientation',
-      'title: exportOptions.includeTitle ? base : undefined',
-      'toc: exportOptions.enableToc',
-    ]) {
-      expect(exportDialog).toContain(option)
-    }
-    const doExport = functionBody(exportDialog, 'async function doExport()', 'let unsub:')
-    expect(doExport.indexOf('const exportOptions = {')).toBeLessThan(doExport.indexOf('const target = await saveAsDialog'))
-    for (const option of ['paperSize: paperSize.value', 'orientation: orientation.value', 'includeTitle: includeTitle.value', 'enableToc: enableToc.value']) {
-      expect(doExport).toContain(option)
-    }
-    expect(exportDialog).toContain("v-if=\"format === 'pandoc-pdf'\"")
+  it('saves project presets with optimistic concurrency and surfaces source precedence', () => {
+    expect(config).toContain('exportSaveConfig(root, config, current.fingerprint)')
+    expect(dialog).toContain("sourceStatus(fieldSource('theme'))")
+    expect(dialog).toContain('saveProjectPreset')
+    expect(dialog).toContain('savePersonal')
   })
 
-  it('captures the active document and Muya instance before the HTML save dialog', () => {
-    const doExport = functionBody(editorPage, 'async function doExportHtml()', 'function doPrint()')
-    const targetDialog = doExport.indexOf('await saveAsDialog')
-    expect(doExport.indexOf('const markdown = tab.markdown')).toBeLessThan(targetDialog)
-    expect(doExport.indexOf('const muya = editor.getMuyaInstance()')).toBeLessThan(targetDialog)
-    expect(doExport).toContain('new ExportHtml(markdown, muya)')
+  it('does not claim a system print dialog saved a file', () => {
+    expect(dialog).toContain("taskStage.value = 'waitingForPrintDialog'")
+    expect(dialog).toContain('MarkCaptain cannot tell whether a file was saved')
+    expect(dialog).not.toContain('await exportPdf(')
   })
 })

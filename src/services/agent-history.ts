@@ -1,7 +1,9 @@
 import type { ChatItem } from '@/stores/agent'
 import { createChapterSummary, finishSummaryJob } from './agent-summary'
-import { reviewProposal, type DocumentSnapshot, type ReferenceSnapshot } from './agent'
+import { reviewProposal, type AgentWebSource, type DocumentSnapshot, type ReferenceSnapshot } from './agent'
 import { validateReferences } from './agent-references'
+import { restoreAgentContextReads, restoreAgentTaskContext } from './agent-context'
+import { validatePublicUrl } from './agent-m2'
 
 export interface HistoryMetadata { id: string; revision: number; title: string; createdAt: number; updatedAt: number }
 export interface HistoryRecord extends HistoryMetadata { schemaVersion: 1; data: { snapshots: DocumentSnapshot[]; chat: unknown; document: unknown } }
@@ -9,6 +11,18 @@ export interface HistoryChat { messages: ChatItem[]; references: ReferenceSnapsh
 const invalid = () => new Error('agent:historyInvalid')
 const object = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 const bytes = (s: string) => new TextEncoder().encode(s).length
+const HISTORY_MESSAGE_REFERENCE_LIMIT = 40 // Eight manual references plus up to 32 project reads.
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const PROJECT_REFERENCE_ID = /^project-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+interface HistoryWebSource {
+  sourceId: string
+  title: string
+  url: string
+  fetchedAt: string
+  publishedAt?: string
+  status: AgentWebSource['status']
+}
 
 function validSnapshot(v: unknown): v is DocumentSnapshot {
   if (!object(v)) return false
@@ -19,8 +33,60 @@ function validSnapshot(v: unknown): v is DocumentSnapshot {
     && (v.snapshotId === undefined || typeof v.snapshotId === 'string' && v.snapshotId.length > 0 && v.snapshotId.length <= 160)
 }
 
+/** Message references are historical read receipts; they do not grant active access. */
+function historyMessageReferences(value: unknown): ReferenceSnapshot[] {
+  if (!Array.isArray(value) || value.length > HISTORY_MESSAGE_REFERENCE_LIMIT) throw invalid()
+  const ids = new Set<string>()
+  for (const candidate of value) {
+    if (!object(candidate) || typeof candidate.documentId !== 'string' || !validSnapshot(candidate.snapshot)
+      || ids.has(candidate.documentId)) throw invalid()
+    const isManual = UUID.test(candidate.documentId)
+    const isProject = PROJECT_REFERENCE_ID.test(candidate.documentId)
+    if (!isManual && !isProject) throw invalid()
+    if (isProject && (candidate.snapshot.tabId !== `project-${candidate.documentId}`
+      || candidate.snapshot.from !== 0 || candidate.snapshot.to !== candidate.snapshot.markdown.length)) throw invalid()
+    ids.add(candidate.documentId)
+  }
+  return value as ReferenceSnapshot[]
+}
+
+export function isArchivedProjectSnapshot(snapshot: DocumentSnapshot): boolean {
+  const documentId = snapshot.tabId.startsWith('project-') ? snapshot.tabId.slice('project-'.length) : ''
+  return PROJECT_REFERENCE_ID.test(documentId)
+}
+
+function restoredProjectSnapshot(snapshot: DocumentSnapshot): DocumentSnapshot {
+  return isArchivedProjectSnapshot(snapshot) ? { ...snapshot, path: undefined } : snapshot
+}
+
+function restoredMessageReferences(value: unknown): ReferenceSnapshot[] {
+  return historyMessageReferences(value).map(reference => PROJECT_REFERENCE_ID.test(reference.documentId)
+    ? { ...reference, snapshot: restoredProjectSnapshot(reference.snapshot) }
+    : reference)
+}
+
+/** Persist only safe source-card metadata; web excerpts are transient research content. */
+function historyWebSources(value: unknown): HistoryWebSource[] {
+  if (!Array.isArray(value)) return []
+  const seen = new Set<string>()
+  const safe: HistoryWebSource[] = []
+  for (const raw of value.slice(0, 40)) {
+    if (!object(raw) || typeof raw.sourceId !== 'string' || !raw.sourceId || raw.sourceId.length > 128 || seen.has(raw.sourceId)
+      || typeof raw.title !== 'string' || !raw.title.trim() || raw.title.length > 300
+      || typeof raw.url !== 'string' || !validatePublicUrl(raw.url)
+      || typeof raw.fetchedAt !== 'string' || raw.fetchedAt.length > 64 || Number.isNaN(Date.parse(raw.fetchedAt))
+      || !['snippet', 'read', 'failed'].includes(String(raw.status))) continue
+    if (raw.publishedAt !== undefined && raw.publishedAt !== null && (typeof raw.publishedAt !== 'string' || raw.publishedAt.length > 128)) continue
+    seen.add(raw.sourceId)
+    safe.push({ sourceId: raw.sourceId, title: raw.title, url: validatePublicUrl(raw.url)!, fetchedAt: raw.fetchedAt,
+      ...(typeof raw.publishedAt === 'string' ? { publishedAt: raw.publishedAt } : {}), status: raw.status as AgentWebSource['status'] })
+  }
+  return safe
+}
+
 /** Intern immutable snapshots so long documents are stored once per range, not per message. */
 export function packHistory(metadata: HistoryMetadata, chat: HistoryChat, document: DocumentSnapshot | null): HistoryRecord {
+  validateReferences(chat.references)
   const snapshots: DocumentSnapshot[] = [], keys = new Map<string, number>()
   function pack(value: unknown, depth = 0): unknown {
     if (depth > 25) throw invalid()
@@ -36,9 +102,19 @@ export function packHistory(metadata: HistoryMetadata, chat: HistoryChat, docume
     if (object(value)) return Object.fromEntries(Object.entries(value).filter(([key]) => key !== 'images' && key !== 'readingImages').map(([key, val]) => [key, pack(val, depth + 1)]))
     return value
   }
-  const data = { chat: pack({ ...chat, messages: chat.messages.map(message => ({ ...message, imagesOmitted: message.imagesOmitted || !!message.images?.length })) }), document: pack(document), snapshots }
+  const messages = chat.messages.map(message => {
+    if (message.references !== undefined) historyMessageReferences(message.references)
+    const persisted = Object.fromEntries(Object.entries(message).filter(([key]) =>
+      !['projectSearchResults', 'projectSearchComplete', 'projectCandidates', 'projectCompleteness'].includes(key)))
+    const webSources = historyWebSources(message.webSources)
+    if (webSources.length) persisted.webSources = webSources
+    else delete persisted.webSources
+    persisted.imagesOmitted = message.imagesOmitted || !!message.images?.length
+    return persisted
+  })
+  const data = { chat: pack({ ...chat, messages }), document: pack(document), snapshots }
   const record: HistoryRecord = { ...metadata, schemaVersion: 1, data }
-  if (bytes(JSON.stringify(record)) > 16_000_000) throw new Error('agent:historyLimit')
+  if (snapshots.length > 512 || bytes(JSON.stringify(record)) > 16_000_000) throw new Error('agent:historyLimit')
   return record
 }
 
@@ -77,17 +153,29 @@ export function hydrateHistory(record: HistoryRecord): { chat: HistoryChat; docu
     const message: ChatItem = { id: value.id, role: value.role as ChatItem['role'], content: value.content, tools: value.tools as string[],
       completed: value.completed === true, cancelled: value.cancelled === true, imagesOmitted: value.imagesOmitted === true,
       ...(typeof value.error === 'string' ? { error: value.error } : {}), ...(typeof value.attachment === 'string' ? { attachment: value.attachment } : {}) }
+    const task = restoreAgentTaskContext(value.task)
+    if (task) { message.task = task; message.contextReads = restoreAgentContextReads(value.contextReads, task) }
     for (const key of ['contextSnapshot', 'readSnapshot', 'answerTarget'] as const) {
       if (value[key] !== undefined && value[key] !== null && !validSnapshot(value[key])) throw invalid()
       message[key] = value[key] as DocumentSnapshot | null | undefined
     }
     if (typeof value.targetTabId === 'string') message.targetTabId = value.targetTabId
-    if (value.references !== undefined) message.references = refs(value.references)
+    if (value.regenerateFrom !== undefined) {
+      if (typeof value.regenerateFrom !== 'string' || !value.regenerateFrom || value.regenerateFrom.length > 160) throw invalid()
+      message.regenerateFrom = value.regenerateFrom
+    }
+    if (value.references !== undefined) message.references = restoredMessageReferences(value.references)
+    if (value.webSources !== undefined) {
+      const sources = historyWebSources(value.webSources)
+      if (sources.length) message.webSources = sources.map(source => ({ ...source, excerpt: '' })) as AgentWebSource[]
+    }
     if (value.sources !== undefined) {
       if (!Array.isArray(value.sources) || value.sources.length > 32 || value.sources.some(source => !object(source) || !validSnapshot(source.snapshot)
         || typeof source.label !== 'string' || Array.from(source.label).length > 200 || typeof source.quote !== 'string'
         || source.quote !== source.snapshot.markdown.slice(source.snapshot.from, source.snapshot.to))) throw invalid()
-      message.sources = value.sources.map(source => ({ ...source, startLine: source.snapshot.markdown.slice(0, source.snapshot.from).split('\n').length, endLine: source.snapshot.markdown.slice(0, source.snapshot.to).split('\n').length })) as ChatItem['sources']
+      message.sources = value.sources.map(source => ({ ...source, snapshot: restoredProjectSnapshot(source.snapshot),
+        startLine: source.snapshot.markdown.slice(0, source.snapshot.from).split('\n').length,
+        endLine: source.snapshot.markdown.slice(0, source.snapshot.to).split('\n').length })) as ChatItem['sources']
     }
     if (object(value.edit)) {
       const edit = value.edit

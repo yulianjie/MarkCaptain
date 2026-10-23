@@ -6,7 +6,7 @@ export default {
   reviewReason: 'レビューコメント（任意）', reviewReasonPlaceholder: '承認・拒否・取り消しの理由、または書き直し方を入力',
   rewrite: 'この意見で書き直す', rewriteDefault: '別の修正案を提案してください。',
   rewritePrompt: '修正項目 {id} をレビュー意見に従って書き直してください：{reason}。今回添付した現在の文書を基準に、承認済みの修正を維持してください。他の拒否・取り消し済みの修正を再提案せず、新しい案をレビュー用に提示してください。',
-  history: { title: '会話履歴', enable: '会話をローカルに保存', detail: '任意のローカル履歴です。画像は保存されません。オフにしても既存の履歴は削除するまで残ります。最大 100 件 / 128 MB。', search: '会話タイトルを検索', empty: '保存した会話はありません', restore: '復元', export: 'Markdown をエクスポート', delete: '削除', restored: 'ローカル履歴を復元しました。過去の編集は閲覧専用です。原文が同じ場合は章ごとの要約を再開できます。', locked: '過去の編集記録 · 適用と取り消しは無効', imagesOmitted: '画像は履歴に保存されていません。画像について質問する前に再添付してください。' },
+  history: { title: '会話履歴', enable: '会話をローカルに保存', detail: '任意のローカル履歴です。画像は保存されません。オフにしても既存の履歴は削除するまで残ります。最大 100 件 / 128 MB。', search: '会話タイトルを検索', empty: '保存した会話はありません', restore: '復元', export: 'Markdown をエクスポート', delete: '削除', restored: 'ローカル履歴を復元しました。過去の編集は閲覧専用です。原文が同じ場合は章ごとの要約を再開できます。', locked: '過去の編集記録 · 適用と取り消しは無効', revalidateReview: '未審査の修正を再関連付けして検証', revalidateNeedsHistory: '新しい審査カードを保存するには、ローカル履歴を有効にしてください。', revalidateUnavailable: '検証できる未審査の修正がありません。', revalidateChooseOne: '関連付ける Markdown 文書を 1 つ選択してください。', revalidateChanged: '履歴セッションが切り替わりました。この記録を開き直して再試行してください。', revalidateNoPath: '選択した文書のファイルパスを検証できません。', revalidateTargetBusy: '対象文書には既に会話があります。上書きしないよう、会話のない文書に切り替えてください。', imagesOmitted: '画像は履歴に保存されていません。画像について質問する前に再添付してください。' },
   references: { title: '参考文書', detail: '必要に応じて読む閲覧専用スナップショット。最大 8 ファイル、各 2 MB、合計 4 MB。編集対象は現在の文書のみです。', openTab: '開いているタブを添付', files: 'Markdown ファイルを選択', reading: '参考ファイルを読み込み中…', remove: '参考文書 {name} を削除' },
 
   referenceDocument: '文書全体を参照し、選択範囲のみ編集',

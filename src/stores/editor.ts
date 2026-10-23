@@ -291,8 +291,33 @@ export const useEditorStore = defineStore('editor', () => {
   /** Reference-counted because directory-remove events may overlap. */
   const removalProbeCounts = new Map<string, number>()
   const saveQueues = new Map<string, Promise<boolean>>()
+  const saveRevisions = new Map<string, number>()
   const externalChangeQueues = new Map<string, Promise<void>>()
   const inFlightSaveMarkdown = new Map<string, string>()
+
+  /** A synchronous lease check: a newly queued manual save invalidates Agent probes. */
+  function getAgentSaveState(id: string) {
+    return { revision: saveRevisions.get(id) ?? 0, pending: saveQueues.has(id) }
+  }
+
+  /** Pause only the selected documents; Agent acceptance never schedules a disk write. */
+  async function pauseAgentAutoSave(ids: string[]): Promise<void> {
+    const selected = ids.map(id => tabs.value.find(tab => tab.id === id))
+    if (selected.some(tab => !tab)) throw new Error('agent:conflict')
+    for (const tab of selected) {
+      tab!.autoSaveBlocked = true
+      clearAutoSave(tab!.id)
+    }
+    await Promise.allSettled(ids.flatMap(id => [saveQueues.get(id), externalChangeQueues.get(id)].filter(operation => operation !== undefined)))
+    // A save already in flight may have cleared its block or queued a newer edit.
+    let identityChanged = false
+    for (const tab of selected) {
+      if (tabs.value.find(candidate => candidate.id === tab!.id) !== tab) { identityChanged = true; continue }
+      tab!.autoSaveBlocked = true
+      clearAutoSave(tab!.id)
+    }
+    if (identityChanged) throw new Error('agent:conflict')
+  }
 
   const currentFile = computed<DocumentState | null>(() => {
     if (!currentFileId.value) return null
@@ -317,7 +342,11 @@ export const useEditorStore = defineStore('editor', () => {
     const pane = panes.value.find(p => p.id === activePaneId.value)
     if (pane) pane.documentId = id
     const next = tabs.value.find(tab => tab.id === id)
-    if (next) sourceCodeMode.value = next.sourceMode
+    if (next) {
+      sourceCodeMode.value = next.sourceMode
+      // Document and mode form one pane identity, including before queued watchers run.
+      if (pane) pane.sourceMode = next.sourceMode
+    }
     else {
       listToc.value = []
       currentSelectionFormats.value = []
@@ -532,6 +561,7 @@ export const useEditorStore = defineStore('editor', () => {
     clearAutoSave(id)
     removalProbeCounts.delete(id)
     saveQueues.delete(id)
+    saveRevisions.delete(id)
     externalChangeQueues.delete(id)
     inFlightSaveMarkdown.delete(id)
     const idx = tabs.value.findIndex(t => t.id === id)
@@ -967,6 +997,7 @@ export const useEditorStore = defineStore('editor', () => {
 
   function queueTabSave(tab: DocumentState, targetPath?: string): Promise<boolean> {
     if (fileMutationBusy.value) return Promise.resolve(false)
+    saveRevisions.set(tab.id, (saveRevisions.get(tab.id) ?? 0) + 1)
     clearAutoSave(tab.id)
     const previous = saveQueues.get(tab.id) ?? Promise.resolve(true)
     const operation = previous.then(
@@ -1071,7 +1102,8 @@ export const useEditorStore = defineStore('editor', () => {
       tab.filename = nextFilename
       tab.lastSavedMarkdown = markdown
       tab.externalChange = null
-      tab.autoSaveBlocked = false
+      // A save of an older buffer cannot authorize autosaving edits accepted in flight.
+      if (tab.markdown === editorSnapshot) tab.autoSaveBlocked = false
       // Only collapse the editor to the persisted newline style after a
       // successful write, and never overwrite keystrokes made in flight.
       if (tab.markdown === editorSnapshot) tab.markdown = markdown
@@ -1349,6 +1381,8 @@ export const useEditorStore = defineStore('editor', () => {
     registerInsertHandler,
     insertText,
     applyAgentEdit,
+    pauseAgentAutoSave,
+    getAgentSaveState,
     setSelectionFormats,
     captureCurrentViewState,
     // lifecycle

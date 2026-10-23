@@ -22,12 +22,12 @@ async function openDocuments(page: Page, sourceMode = false) {
     editor.tabs = [first, last]
     editor.sourceCodeMode = source
   }, sourceMode)
-  await expect(page.getByRole('tab')).toHaveCount(2)
+  await expect(page.locator('.tabs-bar [role="tab"]')).toHaveCount(2)
   await expect(page.locator(sourceMode ? '.source-pane' : '.muya-host')).toContainText('Closing regression')
 }
 
 async function expectEmptyEditors(page: Page) {
-  await expect(page.getByRole('tab')).toHaveCount(0)
+  await expect(page.locator('.tabs-bar [role="tab"]')).toHaveCount(0)
   await expect(page.locator('.muya-host')).toBeHidden()
   await expect(page.locator('.source-pane')).toBeHidden()
   await expect(page.locator('.muya-host [contenteditable="true"]')).toHaveText('')
@@ -61,7 +61,7 @@ for (const sourceMode of [false, true]) {
 
     // Closing a background tab must leave the active document intact.
     await page.locator('.tab-shell .close').first().click()
-    await expect(page.getByRole('tab')).toHaveCount(1)
+    await expect(page.locator('.tabs-bar [role="tab"]')).toHaveCount(1)
     await expect(editable).toContainText('Closing regression')
     await editable.click()
     await page.keyboard.press('Control+End')
@@ -73,7 +73,7 @@ for (const sourceMode of [false, true]) {
     await expect(page.locator('.el-message-box')).toBeVisible()
     await page.keyboard.press('Escape')
     await expect(page.locator('.el-message-box')).toBeHidden()
-    await expect(page.getByRole('tab')).toHaveCount(1)
+    await expect(page.locator('.tabs-bar [role="tab"]')).toHaveCount(1)
     await expect(editable).toContainText('pending edit')
     await page.keyboard.press('Control+f')
     await expect(page.locator('.find-bar')).toBeVisible()
@@ -111,7 +111,7 @@ for (const sourceMode of [false, true]) {
 
 test('Close All clears the final document', async ({ page }) => {
   await openDocuments(page)
-  await page.getByRole('tab').last().click({ button: 'right' })
+  await page.locator('.tabs-bar [role="tab"]').last().click({ button: 'right' })
   await page.locator('.mt-context-menu').getByRole('button', { name: 'Close all tabs', exact: true }).click()
   await expectEmptyEditors(page)
 })

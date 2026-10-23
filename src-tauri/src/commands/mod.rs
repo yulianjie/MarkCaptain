@@ -11,9 +11,13 @@
 
 pub mod agent;
 pub mod agent_external;
+pub mod agent_multi;
+pub mod agent_project;
 pub mod backdrop;
 pub mod debug;
 pub mod export;
+pub mod export_batch;
+pub mod export_project;
 pub mod file;
 pub mod image;
 pub mod local_history;
@@ -49,7 +53,13 @@ macro_rules! markcaptain_handler {
             $crate::commands::agent::cmd_agent_save_config,
             $crate::commands::agent::cmd_agent_test_connection,
             $crate::commands::agent::cmd_agent_start,
+            $crate::commands::agent_multi::cmd_agent_document_versions,
             $crate::commands::agent::cmd_agent_cancel,
+            $crate::commands::agent::project::cmd_agent_project_grant,
+            $crate::commands::agent::project::cmd_agent_project_revoke,
+            $crate::commands::agent_project::cmd_agent_project_load_config,
+            $crate::commands::agent_project::cmd_agent_project_save_config,
+            $crate::commands::agent_project::cmd_agent_check_document,
             $crate::commands::agent::skills::cmd_agent_list_skills,
             $crate::commands::agent::skills::cmd_agent_import_skill,
             $crate::commands::agent::skills::cmd_agent_set_skill_enabled,
@@ -113,6 +123,15 @@ macro_rules! markcaptain_handler {
             $crate::commands::storage::cmd_storage_git_abort,
             // export
             $crate::commands::export::cmd_export_html,
+            $crate::commands::export_batch::cmd_export_project_list,
+            $crate::commands::export_batch::cmd_export_project_snapshot,
+            $crate::commands::export_project::cmd_export_load_config,
+            $crate::commands::export_project::cmd_export_save_dialog,
+            $crate::commands::export_project::cmd_export_save_config,
+            $crate::commands::export_project::cmd_export_preflight,
+            $crate::commands::export_project::cmd_export_start,
+            $crate::commands::export_project::cmd_export_cancel,
+            $crate::commands::export_project::cmd_export_read_resource,
             $crate::commands::export::cmd_export_pdf,
             $crate::commands::export::cmd_pandoc_convert,
             $crate::commands::export::cmd_pandoc_pdf_export,

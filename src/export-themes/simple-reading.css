@@ -1,0 +1,13 @@
+:root {
+  --export-paper: #fff;
+  --export-ink: #292d32;
+  --export-muted: #626b75;
+  --export-border: #d8dde3;
+  --export-soft: #f4f6f8;
+  --export-accent: #426b8a;
+  --export-code: #f4f6f8;
+  --export-content-width: 760px;
+}
+
+.markdown-body > p { margin: .85em 0; }
+.markdown-body blockquote { padding-left: 1em; }

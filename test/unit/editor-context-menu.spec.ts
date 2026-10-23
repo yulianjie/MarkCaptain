@@ -97,6 +97,25 @@ describe('editor context-menu construction', () => {
     })
     expect(items[0]).toMatchObject({ label: labels.checkingSpelling, disabled: true })
   })
+
+  it('adds unified Agent actions without bypassing the existing context-menu actions', async () => {
+    const callbacks = actions(), polish = vi.fn(), translate = vi.fn()
+    const items = buildEditorContextMenuItems({
+      labels,
+      capabilities: { undo: true, redo: true, cut: true, copy: true, paste: true, selectAll: true },
+      actions: callbacks,
+      agentActions: [
+        { label: 'AI · Polish', action: polish },
+        { label: 'AI · Translate', action: translate },
+      ],
+    })
+    await items.find(item => item.label === 'AI · Polish')?.action?.()
+    await items.find(item => item.label === 'AI · Translate')?.action?.()
+    expect(polish).toHaveBeenCalledOnce()
+    expect(translate).toHaveBeenCalledOnce()
+    expect(items.find(item => item.label === 'Undo')?.action).toBe(callbacks.undo)
+    expect(items.find(item => item.label === 'Copy')?.action).toBe(callbacks.copy)
+  })
 })
 
 describe('editor context-menu async request gate', () => {
@@ -123,5 +142,22 @@ describe('Muya spellcheck context-menu integration contract', () => {
     expect(source).toContain('spellchecker.addWord(wordInfo.word)')
     expect(source).not.toContain("bus.on('switch-spellchecker-language'")
     expect(source).not.toContain("bus.on('replace-misspelling'")
+  })
+
+  it('routes selected text Agent actions through the shared no-auto-send command queue', () => {
+    expect(source).toContain('agentActions: AGENT_WRITING_COMMANDS.map')
+    expect(source).toContain('agent.queueWritingCommand(command)')
+    expect(source).not.toContain('agent.send(')
+  })
+
+  it('offers the same Agent actions in the source editor context menu', () => {
+    const sourcePane = readFileSync(
+      fileURLToPath(new URL('../../src/components/editorWithTabs/SourceCodePane.vue', import.meta.url)),
+      'utf8',
+    )
+    expect(sourcePane).toContain('contextmenu(event, view)')
+    expect(sourcePane).toContain('AGENT_WRITING_COMMANDS.map')
+    expect(sourcePane).toContain('agent.queueWritingCommand(command)')
+    expect(sourcePane).not.toContain('agent.send(')
   })
 })

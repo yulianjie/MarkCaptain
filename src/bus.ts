@@ -46,6 +46,9 @@ export interface BusEventMap {
   'replaceValue': string
   'findInFolder': void
   'reveal-search-hit': import('./services/search-reveal').SearchRevealRequest
+  /** Open a read-only review preview after resolving stable IDs from the Agent store. */
+  'agent-review-preview/open': { messageId: string; changeId: string }
+  'agent-review-preview/close': void
   /**
    * A transient request owned by FindReplaceBar. Unlike `findReplaceOpen`, it
    * is delivered even when the bar is already visible so repeated shortcuts
@@ -80,7 +83,9 @@ export interface BusEventMap {
   'rename': void
   'show-table-dialog': void
   'insert-table': { rows: number; columns: number }
-  'show-export-dialog': void
+  'show-export-dialog': { format?: 'html' | 'pdf' | 'docx' | 'odt' | 'epub'; pdfBackend?: 'system-print' | 'pandoc' } | void
+  'show-project-export-dialog': void
+  'show-agent-multi-dialog': void
   'show-updater-dialog': void
 
   // Format / paragraph (editor toolbar)

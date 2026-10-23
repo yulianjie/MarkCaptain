@@ -54,6 +54,14 @@ async function setup(page: Page, source = false) {
   await expect(page.getByRole('heading', { name:'一起把想法写好' })).toBeVisible()
 }
 
+async function ensureAgentPanelOpen(page: Page) {
+  // Viewport emulation resolves before resize handlers and Vue's DOM update.
+  await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
+  const button = page.getByRole('button', { name: /^AI 助手(?: \(.+\))?$/ })
+  if (await button.getAttribute('aria-expanded') !== 'true') await button.click()
+  await expect(page.locator('.agent-panel')).toBeVisible()
+}
+
 async function send(page: Page, text = 'polish') {
   await page.getByRole('textbox', { name: '发送给写作助手的消息' }).fill(text)
   await page.getByRole('button', { name: '发送', exact: true }).click()
@@ -139,6 +147,7 @@ test('pastes, previews, removes and sends images with follow-up history and retr
   await pastePicture(page, dataUrl)
   for (const width of [1280, 540]) {
     await page.setViewportSize({ width, height: 800 })
+    await ensureAgentPanelOpen(page)
     await expect(page.getByRole('button', { name: '发送', exact: true })).toBeInViewport()
     expect(await page.locator('.agent-panel').evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true)
     await page.screenshot({ path: `output/agent-multimodal/images-${width}.png` })
@@ -248,6 +257,7 @@ test('imports, selects, inspects, disables and removes writing skills', async ({
 test('skill management fits narrow panels and updates language and theme live', async ({ page }) => {
   await setup(page)
   await page.setViewportSize({ width: 760, height: 760 })
+  await ensureAgentPanelOpen(page)
   await page.getByRole('button', { name: '技能管理', exact: true }).click()
   for (const locale of ['zh-CN', 'en', 'ja']) {
     await page.evaluate(async locale => {
@@ -342,6 +352,7 @@ test('fits light/dark and narrow windows with selection context and per-document
   await expect(page.getByRole('button', { name:'应用修改' })).toBeEnabled()
   for (const width of [1280, 1024, 780, 540]) {
     await page.setViewportSize({ width, height:800 })
+    await ensureAgentPanelOpen(page)
     for (const dark of [false, true]) {
       await page.evaluate(dark => {document.documentElement.classList.toggle('dark',dark);document.documentElement.dataset.theme=dark?'dark':'light'},dark)
       await expect(page.getByRole('button', { name:'发送', exact:true })).toBeInViewport()

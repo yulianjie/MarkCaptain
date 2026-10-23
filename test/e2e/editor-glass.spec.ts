@@ -1,19 +1,27 @@
 import { test, expect, type Page } from '@playwright/test'
 
-test('sidebar can be hidden completely and restored from the title bar', async ({ page }) => {
+test('outline inspector and navigation sidebar can be toggled independently', async ({ page }) => {
   await seed(page)
   const editorBefore = await page.locator('.editor-column').boundingBox()
   await page.locator('.collapse-outline').click()
+  await expect(page.locator('.document-inspector')).toHaveCount(0)
+  await expect(page.locator('.document-inspector-rail')).toBeVisible()
+  await expect(page.locator('.side-bar')).toBeVisible()
+  const editorWithoutInspector = await page.locator('.editor-column').boundingBox()
+  expect(editorWithoutInspector!.width).toBeGreaterThan(editorBefore!.width)
+  await page.locator('.document-inspector-rail .rail-tab').first().click()
+  await expect(page.locator('.document-inspector')).toBeVisible()
+  await expect(page.locator('.toc-row')).toHaveCount(10)
+
+  const editorWithInspector = await page.locator('.editor-column').boundingBox()
+  await page.locator('.sidebar-toggle').click()
   await expect(page.locator('.side-bar')).toHaveCount(0)
   await expect(page.locator('.sidebar-toggle')).toHaveAttribute('aria-expanded', 'false')
-  const editorAfter = await page.locator('.editor-column').boundingBox()
-  expect(editorAfter!.width).toBeGreaterThan(editorBefore!.width)
+  const editorWithoutNavigation = await page.locator('.editor-column').boundingBox()
+  expect(editorWithoutNavigation!.width).toBeGreaterThan(editorWithInspector!.width)
   await page.locator('.sidebar-toggle').click()
   await expect(page.locator('.toc-row')).toHaveCount(10)
   await expect(page.locator('.sidebar-toggle')).toHaveAttribute('aria-expanded', 'true')
-  await page.locator('.sidebar-toggle').click()
-  await expect(page.locator('.side-bar')).toHaveCount(0)
-  await page.locator('.sidebar-toggle').click()
   await expect(page.locator('.side-bar')).toBeVisible()
 })
 
@@ -144,10 +152,10 @@ const markdown = [
   '## 场景三：热力图展示', '展示区域热力图。'
 ].join('\n\n')
 
-async function seed(page: Page) {
+async function seed(page: Page, showInspector = true) {
   await page.goto('/')
   await page.locator('.muya-host [contenteditable="true"]').waitFor()
-  await page.evaluate(async (content) => {
+  await page.evaluate(async ({ content, showInspector }) => {
     const editorPath = '/src/stores/editor.ts'
     const prefsPath = '/src/stores/preferences.ts'
     const layoutPath = '/src/stores/layout.ts'
@@ -165,9 +173,13 @@ async function seed(page: Page) {
     editor.sourceCodeMode = false
     const tab = editor.newUntitledTab(content)
     tab.filename = 'SKILL.md'
-    useLayoutStore().rightColumn = 'toc'
-  }, markdown)
-  await expect(page.locator('.toc-row')).toHaveCount(10)
+    const layout = useLayoutStore()
+    layout.navigationPanel = 'files'
+    layout.inspectorPanel = 'outline'
+    layout.showInspector = showInspector
+  }, { content: markdown, showInspector })
+  if (showInspector) await expect(page.locator('.toc-row')).toHaveCount(10)
+  else await expect(page.locator('.document-inspector-rail')).toBeVisible()
 }
 
 test('glass outline filters, expands, navigates and tracks real scroll', async ({ page }) => {
@@ -205,13 +217,17 @@ test('glass outline filters, expands, navigates and tracks real scroll', async (
   await page.screenshot({ path: 'output/design/markcaptain-glass-implemented.png', animations: 'disabled' })
   await page.locator('.collapse-outline').click()
   await expect(page.locator('.toc-pane')).toHaveCount(0)
-  await page.locator('.sidebar-toggle').click()
+  await expect(page.locator('.document-inspector-rail')).toBeVisible()
+  await page.locator('.document-inspector-rail .rail-tab').first().click()
   await expect(page.locator('.toc-pane')).toBeVisible()
+  await expect(page.locator('.side-bar')).toBeVisible()
 })
 
 test('search remains reachable in a narrow window and dark theme', async ({ page }) => {
   await page.setViewportSize({ width: 800, height: 650 })
-  await seed(page)
+  await seed(page, false)
+  await expect(page.locator('.document-inspector')).toHaveCount(0)
+  await expect(page.locator('.document-inspector-rail')).toBeVisible()
   const find = page.locator('.editor-toolbar > .toolbar-scroll [data-action="find"]')
   await expect(find).toBeVisible()
   const box = await find.boundingBox()
@@ -221,6 +237,14 @@ test('search remains reachable in a narrow window and dark theme', async ({ page
   const findBox = await page.locator('.find-bar').boundingBox()
   const stageBox = await page.locator('.editor-stage').boundingBox()
   expect(findBox!.x).toBeGreaterThanOrEqual(stageBox!.x)
+
+  await page.setViewportSize({ width: 1400, height: 650 })
+  await page.locator('.document-inspector-rail .rail-tab').first().click()
+  await expect(page.locator('.document-inspector')).toBeVisible()
+  await page.setViewportSize({ width: 800, height: 650 })
+  await expect(page.locator('.document-inspector')).toHaveCount(0)
+  await expect(page.locator('.document-inspector-rail')).toBeVisible()
+
   await page.evaluate(async () => {
     const path = '/src/stores/preferences.ts'
     const { usePreferencesStore } = await import(path)

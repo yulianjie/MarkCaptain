@@ -5,13 +5,16 @@ import { readAgentImage } from '../../src/services/agent-images'
 import { conversationRequest } from '../../src/services/agent-conversation-request'
 
 const transport = vi.hoisted(() => ({ getConfig: vi.fn(), saveConfig: vi.fn(), testConnection: vi.fn(), start: vi.fn(), cancel: vi.fn(), listen: vi.fn(), listSkills: vi.fn(), importSkill: vi.fn() }))
+const projectIpc = vi.hoisted(() => ({ grant: vi.fn(), revoke: vi.fn(), load: vi.fn(), save: vi.fn(), check: vi.fn() }))
 vi.mock('@/services/agent-transport', () => ({ agentTransport: transport }))
 vi.mock('@/services/agent-images', async importOriginal => ({ ...await importOriginal<typeof import('../../src/services/agent-images')>(), readAgentImage: vi.fn() }))
-vi.mock('@/services/tauri-invoke', () => ({ readMarkdown: vi.fn(), saveMarkdown: vi.fn(), saveAsDialog: vi.fn(), renameFile: vi.fn() }))
+vi.mock('@/services/tauri-invoke', () => ({ readMarkdown: vi.fn(), saveMarkdown: vi.fn(), saveAsDialog: vi.fn(), renameFile: vi.fn(),
+  agentProjectGrant: projectIpc.grant, agentProjectRevoke: projectIpc.revoke, agentProjectLoadConfig: projectIpc.load, agentProjectSaveConfig: projectIpc.save, agentCheckDocument: projectIpc.check }))
 vi.mock('element-plus', () => ({ ElMessageBox: { confirm: vi.fn() }, ElNotification: vi.fn() }))
 
 import { useAgentStore } from '../../src/stores/agent'
 import { useEditorStore } from '../../src/stores/editor'
+import { useProjectStore } from '../../src/stores/project'
 import { usePreferencesStore } from '../../src/stores/preferences'
 
 let emit: (event: AgentEvent) => void
@@ -22,6 +25,11 @@ beforeEach(() => {
   transport.start.mockResolvedValue(undefined)
   transport.cancel.mockResolvedValue(undefined)
   transport.listSkills.mockResolvedValue([])
+  projectIpc.grant.mockImplementation(async (root, include, exclude) => ({ grantId: '00000000-0000-4000-8000-000000000001', root, include, exclude }))
+  projectIpc.revoke.mockResolvedValue(undefined)
+  projectIpc.load.mockResolvedValue({ config: null, fingerprint: null })
+  projectIpc.save.mockImplementation(async (root, config) => ({ config, fingerprint: 'saved-fingerprint' }))
+  projectIpc.check.mockResolvedValue({ issues: [], complete: true, externalLinksUnchecked: 0, localTargetsChecked: 0, truncated: false, scope: 'test' })
   usePreferencesStore().autoSave = false
 })
 
@@ -62,6 +70,18 @@ describe('Agent document edits', () => {
     agent.clear()
     expect(agent.includeDocument).toBe(false)
   })
+  it('queues every writing command through the shared draft and captures the active selection', () => {
+    const editor = useEditorStore(), agent = useAgentStore()
+    const tab = editor.newUntitledTab('outside\nselected text\nafter')
+    editor.sourceCodeMode = true
+    tab.sourceSelection = { ranges: [{ anchor: 21, head: 8 }], main: 0 }
+    agent.queueWritingCommand('polish')
+    expect(agent.visible).toBe(true)
+    expect(agent.selection?.markdown.slice(agent.selection.from, agent.selection.to)).toBe('selected text')
+    expect(agent.conversation.draft).toContain('preserving its meaning')
+    agent.queueWritingCommand('translate')
+    expect(agent.conversation.draft).toContain('[target language]')
+  })
   it('sends image-only messages, retains images in follow-ups and retries the same immutable context', async () => {
     const editor = useEditorStore(), agent = useAgentStore()
     const tab = editor.newUntitledTab('hello world')
@@ -79,6 +99,125 @@ describe('Agent document edits', () => {
     await agent.send('What is in the image?')
     expect(transport.start.mock.calls[2]![0].messages[0].images).toEqual([picture])
     expect(transport.start.mock.calls[2]![0].messages.at(-1).images).toBeUndefined()
+  })
+  it('records the fixed task target, model route, and actual passage returned to the model', async () => {
+    const editor = useEditorStore(), agent = useAgentStore()
+    const tab = editor.newUntitledTab('first line\nsecond line\nthird line')
+    agent.config = { baseUrl: 'http://127.0.0.1:11434/v1', model: 'local-writer', authMode: 'none', hasKey: false, hasHeaders: false }
+    agent.selection = { ...snapshot, tabId: tab.id, name: tab.filename, markdown: tab.markdown, from: 11, to: 22 }
+    agent.includeDocument = true
+    await agent.send('Explain this passage')
+    const activeId = agent.run!.id
+    const assistant = agent.conversation.messages.at(-1)!
+    expect(assistant.task).toMatchObject({ taskId: activeId, paneId: editor.activePaneId, documentId: tab.id, scope: 'selection', model: 'local-writer', endpoint: '127.0.0.1:11434', localModel: true, status: 'preparing' })
+    emit({ requestId: activeId, kind: 'tool', text: 'read_document' })
+    expect(assistant.task?.status).toBe('reading')
+    emit({ requestId: activeId, kind: 'context', text: JSON.stringify({ tool: 'read_document', kind: 'range', documentId: 'current', documentName: tab.filename, startLine: 1, endLine: 1, excerpt: 'second line', totalChars: 11 }) })
+    expect(assistant.contextReads).toMatchObject([{ documentId: tab.id, documentName: tab.filename, excerpt: 'second line', startLine: 1, endLine: 1 }])
+    expect(assistant.task?.status).toBe('generating')
+    emit({ requestId: activeId, kind: 'done' })
+    expect(assistant.task?.status).toBe('completed')
+  })
+  it('sends model checks as read-only requests and discards any unexpected edit proposal', async () => {
+    const editor = useEditorStore(), agent = useAgentStore()
+    editor.newUntitledTab('# Check this document\n')
+    agent.conversation.webResearch = { enabled: true, topic: 'irrelevant', allowDocumentQueries: true, approvedQueries: ['query'], suggestedQueries: [], urls: [], publicDns: true }
+    agent.requestModelCheck()
+    await vi.waitFor(() => expect(transport.start).toHaveBeenCalledOnce())
+    const request = transport.start.mock.calls[0]![0]
+    expect(request.readOnly).toBe(true)
+    expect(request.projectSearch).toBeUndefined()
+    expect(request.webResearch).toBeUndefined()
+    expect(request.messages.at(-1)?.content).toContain('contradictions')
+    emit({ requestId: agent.run!.id, kind: 'proposal', proposal: { title: 'Unexpected edit', oldText: '# Check', newText: '# Changed' } })
+    expect(agent.conversation.messages.at(-1)?.edit).toBeUndefined()
+    emit({ requestId: agent.run!.id, kind: 'done' })
+  })
+  it('requires separate approval for document-derived queries and sends public DNS only for that request', async () => {
+    const editor = useEditorStore(), agent = useAgentStore()
+    editor.newUntitledTab('# C:\\Users\\jack\\private.md\n## Public topic')
+    agent.conversation.webResearch.allowDocumentQueries = true
+    agent.suggestWebQueries()
+    expect(agent.conversation.webResearch.suggestedQueries).toEqual(['Public topic'])
+    expect(agent.conversation.webResearch.approvedQueries).toEqual([])
+    agent.approveWebQuery(agent.conversation.webResearch.suggestedQueries[0]!)
+    expect(agent.conversation.webResearch.approvedQueries).toEqual(['Public topic'])
+    agent.conversation.webResearch.enabled = true
+    agent.conversation.webResearch.topic = 'writing topic'
+    agent.conversation.webResearch.publicDns = true
+    await agent.send('Research the approved query')
+    expect(transport.start.mock.calls[0]![0].webResearch).toEqual({ enabled: true, topic: 'writing topic', allowDocumentQueries: true, approvedQueries: ['Public topic'], urls: [], publicDns: true })
+    expect(agent.conversation.webResearch.enabled).toBe(false)
+    expect(agent.conversation.webResearch.publicDns).toBe(false)
+    emit({ requestId: agent.run!.id, kind: 'done' })
+  })
+  it('discards a local check response when its captured document changed while IPC was pending', async () => {
+    const editor = useEditorStore(), agent = useAgentStore()
+    const initial = '# Check\n\nNo evidence yet.\n'
+    const tab = editor.newUntitledTab(initial)
+    const evidence = 'No evidence', from = initial.indexOf(evidence)
+    let finish!: (value: unknown) => void
+    projectIpc.check.mockImplementation(() => new Promise(resolve => { finish = resolve }))
+    const checking = agent.checkCurrentDocument()
+    expect(projectIpc.check.mock.calls[0]![0]).toBe(initial)
+    editor.setMarkdownExternal(tab.id, '# Check\n\nUpdated after check started.\n')
+    finish({ issues: [{ id: 'old', kind: 'glossary', severity: 'warning', message: 'Old check', from, to: from + evidence.length, line: 3, column: 1, evidence }],
+      complete: true, externalLinksUnchecked: 0, localTargetsChecked: 0, truncated: false, scope: 'captured buffer' })
+    await checking
+    expect(agent.documentCheck).toBeNull()
+    expect(agent.documentCheckError).not.toBe('')
+  })
+  it('requires an explicit project grant, forwards dirty buffers for local scope filtering, and keeps read results read-only', async () => {
+    const editor = useEditorStore(), project = useProjectStore(), agent = useAgentStore()
+    const root = 'C:\\vault'
+    project.projectTree = { pathname: root } as NonNullable<typeof project.projectTree>
+    projectIpc.load.mockResolvedValue({ config: { schemaVersion: 1, projectSearch: { enabledByDefault: true, include: ['notes/**/*.md'] } }, fingerprint: 'config-fingerprint' })
+    await vi.waitFor(() => expect(agent.projectConfigRoot).toBe(root))
+    expect(agent.conversation.projectAccess.grantId).toBeNull() // Defaults never grant file access.
+    const current = editor.newUntitledTab('current only')
+    agent.includeDocument = false
+    const dirty = editor.newUntitledTab('UNSAVED SECRET IN LOCAL BUFFER')
+    dirty.pathname = `${root}\\notes\\draft.md`
+    dirty.isSaved = false
+    const excluded = editor.newUntitledTab('OUT OF SCOPE SECRET')
+    excluded.pathname = `${root}\\private\\excluded.md`
+    excluded.isSaved = false
+    editor.setCurrent(current.id)
+    agent.conversation.projectAccess.include = ['notes/**/*.{md,markdown}']
+    await agent.setProjectSearchEnabled(true)
+    agent.conversation.projectAccess.exclude = ['private/**']
+    await agent.send('This must wait for the updated scope')
+    expect(transport.start).not.toHaveBeenCalled()
+    expect(agent.error).not.toBe('')
+    agent.conversation.projectAccess.exclude = []
+    await agent.send('Find the local note')
+    const request = transport.start.mock.calls[0]![0]
+    expect(agent.run).toMatchObject({ projectRoot: root, projectGrantId: '00000000-0000-4000-8000-000000000001' })
+    expect(agent.conversation.projectAccess).toMatchObject({ root, grantId: '00000000-0000-4000-8000-000000000001' })
+    expect(project.projectTree?.pathname).toBe(root)
+    expect(request.projectSearch).toEqual({ grantId: '00000000-0000-4000-8000-000000000001', buffers: [
+      { path: dirty.pathname, markdown: dirty.markdown }, { path: excluded.pathname, markdown: excluded.markdown },
+    ] })
+    expect(JSON.stringify(request.messages)).not.toContain('UNSAVED SECRET IN LOCAL BUFFER')
+    expect(JSON.stringify(request.messages)).not.toContain('OUT OF SCOPE SECRET')
+    const message = agent.conversation.messages.at(-1)!
+    const requestId = agent.run!.id
+    const projectDocumentId = 'project-00000000-0000-4000-8000-000000000001-00000000-0000-4000-8000-000000000002'
+    emit({ requestId, kind: 'project_search', text: JSON.stringify({ results: [{ documentId: projectDocumentId, path: 'notes/draft.md', title: 'Draft', snippet: 'candidate excerpt', line: 2 }], complete: true }) })
+    expect(message.projectSearchResults).toHaveLength(1)
+    emit({ requestId, kind: 'project_source', text: JSON.stringify({ documentId: projectDocumentId, snapshot: {
+      tabId: `project-${projectDocumentId}`, name: 'notes/draft.md', markdown: '# Read-only source\nbody', from: 0, to: '# Read-only source\nbody'.length,
+      path: dirty.pathname, snapshotId: `${requestId}:${projectDocumentId}`,
+    } }) })
+    expect(message.references?.[0]).toMatchObject({ documentId: projectDocumentId, snapshot: { tabId: `project-${projectDocumentId}` } })
+    expect(message.targetTabId).toBe(current.id)
+    emit({ requestId, kind: 'source', text: JSON.stringify({ documentId: projectDocumentId, label: 'Project evidence', startLine: 1, endLine: 1, quote: '# Read-only source' }) })
+    expect(message.sources?.[0]?.snapshot.tabId).toBe(`project-${projectDocumentId}`)
+    agent.conversation.webResearch.enabled = true
+    project.projectTree = { pathname: 'C:\\other-project' } as NonNullable<typeof project.projectTree>
+    await vi.waitFor(() => expect(agent.conversation.projectAccess.grantId).toBeNull())
+    expect(projectIpc.revoke).toHaveBeenCalledWith('00000000-0000-4000-8000-000000000001')
+    expect(agent.conversation.webResearch.enabled).toBe(false)
   })
   it('keeps pending image reads with their document and discards reads after clearing a conversation', async () => {
     const editor = useEditorStore(), agent = useAgentStore()

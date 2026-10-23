@@ -13,8 +13,8 @@ const openedFileRow = readSource('../../src/components/sideBar/OpenedFileRow.vue
 describe('sidebar accessibility contract', () => {
   it('names rail actions and exposes their expanded state', () => {
     expect(sideBar).toContain(':aria-label="t(item.titleKey)"')
-    expect(sideBar).toContain(':aria-pressed="layout.rightColumn === item.key"')
-    expect(sideBar).toContain(':aria-expanded="layout.rightColumn === item.key"')
+    expect(sideBar).toContain(':aria-pressed="layout.navigationPanel === item.key"')
+    expect(sideBar).toContain(':aria-expanded="layout.navigationPanel === item.key"')
     expect(sideBar).toContain(':aria-label="t(\'sideBar.preferences\')"')
   })
 
@@ -23,8 +23,8 @@ describe('sidebar accessibility contract', () => {
     expect(sideBar).toContain('aria-orientation="vertical"')
     expect(sideBar).toContain('tabindex="0"')
     expect(sideBar).toContain('@keydown="onResizeKeydown"')
-    expect(sideBar).toContain("ev.key === 'ArrowLeft'")
-    expect(sideBar).toContain("ev.key === 'ArrowRight'")
+    expect(sideBar).toContain("event.key === 'ArrowLeft'")
+    expect(sideBar).toContain("event.key === 'ArrowRight'")
     expect(sideBar).toContain('@pointerdown="onResizeDown"')
   })
 

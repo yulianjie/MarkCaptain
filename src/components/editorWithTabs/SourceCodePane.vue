@@ -24,6 +24,9 @@ import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { HighlightStyle, syntaxHighlighting, indentOnInput, bracketMatching } from '@codemirror/language'
 import { tags } from '@lezer/highlight'
 import { usePaneEditor } from '@/services/editor-panes'
+import { AGENT_WRITING_COMMANDS, agentWritingCommandLabel } from '@/services/agent-m1-copy'
+import { useAgentStore } from '@/stores/agent'
+import { useI18n } from '@/i18n'
 import type { DocumentState } from '@/stores/help'
 import { bus, type SearchOpt } from '@/bus'
 import {
@@ -45,6 +48,8 @@ import { analyzeNote } from '@/services/note-index'
 
 const props = withDefaults(defineProps<{ paneId?: string }>(), { paneId: 'main' })
 const { editor, isActive } = usePaneEditor(props.paneId)
+const agent = useAgentStore()
+const { t, locale } = useI18n()
 const hostRef = ref<HTMLDivElement | null>(null)
 const viewRef = shallowRef<EditorView | null>(null)
 /** Last id the view's content was synced with — used to detect tab swaps. */
@@ -77,6 +82,72 @@ const mdHighlight = HighlightStyle.define([
 
 const baseExtensions = (): Extension[] => [
   noteCompletions(),
+  EditorView.domEventHandlers({ contextmenu(event, view) {
+    if (!isActive.value || !editor.sourceCodeMode || !boundId.value) return false
+    event.preventDefault()
+    const id = boundId.value
+    const position = view.posAtCoords({ x: event.clientX, y: event.clientY })
+    const selection = view.state.selection.main
+    if (position !== null && (selection.empty || position < selection.from || position > selection.to)) {
+      view.dispatch({ selection: EditorSelection.cursor(position) })
+    }
+    const contextSelection = view.state.selection.main
+    const contextDocument = view.state.doc.toString()
+    const contextFrom = contextSelection.from, contextTo = contextSelection.to
+    const restore = () => isActive.value && boundId.value === id && editor.currentFileId === id && editor.sourceCodeMode
+    const selectionIsCurrent = () => view.state.selection.main.from === contextFrom && view.state.selection.main.to === contextTo
+    const writeClipboard = async (text: string) => {
+      if ('__TAURI_INTERNALS__' in window) {
+        const clipboard = await import('@tauri-apps/plugin-clipboard-manager')
+        await clipboard.writeText(text)
+      } else await navigator.clipboard.writeText(text)
+    }
+    const readClipboard = async () => {
+      if ('__TAURI_INTERNALS__' in window) {
+        const clipboard = await import('@tauri-apps/plugin-clipboard-manager')
+        return clipboard.readText()
+      }
+      return navigator.clipboard.readText()
+    }
+    const copySelection = async (remove = false) => {
+      if (!restore() || contextFrom === contextTo) return
+      const value = contextDocument.slice(contextFrom, contextTo)
+      try {
+        await writeClipboard(value)
+        if (remove && restore() && view.state.doc.toString() === contextDocument
+          && view.state.selection.main.from === contextFrom && view.state.selection.main.to === contextTo) {
+          view.dispatch({ changes: { from: contextFrom, to: contextTo, insert: '' }, selection: { anchor: contextFrom } })
+          view.focus()
+        }
+      } catch { /* Clipboard permissions can be unavailable in browser previews. */ }
+    }
+    const pasteAtSelection = async () => {
+      if (!restore() || view.state.doc.toString() !== contextDocument || !selectionIsCurrent()) return
+      try {
+        const value = await readClipboard()
+        if (!restore() || view.state.doc.toString() !== contextDocument || !selectionIsCurrent()) return
+        view.dispatch({ changes: { from: contextFrom, to: contextTo, insert: value }, selection: { anchor: contextFrom + value.length } })
+        view.focus()
+      } catch { /* Clipboard permissions can be unavailable in browser previews. */ }
+    }
+    const items = [
+      { label: t('editorContextMenu.undo'), action: () => { if (restore()) editor.usesSharedHistory ? editor.stepSharedHistory('undo') : undo(view) } },
+      { label: t('editorContextMenu.redo'), action: () => { if (restore()) editor.usesSharedHistory ? editor.stepSharedHistory('redo') : redo(view) } },
+      { divider: true },
+      { label: t('editorContextMenu.cut'), disabled: contextFrom === contextTo, action: () => copySelection(true) },
+      { label: t('editorContextMenu.copy'), disabled: contextFrom === contextTo, action: () => copySelection() },
+      { label: t('editorContextMenu.paste'), action: () => pasteAtSelection() },
+      { divider: true },
+      { label: t('editorContextMenu.selectAll'), action: () => { if (restore()) selectAll(view) } },
+      { divider: true },
+      ...AGENT_WRITING_COMMANDS.map(command => ({
+        label: `AI · ${agentWritingCommandLabel(command, locale.value)}`,
+        action: () => { if (restore() && view.state.doc.toString() === contextDocument && selectionIsCurrent()) agent.queueWritingCommand(command) },
+      })),
+    ]
+    bus.emit('openContextMenu', { x: event.clientX, y: event.clientY, items })
+    return true
+  } }),
   EditorView.domEventHandlers({ click(event, view) {
     if (!(event.ctrlKey || event.metaKey)) return false
     const position = view.posAtCoords({ x: event.clientX, y: event.clientY })

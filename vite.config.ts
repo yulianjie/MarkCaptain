@@ -64,7 +64,7 @@ export default defineConfig(async () => ({
       : undefined,
     watch: {
       // Don't reload on Rust source changes; Tauri handles those separately.
-      ignored: ['**/src-tauri/**'],
+      ignored: ['**/src-tauri/**', '**/output/**', '**/exports/**'],
     },
   },
 

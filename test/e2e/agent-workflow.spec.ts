@@ -118,6 +118,14 @@ async function markdown(page: Page) {
   return page.evaluate(async()=>{const p='/src/stores/editor.ts';return (await import(p)).useEditorStore().currentFile.markdown as string})
 }
 
+async function ensureAgentPanelOpen(page: Page) {
+  await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
+  const button = page.getByRole('button', { name: /^AI 助手(?: \(.+\))?$/ })
+  await expect(button).toBeVisible()
+  if (await button.getAttribute('aria-expanded') !== 'true') await button.click()
+  await expect(button).toHaveAttribute('aria-expanded', 'true')
+}
+
 async function propose(page: Page) {
   await page.getByRole('textbox', {name:'发送给写作助手的消息'}).fill('修改首尾两段')
   await page.getByRole('button', {name:'发送',exact:true}).click()
@@ -226,6 +234,7 @@ test('sends item-level review feedback and rewrites only the requested rejected 
   await expect(page.locator('.agent-working')).toHaveCount(0)
   expect(await markdown(page)).toBe(accepted)
   await page.setViewportSize({ width: 540, height: 800 })
+  await ensureAgentPanelOpen(page)
   expect(await page.locator('.agent-panel').evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true)
   await page.screenshot({ path: 'output/agent-feedback/review-narrow.png' })
 })
@@ -324,6 +333,7 @@ test('multi-change review remains readable in narrow light and dark panels', asy
   for (const theme of ['light','dark']) {
     await page.evaluate(async theme=>{const p='/src/stores/preferences.ts';(await import(p)).usePreferencesStore().theme=theme},theme)
     await page.setViewportSize({width:540,height:850})
+    await ensureAgentPanelOpen(page)
     const panel=page.locator('.agent-panel')
     expect(await panel.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true)
     await expect(page.getByRole('button',{name:'全部应用',exact:true})).toBeVisible()
@@ -504,7 +514,7 @@ test('opt-in history survives reload, exports, restores safely and deletes witho
   await page.evaluate(async()=>{
     const lp='/src/i18n/index.ts',pp='/src/stores/preferences.ts';(await import(lp)).setLocale('zh-CN');(await import(pp)).usePreferencesStore().language='zh-CN'
   })
-  await page.getByRole('button', { name: /^AI 助手(?: \(.+\))?$/ }).click()
+  await ensureAgentPanelOpen(page)
   await page.getByRole('button',{name:'历史对话',exact:true}).click()
   await expect(page.getByLabel('在本地保存对话',{exact:true})).toBeChecked()
   await page.locator('.agent-history-item').first().getByRole('button',{name:'恢复',exact:true}).click()
@@ -542,9 +552,19 @@ test('saved stopped summaries resume after reload without processing completed c
   await page.reload()
   await page.locator('.editing-region [contenteditable="true"]:visible').first().waitFor()
   await page.evaluate(async()=>{const lp='/src/i18n/index.ts',pp='/src/stores/preferences.ts';(await import(lp)).setLocale('zh-CN');(await import(pp)).usePreferencesStore().language='zh-CN'})
-  await page.getByRole('button', { name: /^AI 助手(?: \(.+\))?$/ }).click()
+  await ensureAgentPanelOpen(page)
   await page.getByRole('button',{name:'历史对话',exact:true}).click()
   await page.locator('.agent-history-item').filter({hasText:'分章总结'}).getByRole('button',{name:'恢复',exact:true}).click()
+  const attachment = page.locator('.agent-context-row input[type="checkbox"]')
+  await expect(attachment).not.toBeChecked()
+  await page.getByRole('button',{name:'继续分章总结',exact:true}).click()
+  await expect.poll(() => page.evaluate(async () => {
+    const p = '/src/stores/agent.ts'
+    const agent = (await import(p)).useAgentStore()
+    return Boolean(agent.error || agent.conversation.messages.at(-1)?.error)
+  })).toBe(true)
+  expect(await page.evaluate(() => (window as unknown as { __summaryRequests?: unknown[] }).__summaryRequests?.length ?? 0)).toBe(0)
+  await attachment.check() // Archived scope is not a new authorization; user reattaches explicitly.
   await page.getByRole('button',{name:'继续分章总结',exact:true}).click()
   await expect.poll(()=>page.evaluate(async()=>{const p='/src/stores/agent.ts';return (await import(p)).useAgentStore().conversation.messages.at(-1)?.completed}),{timeout:20000}).toBe(true)
   const repeated=await page.evaluate(text=>(window as unknown as {__summaryRequests:{context:{markdown:string}|null}[]}).__summaryRequests.some(r=>r.context?.markdown===text),firstChunk)

@@ -11,6 +11,10 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 import { ElMessageBox } from 'element-plus'
 import TitleBar from '@/components/titleBar/TitleBar.vue'
 import AgentPanel from '@/components/agent/AgentPanel.vue'
+import AgentMultiDocumentDialog from '@/components/agent/AgentMultiDocumentDialog.vue'
+import DocumentInspector from '@/components/documentInspector/DocumentInspector.vue'
+import TocPane from '@/components/sideBar/TocPane.vue'
+import AgentReviewPreview from '@/components/agent/AgentReviewPreview.vue'
 import { useAgentStore } from '@/stores/agent'
 import TabsBar from '@/components/editorWithTabs/TabsBar.vue'
 import EditorToolbar from '@/components/editorToolbar/EditorToolbar.vue'
@@ -27,6 +31,7 @@ import RecentDialog from '@/components/recent/RecentDialog.vue'
 import TableDialog from '@/components/table/TableDialog.vue'
 import UpdaterDialog from '@/components/updater/UpdaterDialog.vue'
 import ExportSettingsDialog from '@/components/exportSettings/ExportSettingsDialog.vue'
+import ProjectExportDialog from '@/components/export/ProjectExportDialog.vue'
 import FindReplaceBar from '@/components/search/FindReplaceBar.vue'
 import ContextMenu from '@/components/contextMenu/ContextMenu.vue'
 import ImagePreview from '@/components/imagePreview/ImagePreview.vue'
@@ -41,8 +46,6 @@ import {
   destroyEditorWindow,
   openFiles,
   saveAsDialog,
-  exportHtml,
-  pandocConvert,
   getEditorSession,
   readMarkdown,
   setEditorSession,
@@ -74,7 +77,8 @@ import {
   type BuiltinCommandSpec,
 } from '@/services/command-palette-actions'
 import { bus } from '@/bus'
-import { t } from '@/i18n'
+import { getLocale, t } from '@/i18n'
+import { AGENT_WRITING_COMMANDS, agentWritingCommandLabel } from '@/services/agent-m1-copy'
 import {
   buildEditorSessionSnapshot,
   createEditorSessionRestorePlan,
@@ -489,49 +493,13 @@ function installSessionPersistence() {
 }
 
 async function doExportHtml() {
-  const tab = editor.currentFile
-  if (!tab) return
-  const markdown = tab.markdown
-  const filename = tab.filename
-  const muya = editor.getMuyaInstance()
-  if (!muya) {
-    notify.pushToast({ type: 'error', title: t('toast.exportFailed'), message: t('toast.editorNotReady') })
-    return
-  }
-  const target = await saveAsDialog((filename.replace(/\.md$/i, '') || 'untitled') + '.html')
-  if (!target) return
-  try {
-    const { default: ExportHtml } = await import('muya/lib/utils/exportHtml')
-    const exporter = new ExportHtml(markdown, muya)
-    const html = await exporter.generate({
-      title: filename.replace(/\.md$/i, ''),
-      toc: false,
-      printOptimization: false,
-      extraCss: '',
-    })
-    await exportHtml(target, html)
-    notify.pushToast({ type: 'success', message: t('toast.exportedTo', { path: target }) })
-  } catch (err) {
-    notify.pushToast({ type: 'error', title: t('toast.exportFailed'), message: err instanceof Error ? err.message : String(err) })
-  }
+  bus.emit('show-export-dialog', { format: 'html' })
 }
 
-function doPrint() { bus.emit('show-export-dialog', undefined) }
+function doPrint() { bus.emit('show-export-dialog', { format: 'pdf', pdfBackend: 'system-print' }) }
 
 async function doExportPandoc(format: 'docx' | 'odt' | 'epub') {
-  const tab = editor.currentFile
-  if (!tab) return
-  const target = await saveAsDialog((tab.filename.replace(/\.md$/i, '') || 'untitled') + '.' + format)
-  if (!target) return
-  try {
-    await pandocConvert(tab.markdown, target, format)
-    notify.pushToast({ type: 'success', message: t('toast.exportedTo', { path: target }) })
-  } catch (err) {
-    notify.pushToast({
-      type: 'error', title: t('toast.exportFailed'),
-      message: err instanceof Error ? err.message : String(err),
-    })
-  }
+  bus.emit('show-export-dialog', { format })
 }
 
 /* ── menu action router ─────────────────────────────────────── */
@@ -545,7 +513,7 @@ const MENU_ACTIONS: Record<string, () => void | Promise<void>> = {
   'view.closePane': () => { editor.closePane(editor.activePaneId) },
   'view.layouts': () => { notebook.dialog = 'layouts' },
   'file.localHistory': () => { notebook.dialog = 'history' },
-  'view.notes': () => { layout.showSideBar = true; layout.rightColumn = 'notes' },
+  'view.notes': () => { layout.showInspector = true; layout.inspectorPanel = 'links' },
   'edit.restoreReferences': () => notebook.restoreReferences(),
   'file.new': () => { editor.newUntitledTab() },
   'file.newWindow': async () => { const { newWindow } = await import('@/services/tauri-invoke'); await newWindow() },
@@ -738,6 +706,21 @@ function registerBuiltinCommands() {
   }
 }
 
+const agentWritingCommandIds = AGENT_WRITING_COMMANDS.map(command => `agent.write.${command}`)
+function registerAgentWritingCommands() {
+  for (const command of AGENT_WRITING_COMMANDS) {
+    const id = `agent.write.${command}`
+    cc.register({
+      id,
+      category: () => t('agent.title'),
+      categoryOrder: commandCategoryOrder('help') + 1,
+      description: () => agentWritingCommandLabel(command, getLocale()),
+      keywords: [() => t('agent.title'), () => agentWritingCommandLabel(command, getLocale())],
+      execute: () => agent.queueWritingCommand(command),
+    })
+  }
+}
+
 watch(() => keys.map, map => {
   for (const cmd of cc.subcommands) {
     if (!(cmd.id in map)) continue
@@ -758,6 +741,7 @@ onMounted(async () => {
   // Global bootstrap has already subscribed, then loaded the preference and
   // keybinding snapshots before mounting this page.
   registerBuiltinCommands()
+  registerAgentWritingCommands()
   // Focus-sensitive editor shortcuts are renderer-owned in every runtime.
   // Windows application shortcuts run before Muya/CodeMirror keymaps.
   window.addEventListener('keydown', onApplicationKey, true)
@@ -781,7 +765,7 @@ onMounted(async () => {
   // Print request — Rust's cmd_export_pdf emits this when the user picks
   // "Export PDF" / "Print" from the menu. We invoke the browser's native
   // print dialog so the OS handles "Save as PDF".
-  unsubPrint = await listenTyped('mt://export/print', () => { window.print() })
+  unsubPrint = await listenTyped('mt://export/print', () => { doPrint() })
 
   // Explicit OS opens remain queued in Rust throughout session restoration.
   const startupController = new AbortController()
@@ -864,6 +848,7 @@ onBeforeUnmount(() => {
   stopSessionTransitions?.()
   sessionWriter?.dispose()
   for (const id of BUILTIN_COMMAND_IDS) cc.unregister(id)
+  for (const id of agentWritingCommandIds) cc.unregister(id)
 })
 </script>
 
@@ -880,7 +865,11 @@ onBeforeUnmount(() => {
           <FindReplaceBar />
         </div>
       </div>
-      <AgentPanel v-if="agent.visible" />
+      <DocumentInspector>
+        <template #outline><TocPane /></template>
+        <template #agent><AgentPanel /></template>
+      </DocumentInspector>
+      <AgentReviewPreview />
     </div>
     <StatusBar v-if="layout.showStatusBar" />
     <CommandPalette />
@@ -892,6 +881,8 @@ onBeforeUnmount(() => {
     <TableDialog />
     <UpdaterDialog :prepare-install="prepareUpdateInstall" />
     <ExportSettingsDialog />
+    <ProjectExportDialog />
+    <AgentMultiDocumentDialog />
     <ContextMenu />
     <ImagePreview />
     <div v-if="dragOver" class="drop-veil">Drop to open</div>

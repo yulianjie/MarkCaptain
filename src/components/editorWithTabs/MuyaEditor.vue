@@ -32,6 +32,8 @@ import { onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { readText, writeText } from '@tauri-apps/plugin-clipboard-manager'
 import { open as openExternal } from '@tauri-apps/plugin-shell'
 import { usePaneEditor } from '@/services/editor-panes'
+import { AGENT_WRITING_COMMANDS, agentWritingCommandLabel } from '@/services/agent-m1-copy'
+import { useAgentStore } from '@/stores/agent'
 import { useNotebookStore } from '@/stores/notebook'
 import { markdownSelection } from '@/services/agent'
 import { analyzeNote } from '@/services/note-index'
@@ -79,6 +81,7 @@ import { bus } from '@/bus'
 
 const props = withDefaults(defineProps<{ paneId?: string }>(), { paneId: 'main' })
 const { editor, isActive } = usePaneEditor(props.paneId)
+const agent = useAgentStore()
 const notebook = useNotebookStore()
 const wikiCompletion = ref<{ id: string; markdown: string; from: number; to: number; options: string[]; selected: number } | null>(null)
 function refreshWikiCompletion(event: KeyboardEvent) {
@@ -317,6 +320,10 @@ function handleEditorContextMenu(muya: any, event: MouseEvent, selection: Contex
         },
         capabilities: contextMenuCapabilities(muya, selection),
         actions,
+        agentActions: AGENT_WRITING_COMMANDS.map(command => ({
+          label: `AI · ${agentWritingCommandLabel(command, locale.value)}`,
+          action: () => { if (restore()) agent.queueWritingCommand(command) },
+        })),
         spelling,
         shortcuts: contextMenuShortcuts(),
       }),

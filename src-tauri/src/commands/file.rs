@@ -3,9 +3,10 @@
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
-use tauri::AppHandle;
+use tauri::{AppHandle, State};
 use tauri_plugin_dialog::DialogExt;
 
+use crate::app::{is_markdown_document, AppState};
 use crate::error::{AppError, AppResult};
 use crate::filesystem::markdown::{self, LoadedDocument};
 
@@ -32,17 +33,41 @@ pub struct SaveAsResult {
 
 #[tauri::command]
 pub async fn cmd_read_markdown(
+    state: State<'_, AppState>,
+    path: PathBuf,
+    options: Option<ReadOptions>,
+) -> AppResult<LoadedDocument> {
+    read_markdown_authorized(&state, path, options).await
+}
+
+async fn read_markdown_authorized(
+    state: &AppState,
     path: PathBuf,
     options: Option<ReadOptions>,
 ) -> AppResult<LoadedDocument> {
     let options = options.unwrap_or_default();
     let auto_guess_encoding = options.auto_guess_encoding.unwrap_or(true);
     let default_encoding = options.default_encoding.as_deref().unwrap_or("utf8");
-    markdown::read_markdown_with_options(path, auto_guess_encoding, default_encoding).await
+    let loaded =
+        markdown::read_markdown_with_options(path, auto_guess_encoding, default_encoding).await?;
+    if is_markdown_document(&loaded.path) {
+        state.authorize_document_source(&loaded.path)?;
+    }
+    Ok(loaded)
 }
 
 #[tauri::command]
 pub async fn cmd_save_markdown(
+    state: State<'_, AppState>,
+    path: PathBuf,
+    markdown: String,
+    options: Option<SaveOptions>,
+) -> AppResult<()> {
+    save_markdown_authorized(&state, path, markdown, options).await
+}
+
+async fn save_markdown_authorized(
+    state: &AppState,
     path: PathBuf,
     markdown: String,
     options: Option<SaveOptions>,
@@ -51,13 +76,17 @@ pub async fn cmd_save_markdown(
     let encoding = opts.encoding.as_deref().unwrap_or("utf-8");
     let line_ending = opts.line_ending.as_deref().unwrap_or("lf");
     crate::filesystem::markdown::write_markdown_with_options(
-        path,
+        &path,
         &markdown,
         encoding,
         line_ending,
         opts.bom,
     )
-    .await
+    .await?;
+    if is_markdown_document(&path) {
+        state.authorize_document_source(&path)?;
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -124,7 +153,11 @@ pub async fn cmd_trash_file(path: PathBuf) -> AppResult<()> {
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
     use serde_json::json;
+
+    use crate::app::AppState;
 
     use super::*;
 
@@ -146,5 +179,41 @@ mod tests {
         .unwrap();
         assert_eq!(read.auto_guess_encoding, Some(false));
         assert_eq!(read.default_encoding.as_deref(), Some("windows-1252"));
+    }
+
+    #[tokio::test]
+    async fn successful_markdown_reads_and_saves_authorize_canonical_sources() {
+        let temp = tempfile::tempdir().unwrap();
+        let state = AppState::default();
+        let read_path = temp.path().join("readme.MARKDOWN");
+        fs::write(&read_path, "# Read").unwrap();
+        assert!(!state.is_document_source_authorized(&read_path));
+
+        let loaded = read_markdown_authorized(&state, read_path.clone(), None)
+            .await
+            .unwrap();
+        assert_eq!(loaded.markdown, "# Read");
+        assert!(state.is_document_source_authorized(&read_path));
+        assert!(state.is_document_source_authorized(&loaded.path));
+
+        let save_path = temp.path().join("new-note.mdown");
+        assert!(!state.is_document_source_authorized(&save_path));
+        save_markdown_authorized(&state, save_path.clone(), "# Saved".into(), None)
+            .await
+            .unwrap();
+        assert!(state.is_document_source_authorized(&save_path));
+        assert_eq!(fs::read_to_string(&save_path).unwrap(), "# Saved");
+    }
+
+    #[tokio::test]
+    async fn successful_non_markdown_reads_do_not_grant_document_source_authority() {
+        let temp = tempfile::tempdir().unwrap();
+        let state = AppState::default();
+        let path = temp.path().join("notes.txt");
+        fs::write(&path, "plain text").unwrap();
+        read_markdown_authorized(&state, path.clone(), None)
+            .await
+            .unwrap();
+        assert!(!state.is_document_source_authorized(&path));
     }
 }

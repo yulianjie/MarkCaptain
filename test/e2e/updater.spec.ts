@@ -6,7 +6,7 @@ test('update preference defaults on, persists through the store, and is localize
   await expect(control).toHaveAttribute('aria-checked', 'true')
   await control.locator('..').click()
   await expect(control).toHaveAttribute('aria-checked', 'false')
-  expect(await page.evaluate(async () => {
+  await expect.poll(() => page.evaluate(async () => {
     const path = '/src/services/tauri-invoke.ts'
     return (await import(path)).getPreference('autoCheckUpdates')
   })).toBe(false)

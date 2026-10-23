@@ -236,12 +236,13 @@ export const PREVIEW_DOMPURIFY_CONFIG = Object.freeze({
 export const EXPORT_DOMPURIFY_CONFIG = Object.freeze({
   FORBID_ATTR: ['contenteditable'],
   ALLOW_DATA_ATTR: false,
-  ADD_ATTR: ['data-align'],
+  ADD_ATTR: ['data-align', 'encoding'],
+  ADD_TAGS: ['semantics', 'annotation'],
   USE_PROFILES: {
     html: true,
     svg: true,
     svgFilters: true,
-    mathMl: false
+    mathMl: true
   },
   RETURN_TRUSTED_TYPE: false,
   // Allow "file" protocol to export images on Windows (#1997).
