@@ -1,0 +1,48 @@
+# GitHub Pages publishes the README and documentation, not the Tauri/Vite app.
+title: MarkCaptain
+description: A local-first Markdown editor with a review-first writing Agent
+url: https://yulianjie.github.io
+baseurl: /MarkCaptain
+theme: jekyll-theme-primer
+
+plugins:
+  - jekyll-optional-front-matter
+  - jekyll-readme-index
+  - jekyll-relative-links
+  - jekyll-default-layout
+  - jekyll-titles-from-headings
+
+readme_index:
+  enabled: true
+  remove_originals: false
+
+# Jekyll 3 replaces its default exclusions when this list is supplied.
+# Excluding the desktop entry also lets jekyll-readme-index create the homepage.
+exclude:
+  - index.html
+  - src
+  - src-tauri
+  - scripts
+  - test
+  - design
+  - resources
+  - static
+  - node_modules
+  - dist
+  - output
+  - test-results
+  - playwright-report
+  - vendor
+  - Gemfile
+  - Gemfile.lock
+  - AGENTS.md
+  - CLAUDE.md
+  - DESIGN.md
+  - PLAN.md
+  - plan.md
+  - distance.md
+  - package.json
+  - package-lock.json
+  - yarn.lock
+  - "*.config.*"
+  - "tsconfig*.json"
