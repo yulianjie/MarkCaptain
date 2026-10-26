@@ -18,6 +18,7 @@ import { createSearchRevealRequest } from '@/services/search-reveal'
 import { localHistoryCapture, localHistorySettings } from '@/services/tauri-invoke'
 import { getPaneViewState, restorePaneViewState, type PaneViewState } from '@/services/pane-view-state'
 import { normalizePaneViewState } from '@/services/pane-layouts'
+import { resolveDocumentLink } from '@/services/document-link'
 
 interface RelationNavigationFrame {
   paneId: string
@@ -315,6 +316,25 @@ export const useNotebookStore = defineStore('notebook', () => {
   async function reveal(relative: string, from: number, to = from) {
     await navigateToRelation(relative, from, to)
   }
+  async function followMarkdownLink(target: string) {
+    const current = editor.currentFile
+    const resolved = resolveDocumentLink(target, current?.pathname ?? '')
+    if (!resolved.path) throw new Error(t('notes.invalidPath'))
+    const source = currentNote.value?.relative
+    // Preserve indexed navigation, ambiguity handling and note creation inside
+    // the project. Standalone files and links outside it use normal file open.
+    if (source && !/^(?:[\w+.-]+:|\\|\/\/)/.test(target) && (target.startsWith('/') || pathIsInsideRoot(root.value, resolved.path))) {
+      await followLink(source, { kind: 'markdown', target })
+      return
+    }
+    if (!hasNoteExtension(resolved.path)) throw new Error(t('notes.unsupportedNoteTarget'))
+    const origin = captureRelationNavigationFrame()
+    const tab = await editor.openFile(resolved.path)
+    const heading = resolved.heading ? resolveNoteHeading(analyzeNote(tab.pathname, tab.markdown), resolved.heading) : undefined
+    if (resolved.heading && !heading) throw new Error(t('notes.headingMissing'))
+    if (origin) relationNavigationHistory.value = [...relationNavigationHistory.value, origin].slice(-MAX_RELATION_NAVIGATION_HISTORY)
+    revealRelationTarget(tab, heading?.from ?? 0, heading?.from ?? 0)
+  }
   async function followLink(source: string, link: Pick<NoteLink, 'target' | 'kind'>) {
     const expectedRoot = root.value
     const candidates = resolveNoteLink(source, link, analyses.value)
@@ -548,5 +568,5 @@ export const useNotebookStore = defineStore('notebook', () => {
     clearTimeout(refreshTimer); refreshTimer = setTimeout(() => { void rebuild() }, 500)
   }).then(fn => { off = fn }).catch(() => {})
   onScopeDispose(() => { disposed = true; clearTimeout(historyTimer); cancel(); relationsWorker?.terminate(); worker?.terminate(); clearTimeout(refreshTimer); off?.() })
-  return { root, notes, liveNotes, busy, indexing, relationsBusy, error, dialog, config, templates, rebuild, cancel, quickResults, create, daily, templateContent, saveConfig, analyses, panel, currentNote, currentAnalysis, relationTarget, relationTargetRelative, relationTargetPinned, relationTargetStatus, relationTargetAnalysis, fixRelationTarget, followActiveRelationTarget, backlinks, mentions, canReturnFromRelation, navigateToRelation, returnFromRelation, reveal, followLink, mutating, moveWithReferences, restoreReferences }
+  return { root, notes, liveNotes, busy, indexing, relationsBusy, error, dialog, config, templates, rebuild, cancel, quickResults, create, daily, templateContent, saveConfig, analyses, panel, currentNote, currentAnalysis, relationTarget, relationTargetRelative, relationTargetPinned, relationTargetStatus, relationTargetAnalysis, fixRelationTarget, followActiveRelationTarget, backlinks, mentions, canReturnFromRelation, navigateToRelation, returnFromRelation, reveal, followLink, followMarkdownLink, mutating, moveWithReferences, restoreReferences }
 })

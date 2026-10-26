@@ -35,6 +35,8 @@ import { usePaneEditor } from '@/services/editor-panes'
 import { AGENT_WRITING_COMMANDS, agentWritingCommandLabel } from '@/services/agent-m1-copy'
 import { useAgentStore } from '@/stores/agent'
 import { useNotebookStore } from '@/stores/notebook'
+import { useNotificationStore } from '@/stores/notification'
+import { isExternalDocumentLink } from '@/services/document-link'
 import { markdownSelection } from '@/services/agent'
 import { analyzeNote } from '@/services/note-index'
 import { fuzzyScore } from '@/services/notebook'
@@ -83,6 +85,29 @@ const props = withDefaults(defineProps<{ paneId?: string }>(), { paneId: 'main' 
 const { editor, isActive } = usePaneEditor(props.paneId)
 const agent = useAgentStore()
 const notebook = useNotebookStore()
+const notify = useNotificationStore()
+function openDocumentLink(href: string) {
+  editor.activatePane(props.paneId)
+  // Capture-phase navigation bypasses Muya's document-click cleanup. Close the
+  // source link popup so it cannot cover a link in the destination document.
+  muyaRef.value?.linkTools?.hide()
+  const operation = isExternalDocumentLink(href) ? openExternal(href) : notebook.followMarkdownLink(href)
+  void operation.catch(error => {
+    notebook.error = String(error)
+    notify.pushToast({ type: 'error', message: String(error) })
+  })
+}
+function captureLinkClick(event: MouseEvent) {
+  const anchor = event.target instanceof Element ? event.target.closest('a[href]') : null
+  if (!anchor || anchor.classList.contains('ag-footnote-backlink')) return
+  // Even a plain edit click must not navigate the WebView or spawn a browser tab.
+  event.preventDefault()
+  if (event.type === 'auxclick' || !(event.ctrlKey || event.metaKey)) return
+  const href = anchor.getAttribute('href')
+  if (!href) return
+  event.stopPropagation()
+  openDocumentLink(href)
+}
 const wikiCompletion = ref<{ id: string; markdown: string; from: number; to: number; options: string[]; selected: number } | null>(null)
 function refreshWikiCompletion(event: KeyboardEvent) {
   if (event.isComposing || ['ArrowDown','ArrowUp','Enter','Tab','Escape'].includes(event.key) || editor.sourceCodeMode || !isActive.value) return
@@ -386,12 +411,7 @@ async function loadMuya() {
     Muya.use(ImageToolbar)
     Muya.use(FormatPicker)
     Muya.use(FrontMenu)
-    Muya.use(LinkTools, {
-      jumpClick: (linkInfo: { href?: string }) => {
-        const href = linkInfo?.href
-        if (href) void openExternal(href)
-      },
-    })
+    Muya.use(LinkTools)
     Muya.use(FootnoteTool)
     Muya.use(TableBarTools)
     Muya.__pluginsRegistered = true
@@ -535,14 +555,7 @@ async function construct() {
     const isOsx = navigator.platform.toLowerCase().includes('mac')
     const ctrlOrMeta = (isOsx && event.metaKey) || (!isOsx && event.ctrlKey)
     if (!ctrlOrMeta) return
-    if (formatType === 'link' && typeof data === 'object' && data.href) {
-      if (!/^(?:[\w+.-]+:|\/\/)/.test(data.href)) {
-        const notebook = useNotebookStore(); const source = notebook.currentNote?.relative
-        if (source) void notebook.followLink(source, { kind: 'markdown', target: data.href }).catch(e => { notebook.error = String(e) })
-        return
-      }
-      void openExternal(data.href)
-    } else if (formatType === 'image' && typeof data === 'string' && data) {
+    if (formatType === 'image' && typeof data === 'string' && data) {
       bus.emit('image-preview/open', { src: data })
     }
   })
@@ -559,10 +572,7 @@ async function construct() {
     muya.linkTools.selectItem = (event: MouseEvent, item: unknown) => { editor.activatePane(props.paneId); selectItem(event, item) }
     muya.linkTools.options.jumpClick = (linkInfo: { href?: string }) => {
       const href = linkInfo.href; if (!href) return
-      if (/^(?:[\w+.-]+:|\/\/)/.test(href)) { void openExternal(href); return }
-      editor.activatePane(props.paneId)
-      const source = notebook.currentNote?.relative
-      if (source) void notebook.followLink(source, { kind: 'markdown', target: href }).catch(e => { notebook.error = String(e) })
+      openDocumentLink(href)
     }
   }
   editor.setMuyaInstance(muya)
@@ -878,7 +888,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="muya-host" data-editor-shortcut-scope="true" :style="{ '--muya-quick-insert-hint': JSON.stringify(t('quickInsert.hint')) }" @keyup="refreshWikiCompletion" @keydown.capture="wikiKey" @click="followWiki">
+  <div class="muya-host" data-editor-shortcut-scope="true" :style="{ '--muya-quick-insert-hint': JSON.stringify(t('quickInsert.hint')) }" @keyup="refreshWikiCompletion" @keydown.capture="wikiKey" @click.capture="captureLinkClick" @auxclick.capture="captureLinkClick" @click="followWiki">
     <div v-if="wikiCompletion?.options.length" class="wiki-options" role="listbox">
       <button v-for="(option, i) in wikiCompletion.options" :key="option" role="option" :aria-selected="wikiCompletion.selected === i" @pointerdown.prevent="chooseWiki(option)">{{ option }}</button>
     </div>

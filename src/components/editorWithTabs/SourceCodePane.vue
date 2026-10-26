@@ -151,11 +151,13 @@ const baseExtensions = (): Extension[] => [
   EditorView.domEventHandlers({ click(event, view) {
     if (!(event.ctrlKey || event.metaKey)) return false
     const position = view.posAtCoords({ x: event.clientX, y: event.clientY })
-    const notebook = useNotebookStore(); const source = notebook.currentNote?.relative
-    if (position === null || !source) return false
+    const notebook = useNotebookStore(); const source = notebook.currentNote?.relative ?? ''
+    if (position === null) return false
     const link = analyzeNote(source, view.state.doc.toString()).links.find(l => position >= (l.sourceFrom ?? l.from) && position <= (l.sourceTo ?? l.to))
     if (!link) return false
-    event.preventDefault(); void notebook.followLink(source, link).catch(e => { notebook.error = String(e) }); return true
+    event.preventDefault()
+    const operation = link.kind === 'markdown' ? notebook.followMarkdownLink(link.target) : notebook.followLink(source, link)
+    void operation.catch(e => { notebook.error = String(e) }); return true
   } }),
   lineNumbers(),
   highlightActiveLine(),
