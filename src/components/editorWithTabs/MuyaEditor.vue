@@ -108,6 +108,16 @@ function captureLinkClick(event: MouseEvent) {
   event.stopPropagation()
   openDocumentLink(href)
 }
+function handleEditorClick(event: MouseEvent) {
+  if (event.target instanceof Element && event.target.closest('a[href]')) {
+    // The shell plugin's body listener ignores defaultPrevented and opens any
+    // _blank HTTP href, including WebView-resolved relative document links.
+    // Stop bubbling after Muya has handled the normal editing click.
+    event.stopPropagation()
+    return
+  }
+  followWiki(event)
+}
 const wikiCompletion = ref<{ id: string; markdown: string; from: number; to: number; options: string[]; selected: number } | null>(null)
 function refreshWikiCompletion(event: KeyboardEvent) {
   if (event.isComposing || ['ArrowDown','ArrowUp','Enter','Tab','Escape'].includes(event.key) || editor.sourceCodeMode || !isActive.value) return
@@ -652,6 +662,7 @@ function loadFile(tab: DocumentState, persistCurrent = true) {
   // setMarkdown round-trip's dispatchChange fires under the *old* tab id.
   activeBoundId.value = null
   boundMarkdown = tab.markdown
+  muya.linkTools?.hide()
   muya.setOptions({ baseUrl: tab.pathname })
   muya.clearHistory()
   if (tab.cursor) {
@@ -760,7 +771,9 @@ function withVisibleMuya(fn: (muya: any) => void) {
 }
 
 function centerMuyaSelection() {
-  const root = editorRoot.value
+  // Muya replaces the Vue mount element during construction; the template ref
+  // still points to that detached node. Use the live editable container.
+  const root = muyaRef.value?.container as HTMLElement | undefined
   const focusNode = document.getSelection()?.focusNode
   const element = focusNode instanceof Element ? focusNode : focusNode?.parentElement
   if (!root || !element || !root.contains(element)) return
@@ -888,7 +901,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="muya-host" data-editor-shortcut-scope="true" :style="{ '--muya-quick-insert-hint': JSON.stringify(t('quickInsert.hint')) }" @keyup="refreshWikiCompletion" @keydown.capture="wikiKey" @click.capture="captureLinkClick" @auxclick.capture="captureLinkClick" @click="followWiki">
+  <div class="muya-host" data-editor-shortcut-scope="true" :style="{ '--muya-quick-insert-hint': JSON.stringify(t('quickInsert.hint')) }" @keyup="refreshWikiCompletion" @keydown.capture="wikiKey" @click.capture="captureLinkClick" @auxclick.capture="captureLinkClick" @click="handleEditorClick">
     <div v-if="wikiCompletion?.options.length" class="wiki-options" role="listbox">
       <button v-for="(option, i) in wikiCompletion.options" :key="option" role="option" :aria-selected="wikiCompletion.selected === i" @pointerdown.prevent="chooseWiki(option)">{{ option }}</button>
     </div>

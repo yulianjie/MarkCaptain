@@ -246,6 +246,15 @@ export const useNotebookStore = defineStore('notebook', () => {
     }
   }
   function revealRelationTarget(tab: { id: string; pathname: string; markdown: string }, from: number, to: number) {
+    // Muya restores a source cursor by inserting markers before parsing. A
+    // marker before an ATX heading's # makes it parse as a paragraph instead.
+    // Put a collapsed visual cursor after the heading prefix, preserving both
+    // the heading and the target's DOM selection for scrolling.
+    if (!editor.sourceCodeMode && from === to) {
+      const lineStart = tab.markdown.lastIndexOf('\n', from - 1) + 1
+      const prefix = /^(#{1,6})[\t ]+/.exec(tab.markdown.slice(lineStart))
+      if (prefix && from < lineStart + prefix[0].length) from = to = lineStart + prefix[0].length
+    }
     bus.emit('reveal-search-hit', createSearchRevealRequest({
       tabId: tab.id, path: tab.pathname, mode: editor.sourceCodeMode ? 'source' : 'wysiwyg',
       line: 1, column: 1, length: 0, exactRange: { markdown: tab.markdown, from, to },

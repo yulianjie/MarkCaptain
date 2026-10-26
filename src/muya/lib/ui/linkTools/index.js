@@ -26,6 +26,7 @@ class LinkTools extends BaseFloat {
     this.options = opts
     this.icons = icons
     this.hideTimer = null
+    this.showTimer = null
     const linkContainer = this.linkContainer = document.createElement('div')
     this.container.appendChild(linkContainer)
     this.listen()
@@ -37,7 +38,10 @@ class LinkTools extends BaseFloat {
     eventCenter.subscribe('muya-link-tools', ({ reference, linkInfo }) => {
       if (reference) {
         this.linkInfo = linkInfo
-        setTimeout(() => {
+        clearTimeout(this.showTimer)
+        this.showTimer = setTimeout(() => {
+          this.showTimer = null
+          if (!this.muya.contentState.getBlock(linkInfo.key)) return
           this.show(reference)
           this.render()
         }, 0)
@@ -63,6 +67,19 @@ class LinkTools extends BaseFloat {
 
     eventCenter.attachDOMEvent(this.container, 'mouseover', mouseOverHandler)
     eventCenter.attachDOMEvent(this.container, 'mouseleave', mouseOutHandler)
+  }
+
+  hide () {
+    clearTimeout(this.showTimer)
+    clearTimeout(this.hideTimer)
+    this.showTimer = null
+    this.hideTimer = null
+    super.hide()
+  }
+
+  destroy () {
+    this.hide()
+    super.destroy()
   }
 
   render () {
