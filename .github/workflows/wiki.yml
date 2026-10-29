@@ -1,0 +1,83 @@
+name: Wiki
+
+# docs/wiki is the source of truth for the GitHub Wiki. Every push to master
+# that touches it mirrors the folder into <repo>.wiki.git, including deleted
+# pages. Edit pages in docs/wiki, not on the Wiki website.
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'docs/wiki/**'
+      - '.github/workflows/wiki.yml'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Overwrite Wiki edits that were never committed to docs/wiki'
+        type: boolean
+        default: false
+
+# GITHUB_TOKEN can push to this repository's own wiki with contents: write.
+permissions:
+  contents: write
+
+# One sync at a time; a newer queued run replaces an older queued one.
+concurrency:
+  group: wiki-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Sync docs/wiki to GitHub Wiki
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out docs/wiki
+        uses: actions/checkout@v4
+        with:
+          # Always publish the latest master, even when re-running an older run.
+          ref: master
+          path: source
+          # Full history (blobless via sparse checkout) lets the guard below
+          # recognise every docs/wiki version that was ever committed.
+          fetch-depth: 0
+          sparse-checkout: docs/wiki
+          persist-credentials: false
+
+      - name: Check out GitHub Wiki
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}.wiki
+          path: wiki
+
+      - name: Refuse to overwrite edits made on the Wiki website
+        if: ${{ !inputs.force }}
+        run: |
+          wiki_tree=$(git -C wiki rev-parse 'HEAD^{tree}')
+          for commit in $(git -C source rev-list HEAD -- docs/wiki); do
+            if [ "$(git -C source rev-parse -q --verify "$commit:docs/wiki")" = "$wiki_tree" ]; then
+              echo "Wiki matches docs/wiki at $commit."
+              exit 0
+            fi
+          done
+          echo "::error::The Wiki has edits that were never committed to docs/wiki. Move the edits you want to keep into docs/wiki, then run this workflow manually with 'force'."
+          exit 1
+
+      - name: Publish docs/wiki
+        run: |
+          git -C wiki rm -rq --ignore-unmatch .
+          cp -R source/docs/wiki/. wiki/
+          git -C wiki add -A
+          if git -C wiki diff --cached --quiet; then
+            echo "Wiki is already up to date."
+            # Still prove the token can push, so permission problems show up now
+            # rather than on the next documentation change.
+            git -C wiki push --dry-run origin HEAD:master
+            exit 0
+          fi
+          git -C wiki \
+            -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -q \
+            -m "$(git -C source log -1 --format=%s -- docs/wiki)" \
+            -m "Synced from docs/wiki at ${GITHUB_REPOSITORY}@$(git -C source rev-parse HEAD)."
+          git -C wiki push origin HEAD:master
+          git -C wiki -c core.quotepath=false show --stat --format='Published %h: %s' HEAD

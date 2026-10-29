@@ -31,7 +31,9 @@
 
 ## Wiki 维护
 
-用户 Wiki 的源文件位于 `docs/wiki`，同时发布到 GitHub Wiki。页面之间统一使用 `https://github.com/yulianjie/MarkCaptain/wiki/...` 绝对地址，便于从仓库、Pages 或 Wiki 阅读时跳转。
+用户 Wiki 的源文件位于 `docs/wiki`。推送 master 后，`.github/workflows/wiki.yml` 会把该目录原样同步到 GitHub Wiki，包括删除页面，因此不要直接在 Wiki 网页上编辑。如果 Wiki 上存在 `docs/wiki` 历史中从未出现过的修改，同步会失败而不会覆盖；把需要保留的内容移入 `docs/wiki` 并推送后，在 Actions 中手动运行 Wiki 工作流并勾选 `force`。
+
+页面之间统一使用 `https://github.com/yulianjie/MarkCaptain/wiki/...` 绝对地址，便于从仓库、Pages 或 Wiki 阅读时跳转。
 
 - 发布新版本时，同步更新 `Home.md`、`功能总览.md`、`使用指南.md`、`常见问题.md` 与 `User-Guide.md` 中的版本号。
 - 新增页面时同时更新首页表格、`_Sidebar.md` 以及中英文指南中的链接。
