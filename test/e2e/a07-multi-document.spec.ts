@@ -55,6 +55,12 @@ test.beforeEach(({ page }) => {
 })
 test.afterEach(({ page }) => { expect(errors.get(page)).toEqual([]) })
 
+async function openMultiDocument(page: Page) {
+  const tools = page.locator('.agent-tools-toggle')
+  if (await tools.getAttribute('aria-expanded') !== 'true') await tools.click()
+  await page.getByTestId('agent-multi-open').click()
+}
+
 async function setup(page: Page, source: boolean) {
   await page.addInitScript(() => localStorage.clear())
   await page.route('**/src/services/agent-transport.ts*', route => route.fulfill({ contentType: 'text/javascript', body: transportFixture }))
@@ -98,7 +104,7 @@ async function setup(page: Page, source: boolean) {
     ;(await import('/src/stores/preferences.ts')).usePreferencesStore().autoSave = true
   })
   await page.getByRole('button', { name: /^AI assistant(?: \(.+\))?$/ }).click()
-  await page.getByTestId('agent-multi-open').click()
+  await openMultiDocument(page)
   await expect(page.getByTestId('agent-multi-dialog')).toBeVisible()
   return ids
 }
@@ -144,7 +150,7 @@ for (const source of [false, true]) {
     await expect.poll(() => contents(page)).toEqual([original[0], original[1].replace('Beta', 'Beta revised'), original[2]])
     await page.keyboard.press('Control+Shift+z')
     await expect.poll(() => contents(page)).toEqual([original[0].replace('Alpha', 'Alpha revised'), original[1].replace('Beta', 'Beta revised'), original[2]])
-    await page.getByTestId('agent-multi-open').click()
+    await openMultiDocument(page)
     await cards.nth(1).getByTestId('agent-multi-revert').click()
     await expect.poll(() => contents(page)).toEqual([original[0].replace('Alpha', 'Alpha revised'), original[1], original[2]])
     expect(await page.evaluate(() => window.__a07Saves)).toEqual([])

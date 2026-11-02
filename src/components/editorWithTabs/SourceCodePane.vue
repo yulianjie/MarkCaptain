@@ -465,8 +465,8 @@ onBeforeUnmount(() => {
 .cm-host {
   flex: 1;
   overflow: auto;
-  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
-  font-size: 13px;
+  font-family: var(--mt-code-font, ui-monospace, 'Cascadia Code', Consolas, monospace);
+  font-size: var(--mt-code-font-size, 13px);
   background: var(--mt-bg, #fff);
   color: var(--mt-fg, #24292e);
 }
@@ -490,7 +490,7 @@ onBeforeUnmount(() => {
   background: var(--mt-row-hover, #f6f8fa);
 }
 .cm-host :deep(.cm-content) {
-  padding: 24px 0;
+  padding: 30px 0 64px;
 }
 .cm-host :deep(.cm-line) { padding-inline: 12px 24px; }
 </style>

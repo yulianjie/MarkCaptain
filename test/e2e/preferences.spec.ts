@@ -41,4 +41,59 @@ test.describe('preferences window', () => {
       for (const label of labels) await expect(page.locator('#prefs-panel-keybindings')).toContainText(label)
     }
   })
+
+  test('theme cards persist preferences and follow system appearance', async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'light' })
+    // Vite may serve the application's module with an HMR timestamp. Importing
+    // the queryless URL would create a second module-local browser preference
+    // cache and read unrelated empty state instead of the application's writes.
+    const invokeModule = page.waitForResponse(response =>
+      new URL(response.url()).pathname === '/src/services/tauri-invoke.ts',
+    )
+    await page.goto('/#/preferences')
+    const invokeModuleUrl = (await invokeModule).url()
+    await page.locator('#prefs-tab-theme').click()
+
+    const persistedTheme = () => page.evaluate(async path => {
+      const values = await (await import(path)).getPreferences()
+      return { theme: values.theme, autoSwitchTheme: values.autoSwitchTheme }
+    }, invokeModuleUrl)
+    const dark = page.locator('.theme-choice-dark')
+    const light = page.locator('.theme-choice-light')
+    const system = page.locator('.theme-choice-system')
+    const themeSelector = page.locator('#prefs-panel-theme .el-select').first()
+
+    await dark.click()
+    await expect(dark).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+    await expect.poll(persistedTheme).toEqual({ theme: 'dark', autoSwitchTheme: 2 })
+
+    await system.click()
+    await expect(system).toHaveAttribute('aria-pressed', 'true')
+    await expect.poll(persistedTheme).toEqual({ theme: 'dark', autoSwitchTheme: 1 })
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
+    await expect(themeSelector.locator('.el-select__wrapper')).toHaveClass(/is-disabled/)
+    await page.emulateMedia({ colorScheme: 'dark' })
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+
+    await light.click()
+    await expect(light).toHaveAttribute('aria-pressed', 'true')
+    await expect.poll(persistedTheme).toEqual({ theme: 'light', autoSwitchTheme: 2 })
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
+    await expect(themeSelector.locator('.el-select__wrapper')).not.toHaveClass(/is-disabled/)
+  })
+
+  test('keeps every settings section usable in a narrow window', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 740 })
+    await page.goto('/#/preferences')
+    const sections = ['general', 'editor', 'markdown', 'theme', 'image', 'cloud', 'spellchecker', 'view', 'search', 'keybindings']
+    await expect(page.getByRole('tablist')).toHaveAttribute('aria-orientation', 'horizontal')
+    for (const id of sections) {
+      await page.locator(`#prefs-tab-${id}`).click()
+      const panel = page.locator(`#prefs-panel-${id}`)
+      await expect(panel).toBeVisible()
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)
+      expect(await page.locator('.prefs-body').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
+    }
+  })
 })

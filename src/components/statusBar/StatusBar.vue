@@ -226,11 +226,11 @@ onMounted(() => { void cloud.load() })
   container-type: inline-size;
   flex: 0 0 auto;
   min-width: 0;
-  height: 24px;
+  height: 28px;
   overflow-x: auto;
   overflow-y: hidden;
   color: var(--mt-fg-muted, #6a737d);
-  background: var(--mt-sidebar-bg, #fafbfc);
+  background: var(--mt-bg);
   border-top: 1px solid var(--mt-border, #e1e4e8);
   font-size: 11px;
   line-height: 1;
@@ -247,7 +247,7 @@ onMounted(() => { void cloud.load() })
   width: max-content;
   min-width: 100%;
   height: 100%;
-  padding: 0 12px;
+  padding: 0 19px;
   box-sizing: border-box;
 }
 
@@ -302,16 +302,16 @@ onMounted(() => { void cloud.load() })
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: #2da44e;
+  background: var(--mt-accent);
 }
-.save-state.dirty .state-dot { background: #bf8700; }
+.save-state.dirty .state-dot { background: var(--mt-warning); }
 .save-state.empty .state-dot { background: var(--mt-fg-muted, #8c959f); }
 .cloud-state { gap: 6px; }
 .cloud-state.pending .state-dot,
-.cloud-state.syncing .state-dot { background: #0969da; }
+.cloud-state.syncing .state-dot { background: var(--mt-info); }
 .cloud-state.offline .state-dot { background: var(--mt-fg-muted, #8c959f); }
 .cloud-state.conflict .state-dot,
-.cloud-state.error .state-dot { background: #cf222e; }
+.cloud-state.error .state-dot { background: var(--mt-error); }
 
 .mode-label { gap: 12px; }
 .mode-label::before {

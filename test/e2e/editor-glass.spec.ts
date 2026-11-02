@@ -27,7 +27,7 @@ test('outline inspector and navigation sidebar can be toggled independently', as
 
 test('all built-in themes tint native chrome and retain readable icon states', async ({ page }) => {
   await seed(page)
-  await page.locator('.rail-icon.active').evaluate(element => { (element as HTMLElement).style.transition = 'none' })
+  await page.locator('.navigation-tabs button.active').evaluate(element => { (element as HTMLElement).style.transition = 'none' })
   for (const theme of ['light', 'dark', 'one-dark', 'material-dark', 'graphite-light', 'ulysses-light', 'github-blue']) {
     await page.evaluate(value => {
       document.documentElement.dataset.theme = value
@@ -44,7 +44,7 @@ test('all built-in themes tint native chrome and retain readable icon states', a
     })
     expect(alpha).toBeGreaterThan(dark ? 0.93 : 0.84)
     expect(alpha).toBeLessThan(1)
-    const active = page.locator('.rail-icon.active')
+    const active = page.locator('.navigation-tabs button.active')
     const selectedColor = await active.evaluate(element => getComputedStyle(element).color)
     await active.hover()
     await expect(active).toHaveCSS('color', selectedColor)
@@ -92,7 +92,14 @@ test('native glass exposes the desktop through chrome but keeps the document opa
     expect(alpha).toBeGreaterThan(0)
     expect(alpha).toBeLessThan(255)
   }
-  await expect(page.locator('.editor-column')).toHaveCSS('background-color', 'rgb(255, 255, 255)')
+  const documentBackground = await page.locator('.editor-column').evaluate(element => {
+    const context = document.createElement('canvas').getContext('2d')!
+    context.fillStyle = getComputedStyle(element).backgroundColor
+    context.fillRect(0, 0, 1, 1)
+    return [...context.getImageData(0, 0, 1, 1).data]
+  })
+  expect(documentBackground[3]).toBe(255)
+  await expect(page.locator('.editor-column')).toHaveCSS('background-color', 'rgb(253, 252, 249)')
   await page.emulateMedia({ forcedColors: 'active' })
   await expect(page.locator('.editor-page')).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
 })
@@ -174,7 +181,7 @@ async function seed(page: Page, showInspector = true) {
     const tab = editor.newUntitledTab(content)
     tab.filename = 'SKILL.md'
     const layout = useLayoutStore()
-    layout.navigationPanel = 'files'
+    layout.navigationPanel = window.innerWidth <= 900 ? '' : 'files'
     layout.inspectorPanel = 'outline'
     layout.showInspector = showInspector
   }, { content: markdown, showInspector })
@@ -186,7 +193,7 @@ test('glass outline filters, expands, navigates and tracks real scroll', async (
   await page.setViewportSize({ width: 1512, height: 1040 })
   await seed(page)
   await expect(page.locator('.title-bar [role="menuitem"]')).toHaveCount(8)
-  await expect(page.locator('.breadcrumb')).toHaveCount(0)
+  await expect(page.locator('.document-breadcrumb')).toContainText('SKILL.md')
 
   const branch = page.getByRole('button', { name: '折叠 场景一：明确关键词搜索', exact: true })
   await branch.click()
@@ -252,4 +259,67 @@ test('search remains reachable in a narrow window and dark theme', async ({ page
   })
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
   await page.screenshot({ path: 'output/design/markcaptain-glass-dark-800.png', animations: 'disabled' })
+})
+
+test('outline progress stays at the panel bottom while short and long outlines scroll independently', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 600 })
+  await seed(page)
+  const shortOutline = '# Short document\n\n## First\n\nA paragraph.\n\n## Second\n\nAnother paragraph.'
+  const longOutline = '# Long document\n\n' + Array.from({ length: 60 }, (_, index) => `## Section ${index + 1}\n\nA paragraph under this heading.`).join('\n\n')
+  let previousWidth = 1440
+  for (const width of [1440, 1280, 1024, 768]) {
+    await page.setViewportSize({ width, height: 600 })
+    // The component collapses only when crossing into drawer mode. Wait for
+    // that resize transition before deciding whether the rail needs opening.
+    if (width <= 1180 && previousWidth > 1180) await expect(page.locator('.document-inspector-rail')).toBeVisible()
+    previousWidth = width
+    if (await page.locator('.document-inspector-rail').count()) await page.locator('.document-inspector-rail .rail-tab').first().click()
+    for (const [content, count] of [[shortOutline, 3], [longOutline, 61]] as const) {
+      await page.evaluate(async markdown => {
+        const path = '/src/stores/editor.ts'
+        const { useEditorStore } = await import(path)
+        useEditorStore().newUntitledTab(markdown)
+      }, content)
+      await expect(page.locator('.toc-row')).toHaveCount(count)
+      const geometry = await page.locator('.toc-pane').evaluate(element => {
+        const panel = element.closest('.document-inspector')!.getBoundingClientRect()
+        const footer = element.querySelector('.toc-progress')!.getBoundingClientRect()
+        const list = element.querySelector('.toc-list')!.getBoundingClientRect()
+        return { panel: { top: panel.top, bottom: panel.bottom }, footer: { top: footer.top, bottom: footer.bottom }, list: { top: list.top, bottom: list.bottom } }
+      })
+      expect(geometry.footer.bottom, `footer bottom at ${width}px / ${count} headings`).toBeCloseTo(geometry.panel.bottom, 0)
+      expect(geometry.footer.top).toBeGreaterThanOrEqual(geometry.panel.top)
+      expect(geometry.list.bottom).toBeLessThanOrEqual(geometry.footer.top + 1)
+      expect(geometry.list.bottom - geometry.list.top).toBeGreaterThan(100)
+      await page.locator('.toc-list').evaluate(element => { element.scrollTop = element.scrollHeight })
+      if (count > 3) await expect.poll(() => page.locator('.toc-list').evaluate(element => element.scrollTop)).toBeGreaterThan(0)
+      const after = await page.locator('.toc-progress').boundingBox()
+      expect(after!.y).toBeCloseTo(geometry.footer.top, 0)
+      expect(after!.y + after!.height).toBeCloseTo(geometry.footer.bottom, 0)
+      await expect(page.locator('.toc-progress progress')).toBeInViewport()
+    }
+  }
+})
+
+test('narrow inspector contains keyboard focus and Escape restores the inspector rail', async ({ page }) => {
+  await page.setViewportSize({ width: 768, height: 600 })
+  await seed(page, false)
+  await page.locator('.document-inspector-rail .rail-tab').first().click()
+  await expect(page.locator('.inspector-tab').first()).toBeFocused()
+  const focusables = page.locator('.document-inspector :is(button, input, textarea, select, [tabindex]):not([tabindex="-1"]):visible:not([disabled])')
+  await focusables.last().focus()
+  await page.keyboard.press('Tab')
+  await expect(page.locator('.inspector-tab').first()).toBeFocused()
+  await page.keyboard.press('Shift+Tab')
+  await expect(focusables.last()).toBeFocused()
+  const search = page.locator('.toc-search input')
+  await search.fill('场景')
+  await search.press('Escape')
+  await expect(search).toHaveValue('')
+  await expect(search).toBeFocused()
+  await expect(page.locator('.document-inspector')).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.locator('.document-inspector')).toHaveCount(0)
+  await expect(page.locator('.document-inspector-rail .rail-tab').first()).toBeFocused()
+  await expect(page.locator('.muya-host [contenteditable="true"]')).toBeInViewport()
 })

@@ -5,7 +5,8 @@
  * Owns the keyboard shortcuts, the file-association open-on-launch handoff,
  * the native menu action router, and webview drag-drop file opens.
  */
-import { onBeforeUnmount, onMounted, ref, watch, type WatchStopHandle } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type WatchStopHandle } from 'vue'
+import { ChevronDown, ChevronRight, FileText } from '@lucide/vue'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { ElMessageBox } from 'element-plus'
@@ -25,6 +26,8 @@ import CommandPalette from '@/components/commandPalette/CommandPalette.vue'
 import NotebookDialogs from '@/components/notebook/NotebookDialogs.vue'
 import HistoryLayouts from '@/components/notebook/HistoryLayouts.vue'
 import { useNotebookStore } from '@/stores/notebook'
+import WelcomePanel from '@/components/welcome/WelcomePanel.vue'
+import { useWorkspaceCopy } from '@/components/welcome/workspace-copy'
 import AboutDialog from '@/components/about/AboutDialog.vue'
 import RenameDialog from '@/components/rename/RenameDialog.vue'
 import RecentDialog from '@/components/recent/RecentDialog.vue'
@@ -100,6 +103,25 @@ const notify = useNotificationStore()
 const keys = useKeybindingsStore()
 const project = useProjectStore()
 const notebook = useNotebookStore()
+const workspaceCopy = useWorkspaceCopy()
+const welcomeVisible = ref(false)
+const stopDocumentActivation = editor.$onAction(({ name }) => {
+  if (name === 'setCurrent' || name === 'openFile' || name === 'newUntitledTab' || name === 'activatePane') welcomeVisible.value = false
+})
+function revealEditorCommand() {
+  welcomeVisible.value = false
+  if (window.innerWidth <= 900) layout.setNavigationPanel('')
+  if (window.innerWidth <= 1180) layout.showInspector = false
+}
+const stopFindActivation = bus.on('request-find-replace', revealEditorCommand)
+watch(() => editor.findReplaceOpen, visible => { if (visible) welcomeVisible.value = false })
+const documentDirectory = computed(() => {
+  const pathname = editor.currentFile?.pathname
+  if (!pathname) return workspaceCopy.value.document
+  const parts = pathname.split(/[\\/]/).filter(Boolean)
+  return parts.at(-2) || workspaceCopy.value.document
+})
+watch(() => editor.currentFileId, () => { welcomeVisible.value = false })
 
 const dragOver = ref(false)
 const restoredSessionTabIdsByIndex = ref<Record<number, string>>({})
@@ -656,6 +678,12 @@ async function routeMenuAction(id: string, source: MenuActionSource = 'menu'): P
 
 async function executeMenuAction(id: string, source: MenuActionSource = 'menu'): Promise<void> {
   try {
+    if (welcomeVisible.value && editor.currentFile && (
+      id.startsWith('edit.') || id.startsWith('paragraph.') || id.startsWith('format.') || id === 'view.toggleSourceCode'
+    )) {
+      revealEditorCommand()
+      await nextTick()
+    }
     await routeMenuAction(id, source)
   } catch (error) {
     notify.pushToast({
@@ -835,6 +863,8 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  stopDocumentActivation()
+  stopFindActivation()
   startupAbortController?.abort()
   window.removeEventListener('keydown', onKey)
   window.removeEventListener('keydown', onApplicationKey, true)
@@ -856,13 +886,18 @@ onBeforeUnmount(() => {
   <div class="editor-page" :class="{ 'drag-over': dragOver }">
     <TitleBar />
     <div class="page-body">
-      <SideBar v-if="layout.showSideBar" />
+      <SideBar v-if="layout.showSideBar" @home="welcomeVisible = true" @opened="welcomeVisible = false" />
       <div class="editor-column">
-        <TabsBar v-if="layout.showTabBar" />
-        <EditorToolbar v-if="layout.showToolBar" />
+        <TabsBar v-if="layout.showTabBar" @click="welcomeVisible = false" />
+        <div v-if="editor.currentFile && !welcomeVisible" class="document-location">
+          <div class="document-breadcrumb" :title="editor.currentFile.pathname || editor.currentFile.filename"><span>{{ documentDirectory }}</span><ChevronRight :size="12" /><FileText :size="13" /><strong>{{ editor.currentFile.filename }}</strong></div>
+          <button type="button" class="format-toggle" :title="workspaceCopy.format" :aria-label="workspaceCopy.format" :aria-expanded="layout.showToolBar" @click="layout.toggleToolBar()"><span>Aa</span><ChevronDown :size="12" /></button>
+        </div>
+        <EditorToolbar v-if="layout.showToolBar && editor.currentFile && !welcomeVisible" />
         <div class="editor-stage">
-          <EditorPanes :restored-session-tab-ids-by-index="restoredSessionTabIdsByIndex" />
-          <FindReplaceBar />
+          <WelcomePanel v-if="!editor.tabs.length || welcomeVisible" @open="welcomeVisible = false; doOpen()" @folder="doOpenFolder()" @opened="welcomeVisible = false" />
+          <EditorPanes v-show="editor.tabs.length && !welcomeVisible" :restored-session-tab-ids-by-index="restoredSessionTabIdsByIndex" />
+          <div v-show="!welcomeVisible" class="find-layer"><FindReplaceBar /></div>
         </div>
       </div>
       <DocumentInspector>
@@ -903,6 +938,7 @@ onBeforeUnmount(() => {
 .editor-page:has(.title-bar.is-maximized),
 .editor-page:has(.mac-title-bar) { border-radius: 0; }
 .page-body {
+  position: relative;
   display: flex;
   flex: 1;
   min-height: 0;
@@ -924,17 +960,29 @@ onBeforeUnmount(() => {
   position: relative;
   overflow: hidden;
 }
+.document-location { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 43px; padding: 0 25px; flex-shrink: 0; background: var(--mt-bg); color: var(--mt-fg-muted); }
+.find-layer { position: absolute; inset: 0; pointer-events: none; }
+.find-layer :deep(.find-bar) { pointer-events: auto; }
+.document-breadcrumb { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 11px; }
+.document-breadcrumb > span { max-width: 30%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.document-breadcrumb > svg { flex-shrink: 0; opacity: .7; }
+.document-breadcrumb strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 400; color: var(--mt-fg); }
+.format-toggle { display: inline-flex; align-items: center; gap: 5px; height: 27px; flex-shrink: 0; padding: 0 7px; border: 0; border-radius: 5px; background: transparent; color: var(--mt-fg-muted); cursor: pointer; }
+.format-toggle > span { font-family: Georgia, serif; font-size: 15px; }
+.format-toggle:hover, .format-toggle[aria-expanded="true"] { background: var(--mt-row-hover); color: var(--mt-accent); }
+.format-toggle:focus-visible { outline: 2px solid var(--mt-accent); outline-offset: 1px; }
+@media (max-width: 900px) { .document-location { padding-inline: 18px; } }
 .drop-veil {
   position: absolute;
   inset: 0;
-  background: rgba(3, 102, 214, 0.10);
-  border: 2px dashed rgba(3, 102, 214, 0.55);
+  background: color-mix(in srgb, var(--mt-accent) 10%, transparent);
+  border: 2px dashed var(--mt-accent);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 18px;
   font-weight: 500;
-  color: #0366d6;
+  color: var(--mt-accent);
   pointer-events: none;
   z-index: 100;
 }

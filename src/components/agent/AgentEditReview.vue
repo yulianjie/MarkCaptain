@@ -23,8 +23,8 @@ function preview(change: ReviewedChange) {
 </script>
 
 <template>
-  <section class="agent-edit">
-    <strong>{{ edit.title }}</strong>
+  <section class="agent-edit" :class="{ 'agent-edit-stale': stale, 'agent-edit-locked': readOnly }">
+    <header class="agent-edit-header"><div><small>{{ t('agent.reviewFirst') }}</small><strong>{{ edit.title }}</strong></div><span>{{ edit.changes.length }}</span></header>
     <p v-if="edit.documentChanged" class="agent-muted" role="status">{{ t('agent.reviewDocumentChanged') }}</p>
     <p v-if="edit.rebasedFrom" class="agent-muted" role="status">{{ t('agent.reviewRebased') }}</p>
     <p v-if="edit.rebasedTo" class="agent-muted" role="status">{{ t('agent.reviewSuperseded') }}</p>
@@ -39,24 +39,29 @@ function preview(change: ReviewedChange) {
       <button type="button" :disabled="!agent.canRegenerateReview(edit)" @click="agent.regenerateReview(edit)">{{ t('agent.regenerateReview') }}</button>
     </footer>
     <p v-if="edit.locked" class="agent-muted">{{ t('agent.history.locked') }}</p>
-    <div v-for="(change, index) in edit.changes" :key="change.id" class="agent-edit-change agent-change" :data-change-id="change.id">
+    <div v-for="(change, index) in edit.changes" :key="change.id" class="agent-edit-change agent-change" :data-change-id="change.id" :data-status="change.status">
       <details open>
-        <summary>{{ t('agent.viewChanges') }} · {{ t('agent.changeLines', { start: change.startLine, end: change.endLine }) }}</summary>
+        <summary><span class="agent-change-number">{{ String(index + 1).padStart(2, '0') }}</span>{{ t('agent.changeLines', { start: change.startLine, end: change.endLine }) }}<span class="agent-change-view">{{ t('agent.viewChanges') }}</span></summary>
         <AgentDiffView :change="change" :locale="locale" />
       </details>
-      <label class="agent-review-reason" :for="`agent-reason-${change.id}`">{{ t('agent.reviewReason') }}
+      <details class="agent-review-feedback">
+        <summary>{{ t('agent.reviewReason') }}<span v-if="change.reason" class="agent-feedback-dot" aria-hidden="true" /></summary>
+        <label class="agent-review-reason" :for="`agent-reason-${change.id}`"><span class="agent-visually-hidden">{{ t('agent.reviewReason') }}</span>
         <textarea :id="`agent-reason-${change.id}`" :value="change.reason ?? ''" :disabled="agent.busy || readOnly" rows="2" maxlength="1000" :placeholder="t('agent.reviewReasonPlaceholder')" @input="agent.setReviewReason(edit, index, ($event.target as HTMLTextAreaElement).value)" />
-      </label>
-      <footer>
-        <span>{{ t(edit.documentChanged && change.status === 'applied' ? 'agent.reviewUnverified' : `agent.editStatus.${change.status}`) }}</span>
+        </label>
+      </details>
+      <div class="agent-change-utilities">
         <button v-if="!readOnly && !stale" type="button" @click="preview(change)">{{ agentM1Copy(locale, 'previewChange') }}</button>
         <button v-if="change.status === 'pending' || change.status === 'dismissed'" type="button" :disabled="stale || readOnly || edit.appliedMarkdown !== undefined && edit.appliedMarkdown !== edit.snapshot.markdown" @click="agent.locateSource({ ...edit.snapshot, from: change.from, to: change.to })">{{ t('agent.locateSource') }}</button>
+        <button v-if="change.status !== 'applied'" type="button" :disabled="agent.busy || readOnly || stale || !!agent.conversation.draft.trim() || !!agent.conversation.images.length" @click="agent.rewrite(edit, index)">{{ t('agent.rewrite') }}</button>
+      </div>
+      <footer>
+        <span>{{ t(edit.documentChanged && change.status === 'applied' ? 'agent.reviewUnverified' : `agent.editStatus.${change.status}`) }}</span>
         <template v-if="change.status === 'pending'">
           <button type="button" :disabled="agent.busy || readOnly" @click="agent.dismiss(edit, index)">{{ t(edit.changes.length > 1 ? 'agent.dismissChange' : 'agent.dismiss') }}</button>
           <button type="button" class="agent-primary" :disabled="agent.busy || readOnly || stale" @click="agent.apply(edit, index)">{{ t(edit.changes.length > 1 ? 'agent.applyChange' : 'agent.apply') }}</button>
         </template>
         <button v-if="change.status === 'applied'" type="button" :disabled="agent.busy || readOnly || stale" @click="agent.revert(edit, index)"><RotateCcw :size="12" />{{ t('agent.revert') }}</button>
-        <button v-else type="button" :disabled="agent.busy || readOnly || stale || !!agent.conversation.draft.trim() || !!agent.conversation.images.length" @click="agent.rewrite(edit, index)">{{ t('agent.rewrite') }}</button>
       </footer>
     </div>
     <footer v-if="edit.changes.length > 1" class="agent-edit-all">

@@ -17,6 +17,7 @@ import { t } from './i18n'
 
 import './assets/styles/global.css'
 import './assets/styles/editor-glass.css'
+import './assets/styles/workbench.css'
 
 // Install the debug bridge BEFORE creating the Vue app so we catch even
 // errors thrown during component initialisation.

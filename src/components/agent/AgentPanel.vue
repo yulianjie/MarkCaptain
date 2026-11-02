@@ -36,6 +36,24 @@ const imageInput = ref<HTMLInputElement | null>(null)
 const feed = ref<HTMLElement | null>(null)
 const nearBottom = ref(true)
 const copied = ref('')
+const tray = ref<'context' | 'tools' | null>(null)
+const externalAccessActive = ref(false)
+const workspaceLabels = computed(() => locale.value === 'zh-CN'
+  ? { context: '上下文', tools: '工具与权限', contextDetail: '为这次对话选择资料与写作技能。', toolsDetail: '按需启用项目检索、网络研究与外部工具。', close: '收起', sources: '篇参考文档' }
+  : locale.value === 'ja'
+    ? { context: 'コンテキスト', tools: 'ツールと権限', contextDetail: 'この会話の資料と執筆スキルを選びます。', toolsDetail: 'プロジェクト検索、Web 調査、外部ツールを必要に応じて有効にします。', close: '折りたたむ', sources: '件の参考文書' }
+    : { context: 'Context', tools: 'Tools & access', contextDetail: 'Choose references and writing skills for this conversation.', toolsDetail: 'Enable project search, web research, and external tools when needed.', close: 'Collapse', sources: 'reference documents' })
+const activeTools = computed(() => Number(Boolean(agent.conversation.projectAccess.grantId)) + Number(agent.conversation.webResearch.enabled) + Number(externalAccessActive.value))
+function closeTray() {
+  const previous = tray.value
+  tray.value = null
+  void nextTick(() => document.querySelector<HTMLButtonElement>(previous === 'tools' ? '.agent-tools-toggle' : '.agent-composer-context')?.focus())
+}
+function toggleTray(value: 'context' | 'tools') {
+  if (tray.value === value) { closeTray(); return }
+  tray.value = value
+  void nextTick(() => document.querySelector<HTMLButtonElement>(`#agent-${value}-drawer .agent-drawer-header button`)?.focus())
+}
 let copyTimer: ReturnType<typeof setTimeout> | undefined
 const panelWidth = ref(380)
 const selected = computed(() => agent.selection?.tabId === editor.currentFileId ? agent.selection : null)
@@ -207,13 +225,19 @@ onBeforeUnmount(() => { document.removeEventListener('focusout', captureEditorBl
       <button type="button" :aria-label="t('agent.settings.title')" :title="t('agent.settings.title')" :aria-pressed="agent.settingsOpen" @click="agent.settingsOpen = !agent.settingsOpen; agent.skillsOpen = false; agent.historyOpen = false"><Settings2 :size="16" /></button>
       <button type="button" :aria-label="t('common.close')" :title="t('common.close')" @click="agent.visible = false"><X :size="16" /></button>
     </header>
-    <AgentExternalAccess />
+    <section v-show="!agent.historyOpen && !agent.settingsOpen && !agent.skillsOpen && tray === 'tools'" id="agent-tools-drawer" class="agent-workspace-drawer agent-tools-drawer" :aria-label="workspaceLabels.tools" @keydown.esc.stop.prevent="closeTray">
+      <header class="agent-drawer-header"><strong>{{ workspaceLabels.tools }}</strong><button type="button" :aria-label="workspaceLabels.close" @click="closeTray"><X :size="14" /></button></header>
+      <p class="agent-drawer-description">{{ workspaceLabels.toolsDetail }}</p>
+      <AgentM2Controls />
+      <AgentExternalAccess @access-change="externalAccessActive = $event" />
+      <button type="button" class="agent-multi-entry" data-testid="agent-multi-open" @click="bus.emit('show-agent-multi-dialog', undefined)"><FileText :size="14" />{{ agentMultiCopy(locale).title }}<ArrowUp :size="13" /></button>
+    </section>
     <AgentHistory v-if="agent.historyOpen" />
     <AgentSettings v-else-if="agent.settingsOpen" />
     <AgentSkills v-else-if="agent.skillsOpen" />
     <template v-else>
-      <div class="agent-model-row"><span :title="agent.config?.baseUrl">{{ agent.config?.model || t('agent.notConfigured') }} · {{ routeLabel }} · {{ endpointInfo.endpoint }}</span><span>{{ t('agent.reviewFirst') }}</span></div>
-      <div class="agent-model-row"><button type="button" data-testid="agent-multi-open" @click="bus.emit('show-agent-multi-dialog', undefined)">{{ agentMultiCopy(locale).title }}</button></div>
+      <div class="agent-model-row"><button type="button" :title="`${agent.config?.baseUrl || ''} · ${t('agent.settings.title')}`" @click="agent.settingsOpen = true"><span class="agent-connection-dot" aria-hidden="true" /><span>{{ agent.config?.model || t('agent.notConfigured') }}</span><ArrowDown :size="11" /></button><span class="agent-review-pill"><Check :size="11" />{{ t('agent.reviewFirst') }}</span></div>
+      <div class="agent-route-note" :title="agent.config?.baseUrl">{{ routeLabel }} · {{ endpointInfo.endpoint }}</div>
       <div v-if="agent.configError" class="agent-banner" role="alert">{{ agent.configError }}<button type="button" @click="agent.loadConfig">{{ t('agent.retry') }}</button></div>
       <div v-if="agent.contextNotice" class="agent-banner" role="status">{{ agent.contextNotice }}</div>
       <div v-if="agent.skillsError" class="agent-banner" role="alert">{{ agent.skillsError }}<button type="button" @click="agent.loadSkills">{{ t('agent.retry') }}</button></div>
@@ -298,15 +322,19 @@ onBeforeUnmount(() => { document.removeEventListener('focusout', captureEditorBl
       </div>
       <button v-if="!nearBottom" type="button" class="agent-jump" @click="scrollBottom(true)"><ArrowDown :size="13" />{{ t('agent.latest') }}</button>
       <div v-if="agent.error" class="agent-composer-error" role="alert">{{ agent.error }}<button type="button" :aria-label="t('common.close')" @click="agent.error = ''"><X :size="13" /></button></div>
-      <div class="agent-composer">
-        <AgentM2Controls />
-        <AgentReferences />
+      <section v-show="tray === 'context'" id="agent-context-drawer" class="agent-workspace-drawer agent-context-drawer" :aria-label="workspaceLabels.context" @keydown.esc.stop.prevent="closeTray">
+        <header class="agent-drawer-header"><strong>{{ workspaceLabels.context }}</strong><button type="button" :aria-label="workspaceLabels.close" @click="closeTray"><X :size="14" /></button></header>
+        <p class="agent-drawer-description">{{ workspaceLabels.contextDetail }}</p>
         <div class="agent-context-row"><label :title="attachmentName"><input v-model="agent.includeDocument" type="checkbox" :disabled="!editor.currentFile"><FileText :size="12" /><span>{{ attachmentName }}</span></label><button v-if="selected" type="button" :aria-label="t('agent.clearSelection')" :title="t('agent.clearSelection')" @click="agent.clearSelection"><X :size="12" /></button><button type="button" :disabled="!editor.currentFile" :aria-label="t('agent.attachSelection')" :title="t('agent.attachSelection')" @mousedown.prevent @click="agent.attachSelection()"><TextSelect :size="14" /></button></div>
-        <AgentWritingCommands :locale="locale" :disabled="agent.busy || agent.conversation.readingImages" @choose="agent.queueWritingCommand" />
         <label v-if="selected && agent.includeDocument" class="agent-reference-scope"><input v-model="agent.referenceDocument" type="checkbox" :disabled="agent.busy">{{ t('agent.referenceDocument') }}</label>
-        <button type="button" class="agent-chapter-summary" :disabled="agent.busy || agent.historyLoading || !agent.includeDocument || !editor.currentFile || !agent.config || agent.conversation.readingImages" @click="agent.summarizeChapters()">{{ t('agent.chapterSummary') }}</button>
         <details v-if="selected && agent.includeDocument" class="agent-selection-preview"><summary>{{ t('agent.selectionPreview', { count: selected.to - selected.from }) }}</summary><pre>{{ selected.markdown.slice(selected.from, selected.to) }}</pre></details>
+        <AgentReferences />
         <div class="agent-skill-picker"><BookOpen :size="12" /><select v-model="agent.conversation.skillId" :disabled="agent.skillsLoading || agent.busy" :aria-label="t('agent.skills.choose')"><option value="">{{ t('agent.skills.auto') }}</option><option v-for="skill in agent.skills.filter(s => s.enabled)" :key="skill.id" :value="skill.id">{{ skill.builtin ? t(`agent.skills.builtins.${skill.name}.name`) : skill.name }}</option></select></div>
+        <AgentWritingCommands :locale="locale" :disabled="agent.busy || agent.conversation.readingImages" @choose="agent.queueWritingCommand" />
+        <button type="button" class="agent-chapter-summary" :disabled="agent.busy || agent.historyLoading || !agent.includeDocument || !editor.currentFile || !agent.config || agent.conversation.readingImages" @click="agent.summarizeChapters()">{{ t('agent.chapterSummary') }}</button>
+      </section>
+      <div class="agent-composer">
+        <button type="button" class="agent-composer-context" :aria-expanded="tray === 'context'" aria-controls="agent-context-drawer" :title="attachmentName" @click="toggleTray('context')"><FileText :size="12" /><span>{{ attachmentName }}</span><small v-if="agent.conversation.references.length">+{{ agent.conversation.references.length }}</small><ArrowDown :size="11" /></button>
         <div v-if="agent.conversation.images.length" class="agent-images agent-draft-images">
           <div v-for="(picture, index) in agent.conversation.images" :key="index" class="agent-image-card">
             <button type="button" class="agent-image-preview" :aria-label="t('agent.previewImage', { name: picture.name })" @click="bus.emit('image-preview/open', { src: picture.dataUrl })"><img :src="picture.dataUrl" :alt="picture.name"></button>
@@ -315,9 +343,9 @@ onBeforeUnmount(() => { document.removeEventListener('focusout', captureEditorBl
         </div>
         <p v-if="agent.conversation.readingImages" class="agent-image-hint" role="status">{{ t('agent.readingImages') }}</p>
         <p v-else-if="agent.conversation.images.length" class="agent-image-hint">{{ t('agent.visionHint') }}</p>
-        <textarea ref="input" v-model="agent.conversation.draft" :aria-label="t('agent.inputLabel')" :placeholder="t('agent.placeholder')" rows="3" @keydown="onKey" @paste="paste" @focus="agent.attachSelection(true)" />
+        <textarea ref="input" v-model="agent.conversation.draft" :aria-label="t('agent.inputLabel')" :title="t('agent.keyboardHint')" :placeholder="t('agent.placeholder')" rows="3" @keydown="onKey" @paste="paste" @focus="agent.attachSelection(true)" />
         <input ref="imageInput" class="agent-image-input" type="file" :accept="AGENT_IMAGE_TYPES.join(',')" multiple :aria-label="t('agent.addImages')" @change="chooseImages">
-        <div class="agent-send-row"><button type="button" :disabled="agent.conversation.readingImages || agent.conversation.images.length >= MAX_MESSAGE_IMAGES" :aria-label="t('agent.addImages')" :title="t('agent.addImages')" @click="imageInput?.click()"><ImagePlus :size="16" /></button><small>{{ t('agent.keyboardHint') }}</small><button v-if="agent.busy" type="button" class="agent-stop" :disabled="agent.stopping" :aria-label="t('agent.stop')" :title="t('agent.stop')" @click="agent.stop"><Square :size="14" /></button><button v-else type="button" class="agent-primary" :disabled="agent.historyLoading || (!agent.conversation.draft.trim() && !agent.conversation.images.length) || agent.conversation.readingImages || agent.conversation.readingReferences || agent.loadingConfig || agent.skillsLoading || !agent.config" :aria-label="t('agent.send')" :title="t('agent.send')" @click="send"><ArrowUp :size="17" /></button></div>
+        <div class="agent-send-row"><button type="button" :disabled="agent.conversation.readingImages || agent.conversation.images.length >= MAX_MESSAGE_IMAGES" :aria-label="t('agent.addImages')" :title="t('agent.addImages')" @click="imageInput?.click()"><ImagePlus :size="16" /></button><button type="button" class="agent-tools-toggle" :aria-expanded="tray === 'tools'" aria-controls="agent-tools-drawer" @click="toggleTray('tools')"><Settings2 :size="13" /><span>{{ workspaceLabels.tools }}</span><small v-if="activeTools">{{ activeTools }}</small></button><span class="agent-send-spacer" /><button v-if="agent.busy" type="button" class="agent-stop" :disabled="agent.stopping" :aria-label="t('agent.stop')" :title="t('agent.stop')" @click="agent.stop"><Square :size="14" /></button><button v-else type="button" class="agent-primary" :disabled="agent.historyLoading || (!agent.conversation.draft.trim() && !agent.conversation.images.length) || agent.conversation.readingImages || agent.conversation.readingReferences || agent.loadingConfig || agent.skillsLoading || !agent.config" :aria-label="t('agent.send')" :title="t('agent.send')" @click="send"><ArrowUp :size="17" /></button></div>
       </div>
       <p class="agent-privacy-note">{{ t('agent.privacyNote') }}</p>
     </template>

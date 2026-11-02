@@ -1,0 +1,6 @@
+{
+  "identifier": "io.github.yulianjie.markcaptain.workbench-validation",
+  "productName": "MarkCaptain UI Preview",
+  "build": { "beforeDevCommand": "" },
+  "bundle": { "active": false }
+}

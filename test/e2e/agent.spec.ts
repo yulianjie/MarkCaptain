@@ -62,6 +62,12 @@ async function ensureAgentPanelOpen(page: Page) {
   await expect(page.locator('.agent-panel')).toBeVisible()
 }
 
+async function ensureContextOpen(page: Page) {
+  const toggle = page.locator('.agent-composer-context')
+  if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click()
+  await expect(page.locator('#agent-context-drawer')).toBeVisible()
+}
+
 async function send(page: Page, text = 'polish') {
   await page.getByRole('textbox', { name: '发送给写作助手的消息' }).fill(text)
   await page.getByRole('button', { name: '发送', exact: true }).click()
@@ -118,6 +124,7 @@ async function pastePicture(page: Page, dataUrl: string, text = '') {
 
 test('pastes, previews, removes and sends images with follow-up history and retry', async ({ page }) => {
   await setup(page)
+  await ensureContextOpen(page)
   await page.locator('.agent-context-row input').uncheck()
   const input = page.getByRole('textbox', { name: '发送给写作助手的消息' })
   const dataUrl = await pictureData(page)
@@ -156,6 +163,7 @@ test('pastes, previews, removes and sends images with follow-up history and retr
 
 test('supports image-only file input, validation, and ordinary text paste', async ({ page }) => {
   await setup(page)
+  await ensureContextOpen(page)
   await page.locator('.agent-context-row input').uncheck()
   const dataUrl = await pictureData(page)
   const picker = page.locator('.agent-image-input')
@@ -195,6 +203,7 @@ for (const source of [false, true]) {
     }
     await select()
     await input.click()
+    await ensureContextOpen(page)
     await expect(page.locator('.agent-context-row label')).toContainText('选中内容')
     await page.locator('.agent-selection-preview summary').click()
     await expect(page.locator('.agent-selection-preview pre')).toHaveText('hello world')
@@ -205,6 +214,7 @@ for (const source of [false, true]) {
     await page.keyboard.press('Shift+ArrowLeft') // a fresh, shorter selection
     await page.getByRole('button', { name: /^AI 助手(?: \(.+\))?$/ }).click()
     await page.keyboard.press('Control+Shift+A')
+    await ensureContextOpen(page)
     await expect(page.locator('.agent-context-row label')).toContainText('选中内容')
     await send(page)
     await expect(page.locator('.agent-working')).toHaveCount(0)
@@ -221,6 +231,7 @@ for (const source of [false, true]) {
 
 test('imports, selects, inspects, disables and removes writing skills', async ({ page }) => {
   await setup(page)
+  await ensureContextOpen(page)
   await expect(page.locator('.agent-context-row')).toContainText('按需读取')
   await expect(page.getByRole('combobox', { name: '选择写作技能' })).toHaveValue('')
   await page.getByRole('button', { name: '技能管理', exact: true }).click()
@@ -273,6 +284,7 @@ test('skill management fits narrow panels and updates language and theme live', 
 
 test('selects both new writing skills without attaching a document', async ({ page }) => {
   await setup(page)
+  await ensureContextOpen(page)
   await page.locator('.agent-context-row input').uncheck()
   for (const id of ['builtin:internal-comms', 'builtin:markdown-coauthor']) {
     await page.getByRole('combobox', { name: '选择写作技能' }).selectOption(id)
@@ -326,6 +338,7 @@ test('protects concurrent edits and supports cancellation, retry and settings', 
   await expect(page.locator('.agent-message .agent-error')).toContainText('身份验证失败')
   await page.getByRole('button', { name:'模型设置', exact:true }).click()
   await page.getByLabel('API Key').fill('test-only-placeholder')
+  await page.locator('.agent-settings-advanced > summary').click()
   await page.getByLabel('自定义请求头').fill('X-Tenant-ID: tenant-1\nAuthorization: Token test')
   await page.getByRole('button', { name:'保存并测试' }).click()
   await expect(page.getByText('连接成功，模型已响应')).toBeVisible()
@@ -346,6 +359,7 @@ test('fits light/dark and narrow windows with selection context and per-document
   await page.keyboard.press('ArrowDown')
   await page.keyboard.press('Home')
   await page.keyboard.press('Shift+End')
+  await ensureContextOpen(page)
   await page.getByRole('button', { name:'附加编辑器选中内容' }).click()
   await expect(page.locator('.agent-context-row label')).toContainText('选中内容')
   await send(page)

@@ -186,20 +186,21 @@ function hitAriaLabel(path: string, hit: SearchHit): string {
 </template>
 
 <style scoped>
-.search-pane { height: 100%; display: flex; flex-direction: column; }
+.search-pane { height: 100%; min-height: 0; display: flex; flex-direction: column; }
 .search-header {
   border-bottom: 1px solid var(--mt-border, #eaecef);
-  padding: 8px 12px;
+  padding: 16px 15px 12px;
+  flex-shrink: 0;
 }
 .input-row {
   display: flex;
   align-items: center;
   border: 1px solid var(--mt-border, #d1d5da);
   border-radius: var(--mt-radius-tab);
-  padding: 4px 8px;
+  padding: 8px 9px;
   background: var(--mt-bg, #fff);
 }
-.input-row:focus-within { border-color: var(--mt-accent, #0366d6); }
+.input-row:focus-within { border-color: var(--mt-accent); box-shadow: 0 0 0 2px var(--mt-accent-soft); }
 .leading { color: var(--mt-fg-muted, #6a737d); margin-right: 6px; font-size: 14px; }
 .search-input {
   min-width: 0;
@@ -222,26 +223,26 @@ function hitAriaLabel(path: string, hit: SearchHit): string {
   color: var(--mt-fg-muted, #586069);
   cursor: pointer;
   padding: 2px 6px;
-  border-radius: 3px;
+  border-radius: 5px;
   font-size: 11px;
   font-family: ui-monospace, monospace;
 }
 .toggle:hover { background: var(--mt-row-hover, #eaecef); color: var(--mt-fg, #24292e); }
 .toggle:focus-visible { outline: 2px solid var(--mt-accent, #0366d6); outline-offset: 1px; }
-.toggle.on { background: var(--mt-row-active, #dbedff); color: var(--mt-accent, #0366d6); border-color: var(--mt-accent, #79b8ff); }
+.toggle.on { background: var(--mt-accent-soft, var(--mt-icon-active-bg)); color: var(--mt-accent); border-color: transparent; }
 .status {
   margin-left: auto;
   color: var(--mt-fg-muted, #6a737d);
   font-size: 11px;
 }
-.results { flex: 1; overflow-y: auto; padding-bottom: 16px; }
+.results { flex: 1; min-height: 0; overflow-y: auto; padding-bottom: 16px; }
 .group { margin-top: 8px; }
 .group-header {
-  padding: 4px 12px;
+  padding: 9px 17px;
   font-size: 11px;
   font-weight: 600;
   color: var(--mt-fg, #24292e);
-  background: var(--mt-tab-bg, #f1f3f5);
+  background: transparent;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -249,13 +250,15 @@ function hitAriaLabel(path: string, hit: SearchHit): string {
 .hit {
   display: flex;
   gap: 8px;
-  padding: 3px 12px;
+  padding: 6px 9px;
+  margin: 1px 8px;
+  border-radius: 5px;
   font-size: 12px;
   cursor: pointer;
   align-items: baseline;
 }
 .hit:hover { background: var(--mt-row-hover, #f1f8ff); }
-.hit.current { background: var(--mt-row-active, #dbedff); }
+.hit.current { background: var(--mt-accent-soft, var(--mt-icon-active-bg)); }
 .hit:focus-visible {
   outline: 2px solid var(--mt-accent, #0366d6);
   outline-offset: -2px;
@@ -276,7 +279,8 @@ function hitAriaLabel(path: string, hit: SearchHit): string {
   text-overflow: ellipsis;
 }
 .empty {
-  padding: 16px;
+  padding: 28px 22px;
+  line-height: 1.8;
   text-align: center;
   color: var(--mt-fg-muted, #959da5);
   font-size: 12px;

@@ -42,7 +42,7 @@ defineExpose({ open })
 </script>
 
 <template>
-  <el-dialog v-model="visible" width="640px" align-center :show-close="true">
+  <el-dialog v-model="visible" width="min(640px, calc(100vw - 32px))" class="recent-dialog" align-center :show-close="true">
     <template #header>
       <div class="recent-header">
         <h3>{{ t('recent.title') }}</h3>
@@ -55,76 +55,42 @@ defineExpose({ open })
       <div class="section">
         <div class="section-header">{{ t('recent.folders') }}</div>
         <div v-if="!prefs.recentFolders.length" class="empty">{{ t('recent.noFolders') }}</div>
-        <div v-for="path in prefs.recentFolders" :key="path" class="row" @click="openFolder(path)">
+        <button v-for="path in prefs.recentFolders" :key="path" type="button" class="row" :title="path" @click="openFolder(path)">
           <el-icon class="row-icon folder"><Folder /></el-icon>
-          <div class="path-col">
-            <div class="path-name">{{ path.split(/[\\/]/).pop() }}</div>
-            <div class="path-full">{{ path }}</div>
-          </div>
-        </div>
+          <span class="path-col">
+            <span class="path-name">{{ path.split(/[\\/]/).pop() }}</span>
+            <span class="path-full">{{ path }}</span>
+          </span>
+        </button>
       </div>
       <div class="section">
         <div class="section-header">{{ t('recent.files') }}</div>
         <div v-if="!prefs.recentFiles.length" class="empty">{{ t('recent.noFiles') }}</div>
-        <div v-for="path in prefs.recentFiles" :key="path" class="row" @click="openFile(path)">
+        <button v-for="path in prefs.recentFiles" :key="path" type="button" class="row" :title="path" @click="openFile(path)">
           <el-icon class="row-icon"><Document /></el-icon>
-          <div class="path-col">
-            <div class="path-name">{{ path.split(/[\\/]/).pop() }}</div>
-            <div class="path-full">{{ path }}</div>
-          </div>
-        </div>
+          <span class="path-col">
+            <span class="path-name">{{ path.split(/[\\/]/).pop() }}</span>
+            <span class="path-full">{{ path }}</span>
+          </span>
+        </button>
       </div>
     </div>
   </el-dialog>
 </template>
 
 <style scoped>
-.recent-header { display: flex; align-items: center; justify-content: space-between; }
-.recent-header h3 { margin: 0; font-weight: 600; font-size: 15px; color: #24292e; }
-.recent-body { max-height: 480px; overflow-y: auto; }
-.section { margin-bottom: 16px; }
-.section-header {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  color: #6a737d;
-  letter-spacing: 0.04em;
-  padding: 4px 8px;
-  background: #f5f6f7;
-  margin-bottom: 4px;
-}
-.row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px;
-  cursor: pointer;
-  border-radius: 4px;
-}
-.row:hover { background: #f1f8ff; }
-.row-icon { color: #6a737d; font-size: 16px; flex-shrink: 0; }
-.row-icon.folder { color: #f6c344; }
+.recent-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-right: 24px; }
+.recent-header h3 { margin: 0; font-weight: 600; font-size: 16px; color: var(--mt-fg); }
+.recent-body { max-height: min(480px, 65vh); overflow-y: auto; }
+.section + .section { margin-top: 24px; }
+.section-header { font-size: 10px; font-weight: 600; color: var(--mt-fg-muted); letter-spacing: .08em; padding: 0 10px 9px; margin-bottom: 5px; border-bottom: 1px solid var(--mt-border); }
+.row { display: flex; align-items: center; gap: 13px; width: 100%; padding: 11px 10px; border: 0; text-align: left; font: inherit; color: var(--mt-fg); background: transparent; cursor: pointer; border-radius: 7px; }
+.row:hover { background: var(--mt-row-hover); }
+.row:focus-visible { outline: 2px solid var(--mt-accent); outline-offset: -2px; background: var(--mt-accent-soft); }
+.row-icon { color: var(--mt-fg-muted); font-size: 18px; flex-shrink: 0; }
+.row-icon.folder { color: var(--mt-accent); }
 .path-col { flex: 1; overflow: hidden; }
-.path-name {
-  font-size: 13px;
-  font-weight: 500;
-  color: #24292e;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.path-full {
-  font-size: 11px;
-  color: #6a737d;
-  font-family: ui-monospace, monospace;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.empty {
-  padding: 12px;
-  color: #959da5;
-  font-size: 12px;
-  text-align: center;
-}
+.path-name { display: block; font-size: 13px; font-weight: 500; color: var(--mt-fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.6; }
+.path-full { display: block; font-size: 11px; color: var(--mt-fg-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.6; }
+.empty { padding: 25px 12px; color: var(--mt-fg-muted); font-size: 12px; text-align: center; background: var(--mt-surface); border-radius: 7px; }
 </style>

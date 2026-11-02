@@ -41,7 +41,9 @@ onBeforeUnmount(() => { unsub?.() })
   <el-dialog
     v-model="visible"
     :title="t('table.title')"
-    width="320px"
+    width="min(340px, calc(100vw - 32px))"
+    class="table-dialog"
+    align-center
     :close-on-click-modal="true"
     append-to-body
   >
@@ -59,3 +61,9 @@ onBeforeUnmount(() => { unsub?.() })
     </template>
   </el-dialog>
 </template>
+
+<style scoped>
+.table-dialog :deep(.el-form-item) { margin-bottom: 18px; }
+.table-dialog :deep(.el-input-number) { width: 100%; }
+.table-dialog :deep(.el-form-item:last-child) { margin-bottom: 0; }
+</style>

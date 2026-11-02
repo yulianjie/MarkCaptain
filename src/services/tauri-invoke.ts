@@ -266,6 +266,11 @@ export const showWindow = () => isTauriRuntime()
   ? invoke<void>('cmd_show_window')
   : Promise.resolve()
 
+/** Native title bar appearance for the calling window; null follows the OS. */
+export const setWindowTheme = (theme: 'light' | 'dark' | null): Promise<void> => isTauriRuntime()
+  ? invoke<void>('cmd_window_set_theme', { theme })
+  : Promise.resolve()
+
 export const closeWindow = (label: string) =>
   invoke<void>('cmd_close_window', { label })
 

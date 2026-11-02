@@ -1,0 +1,187 @@
+/* Shared native writing-workbench tokens. Keep editor geometry and Mermaid's
+ * measurement elements outside all chrome resets. Additional themes inherit
+ * these derived surfaces instead of being forced into the default palette. */
+html:root,
+html.dark {
+  --mt-ui-font: 'Segoe UI', 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --mt-titlebar-height: 40px;
+  --mt-statusbar-height: 28px;
+  --mt-surface: color-mix(in srgb, var(--mt-bg) 58%, var(--mt-sidebar-bg));
+  --mt-surface-raised: color-mix(in srgb, var(--mt-bg) 97%, var(--mt-fg));
+  --mt-surface-hover: var(--mt-row-hover);
+  --mt-border-subtle: color-mix(in srgb, var(--mt-border) 68%, transparent);
+  --mt-accent-soft: color-mix(in srgb, var(--mt-accent) 12%, var(--mt-bg));
+  --mt-accent-strong: color-mix(in srgb, var(--mt-accent) 88%, var(--mt-fg));
+  --mt-fg-subtle: color-mix(in srgb, var(--mt-fg-muted) 86%, var(--mt-bg));
+  --mt-text-on-accent: #ffffff;
+  --mt-success: #39724f;
+  --mt-warning: #916522;
+  --mt-error: #a34b41;
+  --mt-info: #4d6e88;
+  --mt-success-soft: color-mix(in srgb, var(--mt-success) 10%, var(--mt-bg));
+  --mt-warning-soft: color-mix(in srgb, var(--mt-warning) 10%, var(--mt-bg));
+  --mt-error-soft: color-mix(in srgb, var(--mt-error) 10%, var(--mt-bg));
+  --mt-info-soft: color-mix(in srgb, var(--mt-info) 10%, var(--mt-bg));
+  --mt-radius-control: 6px;
+  --mt-radius-tab: 8px;
+  --mt-radius-menu: 10px;
+  --mt-radius-window: 12px;
+  --mt-space-1: 4px;
+  --mt-space-2: 8px;
+  --mt-space-3: 12px;
+  --mt-space-4: 16px;
+  --mt-space-5: 24px;
+  --mt-space-6: 32px;
+  --mt-shadow-panel: 0 8px 30px var(--mt-shadow);
+
+  /* Element Plus overlays are teleported to body, so tokens live on html. */
+  --el-font-family: var(--mt-ui-font);
+  --el-font-size-base: 13px;
+  --el-font-size-small: 12px;
+  --el-border-radius-base: var(--mt-radius-control);
+  --el-border-radius-small: 4px;
+  --el-color-primary: var(--mt-accent);
+  --el-color-primary-light-3: color-mix(in srgb, var(--mt-accent) 72%, var(--mt-bg));
+  --el-color-primary-light-5: color-mix(in srgb, var(--mt-accent) 52%, var(--mt-bg));
+  --el-color-primary-light-7: color-mix(in srgb, var(--mt-accent) 28%, var(--mt-bg));
+  --el-color-primary-light-8: color-mix(in srgb, var(--mt-accent) 19%, var(--mt-bg));
+  --el-color-primary-light-9: var(--mt-accent-soft);
+  --el-color-primary-dark-2: var(--mt-accent-strong);
+  --el-color-success: var(--mt-success);
+  --el-color-success-light-9: var(--mt-success-soft);
+  --el-color-warning: var(--mt-warning);
+  --el-color-warning-light-9: var(--mt-warning-soft);
+  --el-color-danger: var(--mt-error);
+  --el-color-danger-light-9: var(--mt-error-soft);
+  --el-color-info: var(--mt-fg-muted);
+  --el-color-info-light-9: var(--mt-surface);
+  --el-bg-color: var(--mt-bg);
+  --el-bg-color-page: var(--mt-sidebar-bg);
+  --el-bg-color-overlay: var(--mt-surface-raised);
+  --el-text-color-primary: var(--mt-fg);
+  --el-text-color-regular: var(--mt-fg);
+  --el-text-color-secondary: var(--mt-fg-muted);
+  --el-text-color-placeholder: var(--mt-fg-muted);
+  --el-text-color-disabled: color-mix(in srgb, var(--mt-fg-muted) 64%, var(--mt-bg));
+  --el-border-color: var(--mt-border);
+  --el-border-color-light: var(--mt-border);
+  --el-border-color-lighter: var(--mt-border-subtle);
+  --el-border-color-extra-light: var(--mt-border-subtle);
+  --el-border-color-dark: color-mix(in srgb, var(--mt-border) 76%, var(--mt-fg-muted));
+  --el-fill-color: var(--mt-surface);
+  --el-fill-color-light: var(--mt-surface);
+  --el-fill-color-lighter: color-mix(in srgb, var(--mt-bg) 78%, var(--mt-sidebar-bg));
+  --el-fill-color-extra-light: var(--mt-bg);
+  --el-fill-color-dark: var(--mt-row-active);
+  --el-fill-color-blank: var(--mt-surface-raised);
+  --el-disabled-bg-color: var(--mt-surface);
+  --el-disabled-text-color: var(--el-text-color-disabled);
+  --el-disabled-border-color: var(--mt-border-subtle);
+  --el-box-shadow-light: 0 6px 24px var(--mt-shadow);
+  --el-box-shadow: 0 10px 40px var(--mt-shadow);
+  --el-overlay-color-lighter: color-mix(in srgb, var(--mt-fg) 28%, transparent);
+
+  /* Match Muya's floating controls to the app without touching its content
+   * measurement, font preferences, or editable box model. */
+  --themeColor: var(--mt-accent);
+  --editorColor: var(--mt-fg);
+  --editorColor80: color-mix(in srgb, var(--mt-fg) 94%, transparent);
+  --editorColor70: color-mix(in srgb, var(--mt-fg) 88%, transparent);
+  --editorColor50: var(--mt-fg-muted);
+  --highlightColor: color-mix(in srgb, var(--mt-accent) 24%, transparent);
+  --selectionColor: color-mix(in srgb, var(--mt-accent) 20%, transparent);
+  --iconColor: var(--mt-fg-muted);
+  --codeBlockBgColor: var(--mt-code-bg);
+  --codeBlockBorderColor: var(--mt-border);
+  --footnoteBgColor: var(--mt-surface);
+  --inputBgColor: var(--mt-surface);
+  --itemBgColor: var(--mt-row-active);
+  --tableBorderColor: var(--mt-border);
+  --floatFontColor: var(--mt-fg);
+  --floatBgColor: var(--mt-surface-raised);
+  --floatHoverColor: var(--mt-row-hover);
+  --floatBorderColor: var(--mt-border);
+  --floatShadow: var(--mt-shadow-panel);
+}
+
+html.dark,
+[data-theme='dark'],
+[data-theme='one-dark'],
+[data-theme='material-dark'] {
+  --mt-text-on-accent: #17251b;
+  --mt-success: #9bc6a2;
+  --mt-warning: #d4b179;
+  --mt-error: #e0a196;
+  --mt-info: #9ebed4;
+}
+
+:is(.title-bar, .side-bar, .tabs-bar, .editor-toolbar, .document-inspector,
+  .document-inspector-rail, .status-bar, .prefs-page, .el-dialog,
+  .el-message-box, .el-popper, .el-message, .el-notification) {
+  font-family: var(--mt-ui-font);
+}
+
+.el-dialog,
+.el-message-box {
+  --el-dialog-bg-color: var(--mt-surface-raised);
+  --el-messagebox-border-radius: var(--mt-radius-window);
+  max-width: calc(100vw - 32px);
+  border: 1px solid var(--mt-border);
+  border-radius: var(--mt-radius-window);
+  background: var(--mt-surface-raised);
+  box-shadow: var(--mt-shadow-panel);
+  color: var(--mt-fg);
+}
+.el-dialog__header { padding-bottom: 16px; }
+.el-dialog__title { font-size: 16px; font-weight: 600; line-height: 1.5; }
+.el-dialog__body { color: var(--mt-fg); min-width: 0; }
+.el-dialog__footer { padding-top: 18px; }
+.el-dialog__headerbtn:focus-visible,
+.el-message-box__headerbtn:focus-visible {
+  outline: 2px solid var(--mt-accent);
+  outline-offset: 2px;
+}
+
+.el-button--primary:not(.is-plain):not(.is-text):not(.is-link) {
+  --el-button-text-color: var(--mt-text-on-accent);
+  --el-button-hover-text-color: var(--mt-text-on-accent);
+  --el-button-active-text-color: var(--mt-text-on-accent);
+  --el-button-disabled-text-color: color-mix(in srgb, var(--mt-text-on-accent) 70%, transparent);
+}
+.el-switch.is-checked .el-switch__core .el-switch__action { background: var(--mt-text-on-accent); }
+.el-checkbox__input.is-checked .el-checkbox__inner::after { border-color: var(--mt-text-on-accent); }
+.el-checkbox__input.is-indeterminate .el-checkbox__inner::before { background: var(--mt-text-on-accent); }
+.el-radio__input.is-checked .el-radio__inner::after { background: var(--mt-text-on-accent); }
+.el-tag { font-weight: 400; }
+.el-message-box { box-sizing: border-box; }
+.el-message-box__content { overflow-wrap: anywhere; }
+.el-message-box__btns { flex-wrap: wrap; row-gap: 8px; }
+.el-popper { max-width: calc(100vw - 24px); overflow-wrap: anywhere; }
+.el-select-dropdown__item { max-width: calc(100vw - 48px); }
+
+@media (max-width: 600px) {
+  .el-dialog, .el-message-box { max-width: calc(100vw - 20px); }
+  .el-dialog { --el-dialog-padding-primary: 16px; }
+  .el-dialog__title { font-size: 15px; }
+  .el-dialog__footer { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+  .el-dialog__footer .el-button + .el-button { margin-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  :is(.el-dialog, .el-overlay, .el-popper, .el-button, .el-switch__core) {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+@media (forced-colors: active) {
+  html:root, html.dark {
+    --mt-accent: Highlight;
+    --mt-text-on-accent: HighlightText;
+    --mt-bg: Canvas;
+    --mt-fg: CanvasText;
+    --mt-fg-muted: CanvasText;
+    --mt-border: ButtonBorder;
+    --mt-sidebar-bg: Canvas;
+    --mt-surface: Canvas;
+    --mt-surface-raised: Canvas;
+  }
+}

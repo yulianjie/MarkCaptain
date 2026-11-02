@@ -99,11 +99,13 @@ watch(connectionId, () => {
     v-model="visible"
     :title="t('cloudUpload.title')"
     width="min(520px, calc(100vw - 24px))"
+    class="cloud-upload-window"
+    align-center
     append-to-body
     destroy-on-close
   >
     <div class="cloud-upload-dialog">
-      <p>{{ t('cloudUpload.file', { name: currentFileName }) }}</p>
+      <p class="upload-file">{{ t('cloudUpload.file', { name: currentFileName }) }}</p>
       <el-form label-position="top">
         <el-form-item :label="t('cloudUpload.destination')">
           <el-select v-model="connectionId" :placeholder="t('cloudUpload.noDestination')">
@@ -166,32 +168,41 @@ watch(connectionId, () => {
 </template>
 
 <style scoped>
-.cloud-upload-dialog { display: grid; gap: 14px; }
-.cloud-upload-dialog > p { margin: 0; color: var(--mt-fg-muted); overflow-wrap: anywhere; }
+.cloud-upload-dialog { display: grid; gap: 17px; }
+.upload-file { margin: 0; color: var(--mt-fg); overflow-wrap: anywhere; padding: 13px 15px; border: 1px solid var(--mt-border); background: var(--mt-surface); border-radius: 8px; font-size: 12px; line-height: 1.6; }
 .cloud-upload-dialog :deep(.el-select) { width: 100%; }
-.directory-path { display: flex; width: 100%; gap: 8px; }
+.cloud-upload-dialog :deep(.el-form-item:last-child) { margin-bottom: 0; }
+.directory-path { display: flex; width: 100%; min-width: 0; gap: 8px; }
+.directory-path :deep(.el-input) { min-width: 0; }
 .directory-list {
-  min-height: 120px;
+  min-height: 140px;
   max-height: 240px;
   overflow: auto;
   border: 1px solid var(--mt-border);
-  border-radius: 7px;
-  padding: 6px;
+  border-radius: 9px;
+  padding: 7px;
+  background: var(--mt-surface-raised);
 }
 .directory-list button {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   width: 100%;
-  min-height: 34px;
+  min-height: 38px;
   border: 0;
-  border-radius: 5px;
-  padding: 6px 8px;
+  border-radius: 6px;
+  padding: 8px 10px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
   color: var(--mt-fg);
   background: transparent;
   text-align: left;
 }
 .directory-list button:hover,
-.directory-list button:focus-visible { background: var(--mt-row-hover); }
-.directory-list p { margin: 12px; color: var(--mt-fg-muted); }
+.directory-list button:focus-visible { background: var(--mt-accent-soft); }
+.directory-list button:focus-visible { outline: 2px solid var(--mt-accent); outline-offset: -2px; }
+.directory-list .el-icon { color: var(--mt-accent); }
+.directory-list button span { overflow-wrap: anywhere; }
+.directory-list p { margin: 21px 14px; color: var(--mt-fg-muted); font-size: 12px; line-height: 1.7; }
 </style>

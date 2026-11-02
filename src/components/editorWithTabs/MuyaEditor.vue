@@ -915,9 +915,11 @@ onBeforeUnmount(() => {
 .muya-host {
   position: relative;
   flex: 1;
+  min-width: 0;
+  min-height: 0;
   overflow: auto;
   background: var(--mt-bg, #fff);
-  padding: 24px 0;
+  padding: clamp(28px, 4vh, 48px) 0 64px;
   font-family: var(--mt-editor-font);
   font-size: var(--mt-font-size);
   line-height: var(--mt-line-height);
@@ -929,7 +931,7 @@ onBeforeUnmount(() => {
   margin: 0 auto;
   /* Muya places the 20px paragraph control 30px to the left of the text.
    * Reserve that gutter plus 10px inside the host's scroll boundary. */
-  padding: 0 40px;
+  padding: 0 clamp(40px, 4.5vw, 72px);
   outline: none;
 }
 /* Keep document typography local to Muya; never style diagram label elements. */
@@ -960,6 +962,7 @@ onBeforeUnmount(() => {
   font-family: var(--mt-code-font);
   font-size: var(--mt-code-font-size);
 }
+@media (max-width: 900px) { .muya-host { padding-top: 28px; } .muya-container { padding-inline: 40px; } }
 </style>
 <style scoped>
 .wiki-options { position: absolute; right: 10px; top: 8px; z-index: 30; max-width: 80%; max-height: 240px; overflow: auto; background: var(--mt-bg); border: 1px solid var(--mt-border); border-radius: 6px; box-shadow: 0 4px 16px #0002; }

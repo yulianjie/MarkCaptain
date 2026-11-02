@@ -6,6 +6,7 @@ import { useLayoutStore, INSPECTOR_MAX, INSPECTOR_MIN, type InspectorPanel } fro
 import { useAgentStore } from '@/stores/agent'
 import { useI18n } from '@/i18n'
 import { translateInspector, type InspectorMessageKey } from './inspector-i18n'
+import { usePanelDrawer } from './use-panel-drawer'
 
 const layout = useLayoutStore()
 const agent = useAgentStore()
@@ -15,7 +16,30 @@ const activePanel = computed(() => layout.inspectorPanel)
 const pinnedLinksVisible = computed(() => layout.linksPinned && activePanel.value !== 'links')
 const panelTitle = computed(() => text(activePanel.value))
 const KEYBOARD_RESIZE_STEP = 16
-const NARROW_VIEWPORT_WIDTH = 1050
+const NARROW_VIEWPORT_WIDTH = 1180
+const viewportWidth = ref(typeof window === 'undefined' ? 1440 : window.innerWidth)
+const drawerElement = ref<HTMLElement | null>(null)
+const closeInspector = usePanelDrawer({
+  active: computed(() => viewportWidth.value <= NARROW_VIEWPORT_WIDTH && layout.showInspector),
+  element: drawerElement,
+  close: () => { layout.showInspector = false },
+  fallback: previousFocus => {
+    const rails = Array.from(document.querySelectorAll<HTMLElement>('.document-inspector-rail .rail-tab'))
+    // Closing Agent changes the active panel to Outline/Links. Restore the
+    // rail that opened the drawer rather than that later store selection.
+    return rails.find(element => element.getAttribute('aria-label') === previousFocus?.getAttribute('aria-label'))
+      ?? rails.find(element => element.getAttribute('aria-label') === text(activePanel.value)) ?? null
+  },
+})
+const inspectorMaxWidth = computed(() => viewportWidth.value <= NARROW_VIEWPORT_WIDTH
+  ? Math.min(viewportWidth.value <= 540 ? 360 : 420, viewportWidth.value - 64)
+  : Math.max(INSPECTOR_MIN, Math.min(INSPECTOR_MAX, Math.floor(viewportWidth.value * .38))))
+const inspectorMinWidth = computed(() => Math.min(INSPECTOR_MIN, inspectorMaxWidth.value))
+const visibleWidth = computed(() => viewportWidth.value <= NARROW_VIEWPORT_WIDTH
+  ? inspectorMaxWidth.value : Math.min(layout.inspectorWidth, inspectorMaxWidth.value))
+function setVisibleWidth(width: number) {
+  layout.setInspectorWidth(Math.max(inspectorMinWidth.value, Math.min(width, inspectorMaxWidth.value)))
+}
 let narrowViewport = typeof window !== 'undefined' && window.innerWidth <= NARROW_VIEWPORT_WIDTH
 if (narrowViewport) layout.showInspector = false
 
@@ -27,10 +51,10 @@ const tabs: InspectorTab[] = [
 ]
 
 function selectPanel(panel: InspectorPanel) {
+  if (viewportWidth.value <= 900) layout.setNavigationPanel('')
   layout.showInspector = true
   layout.setInspectorPanel(panel)
 }
-function closeInspector() { layout.showInspector = false }
 function togglePinnedLinks() {
   const next = !layout.linksPinned
   layout.setLinksPinned(next)
@@ -64,8 +88,8 @@ function onResizeDown(event: PointerEvent) {
   endResize()
   dragging.value = true
   const start = event.clientX
-  const initial = layout.inspectorWidth
-  const move = (next: PointerEvent) => layout.setInspectorWidth(initial + start - next.clientX)
+  const initial = visibleWidth.value
+  const move = (next: PointerEvent) => setVisibleWidth(initial + start - next.clientX)
   const up = () => endResize()
   stopResize = () => {
     window.removeEventListener('pointermove', move)
@@ -76,12 +100,13 @@ function onResizeDown(event: PointerEvent) {
 }
 function onResizeKeydown(event: KeyboardEvent) {
   const step = event.shiftKey ? KEYBOARD_RESIZE_STEP * 3 : KEYBOARD_RESIZE_STEP
-  if (event.key === 'ArrowLeft') { event.preventDefault(); layout.setInspectorWidth(layout.inspectorWidth + step) }
-  else if (event.key === 'ArrowRight') { event.preventDefault(); layout.setInspectorWidth(layout.inspectorWidth - step) }
-  else if (event.key === 'Home') { event.preventDefault(); layout.setInspectorWidth(INSPECTOR_MAX) }
-  else if (event.key === 'End') { event.preventDefault(); layout.setInspectorWidth(INSPECTOR_MIN) }
+  if (event.key === 'ArrowLeft') { event.preventDefault(); setVisibleWidth(visibleWidth.value + step) }
+  else if (event.key === 'ArrowRight') { event.preventDefault(); setVisibleWidth(visibleWidth.value - step) }
+  else if (event.key === 'Home') { event.preventDefault(); setVisibleWidth(inspectorMaxWidth.value) }
+  else if (event.key === 'End') { event.preventDefault(); setVisibleWidth(inspectorMinWidth.value) }
 }
 function onViewportResize() {
+  viewportWidth.value = window.innerWidth
   const nextNarrow = window.innerWidth <= NARROW_VIEWPORT_WIDTH
   if (nextNarrow && !narrowViewport) layout.showInspector = false
   narrowViewport = nextNarrow
@@ -94,7 +119,9 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <aside v-if="layout.showInspector" class="document-inspector" :style="{ width: `${layout.inspectorWidth}px` }" :aria-label="text('inspector')">
+  <button v-if="layout.showInspector" type="button" class="inspector-backdrop" :aria-label="text('close')" @click="closeInspector" />
+  <aside v-if="layout.showInspector" ref="drawerElement" tabindex="-1" class="document-inspector" :style="{ width: `${visibleWidth}px` }" :aria-label="text('inspector')"
+    :role="viewportWidth <= NARROW_VIEWPORT_WIDTH ? 'dialog' : undefined" :aria-modal="viewportWidth <= NARROW_VIEWPORT_WIDTH ? true : undefined">
     <header class="inspector-header">
       <div class="inspector-tabs" role="tablist" aria-label="Document inspector">
         <button v-for="tab in tabs" :key="tab.key" type="button" role="tab" class="inspector-tab"
@@ -136,8 +163,8 @@ onBeforeUnmount(() => {
     </section>
 
     <div class="inspector-resizer" :class="{ dragging }" role="separator" aria-orientation="vertical"
-      aria-label="Resize document inspector" :aria-valuemin="INSPECTOR_MIN" :aria-valuemax="INSPECTOR_MAX"
-      :aria-valuenow="layout.inspectorWidth" tabindex="0" @keydown="onResizeKeydown" @pointerdown="onResizeDown" />
+      aria-label="Resize document inspector" :aria-valuemin="inspectorMinWidth" :aria-valuemax="inspectorMaxWidth"
+      :aria-valuenow="visibleWidth" tabindex="0" @keydown="onResizeKeydown" @pointerdown="onResizeDown" />
   </aside>
   <aside v-else class="document-inspector-rail" :aria-label="text('inspector')">
     <button v-for="tab in tabs" :key="tab.key" type="button" class="rail-tab" :title="text(tab.label)" :aria-label="text(tab.label)"
@@ -148,17 +175,18 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.document-inspector { box-sizing: border-box; position: relative; display: flex; flex: 0 0 auto; flex-direction: column; min-width: 0; min-height: 0; height: 100%; overflow: hidden; border-left: 1px solid var(--mt-border); background: var(--mt-glass-bg); color: var(--mt-fg); }
-.document-inspector-rail { box-sizing: border-box; display: flex; flex: 0 0 44px; flex-direction: column; align-items: center; gap: 8px; height: 100%; padding: 7px 0; border-left: 1px solid var(--mt-border); background: var(--mt-glass-bg); }
+.document-inspector { box-sizing: border-box; position: relative; display: flex; flex: 0 0 auto; flex-direction: column; min-width: 0; min-height: 0; height: 100%; overflow: hidden; border-left: 1px solid var(--mt-border); background: var(--mt-bg); color: var(--mt-fg); }
+.document-inspector-rail { box-sizing: border-box; display: flex; flex: 0 0 44px; flex-direction: column; align-items: center; gap: 8px; height: 100%; padding: 12px 0; border-left: 1px solid var(--mt-border); background: var(--mt-bg); }
+.inspector-backdrop { display: none; }
 .rail-tab { display: grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: var(--mt-radius-control); background: transparent; color: var(--mt-fg-muted); cursor: pointer; }
 .rail-tab:hover, .rail-tab:focus-visible { background: var(--mt-row-hover); color: var(--mt-accent); }
 .rail-tab:focus-visible { outline: 2px solid var(--mt-accent); outline-offset: 1px; }
-.inspector-header { display: flex; flex: 0 0 40px; align-items: center; justify-content: space-between; min-width: 0; border-bottom: 1px solid var(--mt-border); padding: 0 8px; gap: 4px; }
+.inspector-header { display: flex; flex: 0 0 45px; align-items: center; justify-content: space-between; min-width: 0; border-bottom: 1px solid var(--mt-border); padding: 0 12px; gap: 4px; }
 .inspector-tabs { display: flex; align-items: center; gap: 2px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
 .inspector-tabs::-webkit-scrollbar { display: none; }
-.inspector-tab, .icon-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 28px; padding: 0 8px; border: 0; border-radius: var(--mt-radius-control); background: transparent; color: var(--mt-fg-muted); cursor: pointer; white-space: nowrap; }
+.inspector-tab, .icon-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 29px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: var(--mt-fg-muted); cursor: pointer; white-space: nowrap; }
 .inspector-tab { font: inherit; font-size: 12px; }
-.inspector-tab[aria-selected="true"] { background: var(--mt-icon-active-bg); color: var(--mt-accent); }
+.inspector-tab[aria-selected="true"] { background: var(--mt-accent-soft, var(--mt-icon-active-bg)); color: var(--mt-accent); }
 .icon-button { width: 28px; flex: 0 0 28px; padding: 0; }
 .icon-button:hover, .inspector-tab:hover { background: var(--mt-row-hover); color: var(--mt-fg); }
 .header-actions { display: flex; flex: 0 0 auto; gap: 2px; }
@@ -177,13 +205,13 @@ onBeforeUnmount(() => {
 .inspector-resizer:hover, .inspector-resizer.dragging { background: var(--mt-accent); opacity: .45; }
 .inspector-resizer:focus-visible { width: 5px; left: -3px; background: var(--mt-accent); opacity: .7; outline: none; }
 .inspector-tab:focus-visible, .icon-button:focus-visible { outline: 2px solid var(--mt-accent); outline-offset: -2px; }
-@media (max-width: 1050px) {
-  .document-inspector { position: fixed; z-index: 30; top: 32px; right: 0; bottom: 24px; height: auto; width: min(420px, calc(100vw - 48px)) !important; box-shadow: -12px 0 32px #0003; }
+@media (max-width: 1180px) {
+  .document-inspector { position: absolute; z-index: 42; inset: 0 0 0 auto; height: 100%; max-width: calc(100vw - 64px); box-shadow: -12px 0 32px #0002; }
   .document-inspector :deep(.agent-panel) { position: relative; inset: auto; width: 100%; min-width: 0; max-width: 100%; box-shadow: none; }
-  .document-inspector-rail { position: fixed; z-index: 29; top: 32px; right: 0; bottom: 24px; height: auto; box-shadow: -8px 0 24px #0002; }
+  .inspector-backdrop { display: block; position: absolute; z-index: 41; inset: 0; border: 0; padding: 0; background: #0003; }
+  .inspector-resizer { display: none; }
 }
 @media (max-width: 540px) {
-  .document-inspector { width: min(360px, calc(100vw - 36px)) !important; }
   .pinned-content { flex-basis: 46%; min-height: 112px; }
   .inspector-tab { padding-inline: 6px; }
   .inspector-tab span { display: none; }

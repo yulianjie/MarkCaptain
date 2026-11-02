@@ -4,6 +4,7 @@
  * Ctrl/Cmd+Shift+P or `mt://palette/show` event to open.
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { Search } from '@lucide/vue'
 import {
   nextEnabledCommandIndex,
   safeCommandIndex,
@@ -11,10 +12,16 @@ import {
 } from '@/stores/commandCenter'
 import { useNotificationStore } from '@/stores/notification'
 import { bus } from '@/bus'
-import { t } from '@/i18n'
+import { useI18n } from '@/i18n'
 
 const cc = useCommandCenterStore()
 const notify = useNotificationStore()
+const { t, locale } = useI18n()
+const footerCopy = computed(() => ({
+  en: { navigate: 'Navigate', execute: 'Run' },
+  'zh-CN': { navigate: '选择', execute: '执行' },
+  ja: { navigate: '選択', execute: '実行' },
+})[locale.value])
 const visible = ref(false)
 const query = ref('')
 const selectedIndex = ref(0)
@@ -106,7 +113,7 @@ defineExpose({ open })
 <template>
   <el-dialog
     v-model="visible"
-    width="560px"
+    width="min(600px, calc(100vw - 32px))"
     :show-close="false"
     :close-on-click-modal="true"
     class="command-palette-dialog"
@@ -114,18 +121,22 @@ defineExpose({ open })
     :aria-label="t('command.title')"
   >
     <template #header>
-      <input
-        ref="inputRef"
-        v-model="query"
-        class="cp-input"
-        :placeholder="t('command.placeholder')"
-        spellcheck="false"
-        role="combobox"
-        aria-autocomplete="list"
-        aria-controls="command-palette-list"
-        :aria-expanded="visible"
-        :aria-activedescendant="activeOptionId"
-      />
+      <div class="cp-search">
+        <Search :size="18" aria-hidden="true" />
+        <input
+          ref="inputRef"
+          v-model="query"
+          class="cp-input"
+          :placeholder="t('command.placeholder')"
+          :aria-label="t('command.title')"
+          spellcheck="false"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-controls="command-palette-list"
+          :aria-expanded="visible"
+          :aria-activedescendant="activeOptionId"
+        />
+      </div>
     </template>
     <div id="command-palette-list" class="cp-list" role="listbox" :aria-label="t('command.results')">
       <div
@@ -151,37 +162,53 @@ defineExpose({ open })
       </div>
       <div v-if="!matches.length" class="cp-empty" role="status">{{ t('command.noMatches') }}</div>
     </div>
+    <template #footer>
+      <div class="cp-footer"><span><kbd>↑</kbd><kbd>↓</kbd>{{ footerCopy.navigate }}</span><span><kbd>↵</kbd>{{ footerCopy.execute }}</span><span><kbd>Esc</kbd>{{ t('common.close') }}</span></div>
+    </template>
   </el-dialog>
 </template>
 
 <style scoped>
+.cp-search { display: flex; align-items: center; gap: 11px; padding: 3px 1px 5px; color: var(--mt-fg-muted); }
+.cp-search svg { flex-shrink: 0; }
 .cp-input {
   width: 100%;
-  padding: 8px 12px;
+  min-width: 0;
+  padding: 8px 2px;
+  box-sizing: border-box;
   font-size: 15px;
-  border: 1px solid var(--mt-border, #d1d5da);
-  border-radius: 6px;
+  font-family: inherit;
+  border: 0;
+  border-radius: 3px;
   outline: none;
-  color: var(--mt-fg, #24292e);
-  background: var(--mt-bg, #fff);
+  color: var(--mt-fg);
+  background: transparent;
 }
-.cp-input:focus {
-  border-color: var(--mt-accent, #0366d6);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--mt-accent, #0366d6) 18%, transparent);
+.cp-search:focus-within { color: var(--mt-accent); }
+.cp-input::placeholder { color: var(--mt-fg-muted); font-size: 13px; }
+.cp-list { max-height: min(390px, 56vh); overflow-y: auto; padding: 8px 0 0; border-top: 1px solid var(--mt-border); }
+.cp-footer { display: flex; align-items: center; gap: 17px; color: var(--mt-fg-muted); border-top: 1px solid var(--mt-border); padding-top: 13px; font-size: 10px; }
+.cp-footer > span { display: flex; align-items: center; gap: 5px; }
+.cp-footer > span:last-child { margin-left: auto; }
+.cp-footer kbd, .cp-shortcut { border: 1px solid var(--mt-border); border-radius: 4px; background: var(--mt-surface); font-family: var(--mt-ui-font); font-size: 10px; padding: 2px 5px; line-height: 1.4; }
+.cp-footer kbd { min-width: 11px; text-align: center; }
+.cp-row {
+  gap: 14px;
+  min-height: 39px;
+  box-sizing: border-box;
+  margin: 2px 0;
 }
-.cp-list { max-height: 360px; overflow-y: auto; }
 .cp-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
+  padding: 10px 12px;
   cursor: pointer;
   font-size: 13px;
-  border-radius: 4px;
+  border-radius: 7px;
 }
 .cp-row.selected {
-  background: var(--mt-row-active, #f1f8ff);
-  background: color-mix(in srgb, var(--mt-accent, #0366d6) 11%, transparent);
+  background: var(--mt-accent-soft);
 }
 .cp-row.disabled {
   cursor: not-allowed;
@@ -190,23 +217,24 @@ defineExpose({ open })
 .cp-label {
   display: flex;
   align-items: baseline;
+  flex-wrap: wrap;
+  gap: 3px 0;
   min-width: 0;
 }
 .cp-category {
-  color: var(--mt-fg-muted, #6a737d);
+  color: var(--mt-fg-muted);
   margin-right: 8px;
   flex: 0 0 auto;
 }
-.cp-desc { color: var(--mt-fg, #24292e); }
+.cp-desc { color: var(--mt-fg); overflow-wrap: anywhere; }
 .cp-shortcut {
-  color: var(--mt-fg-muted, #6a737d);
-  font-size: 11px;
-  font-family: ui-monospace, monospace;
+  color: var(--mt-fg-muted);
+  flex-shrink: 0;
 }
 .cp-empty {
-  padding: 16px;
+  padding: 34px 16px;
   text-align: center;
-  color: var(--mt-fg-muted, #959da5);
+  color: var(--mt-fg-muted);
   font-size: 13px;
 }
 </style>

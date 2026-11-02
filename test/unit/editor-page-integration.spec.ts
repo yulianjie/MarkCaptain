@@ -19,7 +19,7 @@ const sourceEditor = readSource('../../src/components/editorWithTabs/SourceCodeP
 describe('editor page chrome integration', () => {
   it('mounts preference-controlled toolbar/status chrome around the editor stage', () => {
     expect(editorPage).toMatch(
-      /<TabsBar[^>]*\/>\s*<EditorToolbar v-if="layout\.showToolBar" \/>\s*<div class="editor-stage">[\s\S]*?<\/div>\s*<StatusBar v-if="layout\.showStatusBar" \/>/,
+      /<TabsBar[^>]*\/>[\s\S]*?<EditorToolbar v-if="layout\.showToolBar && editor\.currentFile && !welcomeVisible" \/>\s*<div class="editor-stage">[\s\S]*?<StatusBar v-if="layout\.showStatusBar" \/>/,
     )
   })
 

@@ -60,7 +60,7 @@ watch(visible, async (v) => { if (v) { await Promise.resolve(); input.value?.foc
 </script>
 
 <template>
-  <el-dialog v-model="visible" width="420px" align-center :show-close="false">
+  <el-dialog v-model="visible" width="min(420px, calc(100vw - 32px))" class="rename-dialog" align-center :show-close="false">
     <template #header>
       <h3 class="rename-title">{{ t('rename.title') }}</h3>
     </template>
@@ -69,6 +69,7 @@ watch(visible, async (v) => { if (v) { await Promise.resolve(); input.value?.foc
       v-model="draft"
       class="rename-input"
       spellcheck="false"
+      :aria-label="t('rename.title')"
       :placeholder="t('rename.placeholder')"
       @keyup.enter="apply"
       @keyup.escape="cancel"
@@ -83,15 +84,21 @@ watch(visible, async (v) => { if (v) { await Promise.resolve(); input.value?.foc
 </template>
 
 <style scoped>
-.rename-title { margin: 0; font-size: 15px; font-weight: 600; color: #24292e; }
+.rename-title { margin: 0; font-size: 16px; font-weight: 600; color: var(--mt-fg); }
 .rename-input {
   width: 100%;
-  padding: 6px 10px;
-  border: 1px solid #d1d5da;
-  border-radius: 4px;
+  box-sizing: border-box;
+  min-height: 40px;
+  padding: 9px 12px;
+  border: 1px solid var(--mt-border);
+  border-radius: 7px;
   outline: none;
   font-size: 13px;
+  font-family: inherit;
+  color: var(--mt-fg);
+  background: var(--mt-surface-raised);
 }
-.rename-input:focus { border-color: #0366d6; }
-.footer { text-align: right; }
+.rename-input:focus { border-color: var(--mt-accent); box-shadow: 0 0 0 3px var(--mt-accent-soft); }
+.footer { display: flex; justify-content: flex-end; gap: 8px; }
+.footer :deep(.el-button + .el-button) { margin-left: 0; }
 </style>

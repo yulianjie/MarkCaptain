@@ -118,6 +118,16 @@ async function releaseExport(page: Page) {
   })
 }
 
+test('an unsaved document is identified as a buffer and remains available for export preview', async ({ page }) => {
+  await mockIpc(page)
+  await dispatchMenuAction(page, 'file.exportHtml')
+  const summary = page.locator('.export-dialog .document-summary')
+  await expect(summary.locator('strong')).not.toBeEmpty()
+  await expect(summary.locator('div > span').first()).toHaveText('Unsaved buffer')
+  await expect(summary).not.toContainText('Open a Markdown document before exporting.')
+  await preview(page)
+})
+
 test('built-in preset selections persist and drive preview options', async ({ page }) => {
   await mockIpc(page)
   await dispatchMenuAction(page, 'file.exportHtml')

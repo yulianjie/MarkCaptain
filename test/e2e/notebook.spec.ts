@@ -156,7 +156,7 @@ test('indexes aliases, backlinks, tags and task edits through undo', async ({ pa
   await page.locator('.cm-content').first().click(); await page.keyboard.press('Control+z')
   await expect(page.locator('.cm-content').first()).toContainText('[ ] 中文任务')
   await page.locator('.notebook-panel header select').selectOption('properties')
-  await page.locator('.properties .field').filter({ has: page.locator('strong', { hasText: /^priority$/ }) }).getByRole('button', { name: 'Edit', exact: true }).click()
+  await page.locator('.properties .field').filter({ has: page.locator('strong', { hasText: /^priority$/ }) }).getByRole('button', { name: 'Edit: priority', exact: true }).click()
   await page.locator('.properties form input[type=number]').fill('4')
   await page.locator('.properties form').getByRole('button', { name: 'Save', exact: true }).click()
   await expect(page.locator('.properties [role="alert"]')).toHaveCount(0)

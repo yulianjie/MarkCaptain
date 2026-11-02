@@ -19,6 +19,7 @@ const partClass = (part: InlineDiffPart) => part.kind === 'removed' ? 'agent-dif
       <button v-if="hasStructured" type="button" :aria-pressed="mode === 'structured'" @click="mode = 'structured'">{{ text('structuredDiff') }}</button>
       <button type="button" :aria-pressed="mode === 'raw'" @click="mode = 'raw'">{{ text('rawDiff') }}</button>
     </nav>
+    <div class="agent-diff-legend"><span><i class="agent-diff-legend-remove" aria-hidden="true" />{{ text('before') }}</span><span><i class="agent-diff-legend-add" aria-hidden="true" />{{ text('after') }}</span></div>
 
     <div v-if="mode === 'readable'" class="agent-readable-diff">
       <div v-for="(line, index) in diff.readable" :key="index" class="agent-readable-line" :class="`agent-readable-${line.kind}`">

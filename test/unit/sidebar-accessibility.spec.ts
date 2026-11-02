@@ -28,20 +28,19 @@ describe('sidebar accessibility contract', () => {
     expect(sideBar).toContain('@pointerdown="onResizeDown"')
   })
 
-  it('uses real buttons for collapsible section headings', () => {
-    expect(treePane).toContain('id="opened-files-heading"')
-    expect(treePane).toContain(':aria-expanded="!openedCollapsed"')
-    expect(treePane).toContain('aria-controls="opened-files-content"')
+  it('keeps a collapsible workspace tree without duplicating the document tabs', () => {
+    expect(treePane).not.toContain('opened-files-heading')
+    expect(treePane).not.toContain('OpenedFileRow')
     expect(treePane).toContain('id="project-heading"')
     expect(treePane).toContain(':aria-expanded="!projectCollapsed"')
     expect(treePane).toContain('aria-controls="project-content"')
-    expect(treePane.match(/class="section-toggle"/g)).toHaveLength(2)
+    expect(treePane.match(/class="section-toggle"/g)).toHaveLength(1)
   })
 
   it('keeps the no-project state compact and focus rings visible', () => {
     expect(treePane).toContain(':class="{ \'has-project\': project.projectTree }"')
     expect(treePane).toMatch(/\.section\.project-section\.has-project\s*\{\s*flex:\s*1;/)
-    expect(treePane).toMatch(/\.empty-state\s*\{[\s\S]*?display:\s*flex;[\s\S]*?padding:\s*10px 12px;/)
+    expect(treePane).toMatch(/\.empty-state\s*\{[^}]*display:\s*flex;[^}]*flex-direction:\s*column;/)
     expect(treePane).toMatch(/\.section-toggle:focus-visible/)
   })
 

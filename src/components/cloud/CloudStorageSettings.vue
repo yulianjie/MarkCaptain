@@ -249,17 +249,25 @@ onMounted(() => { void cloud.load() })
 </template>
 
 <style scoped>
-.cloud-settings { display: grid; gap: 16px; }
-.cloud-intro, .empty-copy, .agent-note { margin: 0; color: var(--mt-fg-muted); line-height: 1.6; }
-.connection-list { display: grid; gap: 12px; }
-.connection-card { display: flex; align-items: center; justify-content: space-between; gap: 16px; border: 1px solid var(--mt-border); border-radius: 8px; padding: 14px; }
-.connection-copy { min-width: 0; display: grid; gap: 4px; }
-.connection-copy span, .connection-copy small { color: var(--mt-fg-muted); overflow-wrap: anywhere; }
-.connection-actions, .form-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.input-with-action { display: flex; width: 100%; gap: 8px; }
-.agent-note { margin: 4px 0 16px 210px; font-size: 12px; }
-@media (max-width: 760px) {
-  .connection-card { align-items: stretch; flex-direction: column; }
-  .agent-note { margin-left: 0; }
-}
+.cloud-settings { display: grid; gap: 18px; min-width: 0; }
+.cloud-intro, .empty-copy, .agent-note { margin: 0; color: var(--mt-fg-muted); line-height: 1.7; font-size: 12px; }
+.connection-list { display: grid; gap: 14px; }
+.connection-card { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; border: 1px solid var(--mt-border); border-radius: 10px; padding: 19px; background: var(--mt-surface-raised); }
+.connection-copy { min-width: 0; display: grid; gap: 6px; }
+.connection-copy strong { font-size: 14px; font-weight: 600; color: var(--mt-fg); }
+.connection-copy span { font-size: 11px; color: var(--mt-accent); }
+.connection-copy small { color: var(--mt-fg-muted); overflow-wrap: anywhere; font-size: 11px; line-height: 1.6; }
+.connection-actions { justify-content: flex-end; }
+.connection-actions, .form-actions { display: flex; flex-wrap: wrap; gap: 7px; }
+.connection-actions :deep(.el-button + .el-button), .form-actions :deep(.el-button + .el-button) { margin-left: 0; }
+.connection-list > .el-button { justify-self: start; margin-top: 4px; }
+.empty-copy { border: 1px dashed var(--mt-border); border-radius: 10px; background: var(--mt-surface); padding: 32px 22px; text-align: center; }
+.input-with-action { display: flex; width: 100%; min-width: 0; gap: 8px; }
+.input-with-action :deep(.el-input) { min-width: 0; }
+.connection-form :deep(.el-select) { width: 100%; }
+.form-actions { justify-content: flex-end; padding-top: 20px; border-top: 1px solid var(--mt-border); margin-top: 16px; }
+.agent-note { margin: 4px 0 16px 210px; padding: 12px 14px; background: var(--mt-accent-soft); border-radius: 7px; }
+@media (max-width: 1000px) { .connection-card { flex-direction: column; } .connection-actions { justify-content: flex-start; } }
+@media (max-width: 760px) { .connection-card { align-items: stretch; padding: 16px; } .agent-note { margin-left: 0; } }
+@media (max-width: 620px) { .connection-form :deep(.el-form-item) { display: block; } .connection-form :deep(.el-form-item__label) { width: 100% !important; height: auto; line-height: 1.5; margin-bottom: 7px; } .connection-form :deep(.el-form-item__content) { margin-left: 0 !important; min-width: 0; } }
 </style>

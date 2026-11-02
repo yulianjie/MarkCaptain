@@ -60,6 +60,7 @@ Channel naming convention:
 | `app-create-editor-window` | `invoke('cmd_new_window')` |
 | `app-create-settings-window` | `invoke('cmd_open_settings')` |
 | First renderer paint | `invoke('cmd_show_window')` validates geometry, then reveals the calling window |
+| Resolved application theme | `setWindowTheme('light' \| 'dark' \| null)` invokes `cmd_window_set_theme` for the calling window; `null` restores OS-following native decorations |
 | `window-close-by-id` | `invoke('cmd_close_window', { label })` |
 | `window-reload-by-id` | `WebviewWindow.reload()` via Tauri JS API |
 | `mt::app-try-quit` | `invoke('process:plugin:exit')` from `@tauri-apps/plugin-process` |

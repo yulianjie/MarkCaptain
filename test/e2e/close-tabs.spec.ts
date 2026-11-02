@@ -112,6 +112,6 @@ for (const sourceMode of [false, true]) {
 test('Close All clears the final document', async ({ page }) => {
   await openDocuments(page)
   await page.locator('.tabs-bar [role="tab"]').last().click({ button: 'right' })
-  await page.locator('.mt-context-menu').getByRole('button', { name: 'Close all tabs', exact: true }).click()
+  await page.locator('.mt-context-menu').getByRole('menuitem', { name: 'Close all tabs', exact: true }).click()
   await expectEmptyEditors(page)
 })

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { ArrowLeft, CornerDownRight, Search, X } from '@lucide/vue'
+import { ArrowLeft, CornerDownRight, Search, X, RefreshCw, Pin, PinOff, NotebookPen } from '@lucide/vue'
 import { useNotebookStore } from '@/stores/notebook'
 import { useEditorStore } from '@/stores/editor'
 import { useI18n } from '@/i18n'
@@ -82,11 +82,12 @@ function toggleTarget() {
 <template>
   <section class="notebook-panel" aria-label="Document links">
     <header class="notebook-toolbar">
+      <NotebookPen :size="15" class="toolbar-mark" aria-hidden="true" />
       <select v-model="notebook.panel" :aria-label="t('notes.panel')">
         <option v-for="tab in tabs" :key="tab" :value="tab">{{ t(`notes.${tab}`) }}</option>
       </select>
-      <button type="button" :title="t('notes.rebuild')" :aria-label="t('notes.rebuild')" @click="notebook.rebuild(true)">↻</button>
-      <button type="button" :title="t('notes.quick')" :aria-label="t('notes.quick')" @click="notebook.dialog = 'quick'">⌕</button>
+      <button type="button" :title="t('notes.rebuild')" :aria-label="t('notes.rebuild')" @click="notebook.rebuild(true)"><RefreshCw :size="14" aria-hidden="true" /></button>
+      <button type="button" :title="t('notes.quick')" :aria-label="t('notes.quick')" @click="notebook.dialog = 'quick'"><Search :size="14" aria-hidden="true" /></button>
     </header>
 
     <template v-if="notebook.panel === 'links'">
@@ -99,7 +100,8 @@ function toggleTarget() {
         <div class="target-actions">
           <button v-if="notebook.relationTargetPinned || notebook.relationTarget" type="button" class="target-action"
             :title="text(notebook.relationTargetPinned ? 'useActive' : 'fixTarget')"
-            :aria-label="text(notebook.relationTargetPinned ? 'useActive' : 'fixTarget')" @click="toggleTarget">
+            :aria-label="text(notebook.relationTargetPinned ? 'useActive' : 'fixTarget')" :aria-pressed="notebook.relationTargetPinned" @click="toggleTarget">
+            <component :is="notebook.relationTargetPinned ? PinOff : Pin" :size="12" aria-hidden="true" />
             {{ text(notebook.relationTargetPinned ? 'useActive' : 'fixTarget') }}
           </button>
           <button v-if="notebook.canReturnFromRelation" type="button" class="icon-action" :title="text('back')" :aria-label="text('back')" @click="notebook.returnFromRelation()">
@@ -186,44 +188,49 @@ function toggleTarget() {
 </template>
 
 <style scoped>
-.notebook-panel { display: flex; flex-direction: column; height: 100%; min-height: 0; overflow: hidden; padding: 8px 10px; box-sizing: border-box; font-size: 12px; }
-.notebook-toolbar { display: flex; flex: 0 0 auto; gap: 6px; align-items: center; }
-.notebook-toolbar select { min-width: 0; flex: 1; height: 30px; }
-.notebook-toolbar button, .notebook-toolbar select, .target-action, .icon-action, .relation-filter button { background: transparent; color: var(--mt-fg); border: 1px solid var(--mt-border); padding: 5px; border-radius: 6px; }
+.notebook-panel { display: flex; flex-direction: column; height: 100%; min-height: 0; overflow: hidden; padding: 0 14px 12px; box-sizing: border-box; color: var(--mt-fg); background: var(--mt-bg); font: 12px/1.6 var(--mt-ui-font); }
+.notebook-toolbar { display: flex; flex: 0 0 auto; gap: 5px; align-items: center; min-height: 46px; border-bottom: 1px solid var(--mt-border); }
+.toolbar-mark { color: var(--mt-accent); flex-shrink: 0; margin-right: 2px; }
+.notebook-toolbar select { min-width: 0; flex: 1; height: 30px; font: inherit; font-weight: 500; }
+.notebook-toolbar button, .notebook-toolbar select, .target-action, .icon-action, .relation-filter button { background: transparent; color: var(--mt-fg-muted); border: 0; padding: 5px; border-radius: 6px; }
+.notebook-toolbar button { display: grid; place-items: center; width: 28px; height: 28px; }
+.notebook-toolbar button:hover, .target-action:hover, .icon-action:hover { background: var(--mt-row-hover); color: var(--mt-fg); }
 .notebook-toolbar button, .target-action, .icon-action, .relation-filter button { cursor: pointer; }
-.target-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 12px 2px 9px; border-bottom: 1px solid var(--mt-border); }
+.target-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 9px; padding: 17px 2px 13px; }
 .target-name { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
-.target-name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 600; }
+.target-name { flex: 1 1 150px; }
+.target-name strong { overflow-wrap: anywhere; line-height: 1.6; font-size: 12px; font-weight: 500; }
 .target-name small, .eyebrow { color: var(--mt-fg-muted); font-size: 10px; }
 .eyebrow { text-transform: uppercase; letter-spacing: .05em; }
-.target-actions { display: flex; flex: 0 0 auto; gap: 4px; align-items: center; }
-.target-action { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
+.target-actions { display: flex; flex: 0 0 auto; gap: 4px; align-items: center; margin-left: auto; }
+.target-action { display: inline-flex; align-items: center; gap: 5px; max-width: 170px; font-size: 11px; line-height: 1.5; }
+.target-action[aria-pressed=true] { background: var(--mt-accent-soft); color: var(--mt-accent); }
 .icon-action { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; }
-.relation-filter { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; min-height: 30px; margin: 9px 0; padding: 0 7px; border: 1px solid var(--mt-border); border-radius: 6px; color: var(--mt-fg-muted); }
+.relation-filter { display: flex; align-items: center; gap: 7px; flex: 0 0 auto; min-height: 34px; margin: 0 0 12px; padding: 0 9px; border: 1px solid var(--mt-border); border-radius: 7px; color: var(--mt-fg-muted); background: var(--mt-surface-raised); }
 .relation-filter:focus-within { outline: 2px solid var(--mt-accent); outline-offset: 1px; }
 .relation-filter input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--mt-fg); font: inherit; }
 .relation-filter button { display: grid; place-items: center; padding: 2px; border: 0; }
-.relation-status { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; padding: 7px 8px; border-radius: 6px; background: var(--mt-sidebar-bg); color: var(--mt-fg-muted); line-height: 1.4; }
+.relation-status { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 12px; padding: 10px; border: 1px solid var(--mt-border); border-radius: 7px; background: var(--mt-surface); color: var(--mt-fg-muted); line-height: 1.6; font-size: 11px; }
 .relation-status.warning { color: var(--mt-warning, #a46600); }
 .relation-status button { margin-left: auto; flex: 0 0 auto; border: 0; background: transparent; color: var(--mt-accent); cursor: pointer; font: inherit; }
 .loading-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--mt-accent); animation: pulse 1s ease-in-out infinite alternate; }
 .relation-scroll { flex: 1; min-height: 0; overflow: auto; scrollbar-width: thin; }
-.relation-section { border-bottom: 1px solid var(--mt-border); }
+.relation-section { border-bottom: 1px solid var(--mt-border); padding: 3px 0 9px; margin-bottom: 9px; }
 .relation-section > summary, .source-group > summary { display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 32px; cursor: pointer; list-style: none; }
 .relation-section > summary::-webkit-details-marker, .source-group > summary::-webkit-details-marker { display: none; }
 .relation-section > summary::before, .source-group > summary::before { content: '›'; width: 10px; color: var(--mt-fg-muted); transition: transform 120ms; }
 .relation-section[open] > summary::before, .source-group[open] > summary::before { transform: rotate(90deg); }
-.relation-section > summary { font-weight: 600; }
+.relation-section > summary { font-weight: 500; color: var(--mt-fg-muted); font-size: 11px; }
 .count { margin-left: auto; color: var(--mt-fg-muted); font-size: 10px; font-variant-numeric: tabular-nums; }
-.source-group { margin: 2px 0 6px 11px; }
+.source-group { margin: 4px 0 7px 7px; padding-left: 5px; border-left: 1px solid var(--mt-border); }
 .source-group > summary { min-height: 28px; font-weight: 400; color: var(--mt-fg-muted); }
-.source-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.source-path { min-width: 0; overflow-wrap: anywhere; line-height: 1.6; }
 .relation-row { padding: 2px 0 6px 10px; }
 .relation-row-main { display: flex; align-items: stretch; gap: 4px; }
-.location-button, .outgoing-row { display: flex; min-width: 0; flex: 1; align-items: center; gap: 8px; border: 0; border-radius: 5px; padding: 5px 6px; background: transparent; color: var(--mt-fg); cursor: pointer; text-align: left; font: inherit; }
+.location-button, .outgoing-row { display: flex; min-width: 0; flex: 1; align-items: flex-start; gap: 8px; border: 0; border-radius: 6px; padding: 8px; background: transparent; color: var(--mt-fg); cursor: pointer; text-align: left; font: inherit; }
 .location-button:hover, .outgoing-row:hover { background: var(--mt-row-hover); }
 .line-number { flex: 0 0 auto; color: var(--mt-fg-muted); font: 10px/1.4 'Cascadia Code', Consolas, monospace; }
-.row-target { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row-target { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; line-height: 1.6; }
 .open-other { display: grid; place-items: center; width: 28px; flex: 0 0 28px; border: 0; border-radius: 5px; background: transparent; color: var(--mt-fg-muted); cursor: pointer; }
 .open-other:hover { background: var(--mt-row-hover); color: var(--mt-accent); }
 .context-details { padding: 0 6px; color: var(--mt-fg-muted); }
@@ -231,7 +238,7 @@ function toggleTarget() {
 .context-details p { margin: 5px 0 3px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--mt-fg); }
 .outgoing-row { width: 100%; flex-direction: column; align-items: flex-start; gap: 3px; overflow-wrap: anywhere; }
 .outgoing-row span { overflow-wrap: anywhere; }
-.outgoing-row small { color: var(--mt-fg-muted); }
+.outgoing-row small { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: var(--mt-fg-muted); font-size: 11px; }
 .section-empty, .no-relations, .partial-note { margin: 4px 0 9px; padding: 5px 8px; color: var(--mt-fg-muted); font-size: 11px; }
 .no-relations { text-align: center; }
 .partial-note { color: var(--mt-warning, #a46600); }
@@ -239,6 +246,7 @@ function toggleTarget() {
 .index-errors { flex: 0 0 auto; max-height: 25%; overflow: auto; }
 .index-errors p { overflow-wrap: anywhere; color: var(--mt-fg-muted); }
 button:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid var(--mt-accent); outline-offset: 1px; }
+button:disabled { cursor: default; opacity: .45; }
 @keyframes pulse { from { opacity: .4; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .loading-dot { animation: none; } }
 </style>

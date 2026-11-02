@@ -7,7 +7,8 @@ import { AGENT_PRESETS, parseAgentHeaders, type AgentAuthMode } from '@/services
 import { useI18n } from '@/i18n'
 
 const agent = useAgentStore()
-const { t } = useI18n()
+const { t, locale } = useI18n()
+const sections = computed(() => locale.value === 'zh-CN' ? { connection: '模型连接', auth: '身份验证', advanced: '高级请求头' } : locale.value === 'ja' ? { connection: 'モデル接続', auth: '認証', advanced: '追加リクエストヘッダー' } : { connection: 'Model connection', auth: 'Authentication', advanced: 'Additional request headers' })
 const baseUrl = ref('')
 const model = ref('')
 const apiKey = ref('')
@@ -86,6 +87,8 @@ onBeforeUnmount(() => { apiKey.value = ''; headers.value = '' })
     <p>{{ t('agent.settings.description') }}</p>
     <form @submit.prevent="save(false)">
       <fieldset :disabled="saving || testing || agent.busy">
+        <section class="agent-setting-group">
+        <h3>{{ sections.connection }}</h3>
         <label for="agent-provider">{{ t('agent.settings.provider') }}</label>
         <select id="agent-provider" v-model="preset" @change="choosePreset">
           <option v-for="option in AGENT_PRESETS" :key="option.id" :value="option.id">{{ option.id === 'custom' ? t('agent.settings.custom') : option.name }}</option>
@@ -95,6 +98,9 @@ onBeforeUnmount(() => { apiKey.value = ''; headers.value = '' })
         <small>{{ t('agent.settings.urlHelp') }}</small>
         <label for="agent-model">{{ t('agent.settings.model') }}</label>
         <input id="agent-model" v-model="model" required maxlength="200" :placeholder="t('agent.settings.modelPlaceholder')" autocomplete="off" spellcheck="false">
+        </section>
+        <section class="agent-setting-group">
+        <h3>{{ sections.auth }}</h3>
         <label for="agent-auth-mode">{{ t('agent.settings.authMode') }}</label>
         <select id="agent-auth-mode" v-model="authMode">
           <option value="system">{{ t('agent.settings.authSystem') }}</option>
@@ -106,11 +112,15 @@ onBeforeUnmount(() => { apiKey.value = ''; headers.value = '' })
         <input id="agent-key" v-model="apiKey" type="password" maxlength="4096" :placeholder="t(sameEndpoint && agent.config?.hasKey ? 'agent.settings.keepKey' : 'agent.settings.keyPlaceholder')" autocomplete="new-password" spellcheck="false">
         <small>{{ t('agent.settings.keyHelp') }}</small>
         <button v-if="sameEndpoint && agent.config?.hasKey" class="agent-text-button" type="button" @click="forget">{{ t('agent.settings.forgetKey') }}</button>
-        <label for="agent-headers">{{ t('agent.settings.headers') }} <span v-if="sameEndpoint && agent.config?.hasHeaders" class="agent-key-state"><Check :size="12" />{{ t('agent.settings.headersSaved') }}</span></label>
+        <details class="agent-settings-advanced">
+        <summary>{{ sections.advanced }} <span v-if="sameEndpoint && agent.config?.hasHeaders" class="agent-key-state"><Check :size="12" />{{ t('agent.settings.headersSaved') }}</span></summary>
+        <label for="agent-headers">{{ t('agent.settings.headers') }}</label>
         <textarea id="agent-headers" v-model="headers" rows="4" maxlength="32768" :placeholder="t(sameEndpoint && agent.config?.hasHeaders ? 'agent.settings.keepHeaders' : 'agent.settings.headersPlaceholder')" autocomplete="off" spellcheck="false" />
         <small>{{ t('agent.settings.headersHelp') }}</small>
         <button v-if="sameEndpoint && agent.config?.hasHeaders" class="agent-text-button" type="button" @click="forgetHeaders">{{ t('agent.settings.forgetHeaders') }}</button>
+        </details>
         </template>
+        </section>
         <div class="agent-settings-actions"><button type="submit" class="agent-primary">{{ t('common.save') }}</button><button type="button" @click="save(true)">{{ t('agent.settings.test') }}</button></div>
       </fieldset>
     </form>

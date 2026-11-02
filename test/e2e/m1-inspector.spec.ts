@@ -95,7 +95,7 @@ test('keeps file navigation beside links and returns from current or other-pane 
 
 test('pins links with Agent, synchronizes Agent visibility, and reopens the inspector rail on narrow windows', async ({ page }) => {
   await setupInspector(page)
-  const titlebarAgent = page.getByRole('button', { name: 'AI assistant' })
+  const titlebarAgent = page.locator('.title-bar').getByRole('button', { name: 'AI assistant' })
   await titlebarAgent.click()
   await expect(page.getByRole('tab', { name: 'Agent' })).toHaveAttribute('aria-selected', 'true')
   await expect(titlebarAgent).toHaveAttribute('aria-expanded', 'true')
@@ -111,12 +111,17 @@ test('pins links with Agent, synchronizes Agent visibility, and reopens the insp
   await expect.poll(() => page.evaluate(async () => (await import('/src/stores/agent.ts')).useAgentStore().visible)).toBe(true)
   expect(await page.evaluate(() => localStorage.getItem('mt:documentInspectorLinksPinned'))).toBe('true')
 
-  await page.setViewportSize({ width: 900, height: 760 })
+  await page.setViewportSize({ width: 900, height: 600 })
   await expect(page.locator('.document-inspector')).toHaveCount(0)
   await expect(page.locator('.document-inspector-rail')).toBeVisible()
   await page.locator('.document-inspector-rail').getByRole('button', { name: 'Agent' }).click()
   await expect(page.locator('.document-inspector')).toBeVisible()
-  await expect(page.locator('.document-inspector')).toHaveCSS('position', 'fixed')
+  await expect(page.locator('.document-inspector')).toHaveCSS('position', 'absolute')
+  const drawerBounds = await page.locator('.document-inspector').boundingBox()
+  const bodyBounds = await page.locator('.page-body').boundingBox()
+  expect(drawerBounds!.y).toBeCloseTo(bodyBounds!.y, 0)
+  expect(drawerBounds!.y + drawerBounds!.height).toBeLessThanOrEqual(bodyBounds!.y + bodyBounds!.height + 1)
+  expect(drawerBounds!.x + drawerBounds!.width).toBeLessThanOrEqual(900)
   const agentBox = await page.locator('#agent-panel').evaluate(element => ({
     minWidth: getComputedStyle(element).minWidth,
     position: getComputedStyle(element).position,
@@ -135,10 +140,34 @@ test('pins links with Agent, synchronizes Agent visibility, and reopens the insp
   await expect(page.locator('#agent-panel')).toBeVisible()
   await expect.poll(() => page.evaluate(async () => (await import('/src/stores/agent.ts')).useAgentStore().visible)).toBe(true)
 
-  await page.getByRole('button', { name: 'Hide inspector' }).click()
+  await page.locator('.inspector-header').getByRole('button', { name: 'Hide inspector' }).click()
   await expect(page.locator('.document-inspector')).toHaveCount(0)
   await expect(page.locator('.document-inspector-rail')).toBeVisible()
   await page.locator('.document-inspector-rail').getByRole('button', { name: 'Outline' }).click()
   await expect(page.locator('.document-inspector .toc-pane')).toBeVisible()
   await expect(page.locator('.document-inspector-rail')).toHaveCount(0)
+})
+
+test('Escape collapses embedded Agent trays before closing the narrow inspector', async ({ page }) => {
+  await setupInspector(page)
+  await page.setViewportSize({ width: 900, height: 600 })
+  await expect(page.locator('.document-inspector-rail')).toBeVisible()
+  await page.locator('.document-inspector-rail').getByRole('button', { name: 'Agent' }).click()
+  await expect(page.locator('#agent-panel')).toBeVisible()
+  for (const [trigger, drawer] of [
+    ['.agent-tools-toggle', '#agent-tools-drawer'],
+    ['.agent-composer-context', '#agent-context-drawer'],
+  ]) {
+    await page.locator(trigger).click()
+    await expect(page.locator(drawer)).toBeVisible()
+    await expect(page.locator(`${drawer} .agent-drawer-header button`)).toBeFocused()
+    await page.keyboard.press('Escape')
+    await expect(page.locator(drawer)).toBeHidden()
+    await expect(page.locator('.document-inspector')).toBeVisible()
+    await expect(page.locator('#agent-panel')).toBeVisible()
+    await expect(page.locator(trigger)).toBeFocused()
+  }
+  await page.keyboard.press('Escape')
+  await expect(page.locator('.document-inspector')).toHaveCount(0)
+  await expect(page.locator('.document-inspector-rail').getByRole('button', { name: 'Agent' })).toBeFocused()
 })

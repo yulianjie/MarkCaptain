@@ -134,6 +134,8 @@ onBeforeUnmount(() => {
           class="item"
           :class="{ disabled: item.disabled }"
           type="button"
+          role="menuitem"
+          :disabled="item.disabled"
           @click="pick(item)"
         >
           <span class="label">{{ item.label }}</span>
@@ -148,15 +150,19 @@ onBeforeUnmount(() => {
 .mt-context-menu {
   position: fixed;
   z-index: 5000;
-  min-width: 200px;
-  max-width: 320px;
-  padding: 4px 0;
-  background: var(--mt-bg, #fff);
-  color: var(--mt-fg, #24292e);
-  border: 1px solid var(--mt-border, #d1d5da);
-  border-radius: 6px;
-  box-shadow: 0 8px 24px var(--mt-shadow, rgba(27, 31, 35, 0.12));
-  font-size: 13px;
+  min-width: min(220px, calc(100vw - 12px));
+  max-width: min(340px, calc(100vw - 12px));
+  max-height: calc(100vh - 12px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 5px;
+  background: var(--mt-surface-raised, #fdfcf9);
+  color: var(--mt-fg, #252923);
+  border: 1px solid var(--mt-border, #deded5);
+  border-radius: 10px;
+  box-shadow: var(--mt-shadow-panel, 0 8px 30px rgba(30, 40, 30, .12));
+  font-family: var(--mt-ui-font, inherit);
+  font-size: 12px;
   user-select: none;
 }
 .item {
@@ -165,29 +171,34 @@ onBeforeUnmount(() => {
   width: 100%;
   background: transparent;
   border: 0;
-  padding: 6px 14px;
+  min-height: 33px;
+  padding: 7px 10px;
+  border-radius: 5px;
   color: inherit;
   font: inherit;
   text-align: left;
   cursor: pointer;
 }
-.item:hover:not(.disabled) {
-  background: var(--mt-row-hover, #f1f8ff);
+.item:hover:not(.disabled), .item:focus-visible {
+  background: var(--mt-accent-soft, #e5ece3);
+  color: var(--mt-accent, #3e6250);
 }
+.item:focus-visible { outline: 2px solid var(--mt-accent); outline-offset: -2px; }
 .item.disabled {
-  color: var(--mt-fg-muted, #959da5);
+  color: var(--mt-fg-muted, #74796e);
+  opacity: .5;
   cursor: not-allowed;
 }
 .label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .shortcut {
   margin-left: 16px;
-  color: var(--mt-fg-muted, #959da5);
-  font-size: 11px;
+  color: var(--mt-fg-muted, #74796e);
+  font-size: 10px;
   font-family: ui-monospace, monospace;
 }
 .divider {
   height: 1px;
-  background: var(--mt-border, #eaecef);
-  margin: 4px 0;
+  background: var(--mt-border, #deded5);
+  margin: 5px 5px;
 }
 </style>

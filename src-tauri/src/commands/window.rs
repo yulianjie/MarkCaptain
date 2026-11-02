@@ -1,11 +1,67 @@
 //! Window-level commands.
 
+use serde::Deserialize;
+use serde_json::Value;
 use tauri::{
-    AppHandle, Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent,
+    AppHandle, Manager, State, Theme, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent,
 };
 
 use crate::app::AppState;
 use crate::error::{AppError, AppResult};
+
+/// Accept only the explicit native palettes. Tauri's Theme deserializer maps
+/// unknown strings to Light, which would silently hide a renderer typo.
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum NativeWindowTheme {
+    Light,
+    Dark,
+}
+
+impl From<NativeWindowTheme> for Theme {
+    fn from(theme: NativeWindowTheme) -> Self {
+        match theme {
+            NativeWindowTheme::Light => Self::Light,
+            NativeWindowTheme::Dark => Self::Dark,
+        }
+    }
+}
+
+/// User CSS needs the renderer's computed background to determine brightness.
+/// Such windows stay hidden until that resolution and native synchronization
+/// have completed. Known palettes can set their title bar during construction.
+fn initial_window_theme(preferences: &Value) -> Option<Theme> {
+    if preferences.get("autoSwitchTheme").and_then(Value::as_u64) == Some(1) {
+        return None;
+    }
+    match preferences.get("theme").and_then(Value::as_str) {
+        Some("dark" | "one-dark" | "material-dark") => Some(Theme::Dark),
+        Some("light" | "github-blue" | "graphite-light" | "ulysses-light") => Some(Theme::Light),
+        _ => None,
+    }
+}
+
+fn initial_window_theme_from_snapshot(snapshot: AppResult<Value>) -> Option<Theme> {
+    match snapshot {
+        Ok(preferences) => initial_window_theme(&preferences),
+        Err(error) => {
+            tracing::warn!(%error, "initial settings theme unavailable; using system appearance");
+            None
+        }
+    }
+}
+
+#[tauri::command]
+pub fn cmd_window_set_theme(
+    window: WebviewWindow,
+    theme: Option<NativeWindowTheme>,
+) -> AppResult<()> {
+    // Use the injected caller instead of accepting an arbitrary window label.
+    // None clears the manual override so later OS changes remain automatic.
+    window
+        .set_theme(theme.map(Theme::from))
+        .map_err(AppError::from)
+}
 
 #[tauri::command]
 pub async fn cmd_new_window(app: AppHandle, label: Option<String>) -> AppResult<()> {
@@ -150,12 +206,16 @@ pub async fn cmd_open_settings(app: AppHandle, window: WebviewWindow) -> AppResu
         crate::window_placement::show(&win, preferred.as_ref())?;
         return Ok(());
     }
+    // A corrupt/unreadable preference snapshot must not make the utility
+    // window unreachable. Its renderer retains the existing defaults fallback.
+    let native_theme = initial_window_theme_from_snapshot(crate::preferences::store::get_all(&app));
     let window = WebviewWindowBuilder::new(
         &app,
         label,
         WebviewUrl::App("index.html#/preferences".into()),
     )
     .title("Preferences")
+    .theme(native_theme)
     .inner_size(900.0, 700.0)
     .min_inner_size(760.0, 560.0)
     // The renderer shows the window after preferences/i18n are hydrated,
@@ -187,7 +247,53 @@ pub async fn cmd_open_settings(app: AppHandle, window: WebviewWindow) -> AppResu
 
 #[cfg(test)]
 mod tests {
-    use super::{ensure_editor_window, ensure_settings_window};
+    use super::{
+        ensure_editor_window, ensure_settings_window, initial_window_theme,
+        initial_window_theme_from_snapshot, NativeWindowTheme,
+    };
+    use serde_json::json;
+    use tauri::Theme;
+
+    #[test]
+    fn initial_settings_theme_uses_known_palettes_and_preserves_system_mode() {
+        for theme in ["dark", "one-dark", "material-dark"] {
+            assert_eq!(
+                initial_window_theme(&json!({"theme": theme, "autoSwitchTheme": 2})),
+                Some(Theme::Dark)
+            );
+        }
+        for theme in ["light", "github-blue", "graphite-light", "ulysses-light"] {
+            assert_eq!(
+                initial_window_theme(&json!({"theme": theme, "autoSwitchTheme": 2})),
+                Some(Theme::Light)
+            );
+        }
+        assert_eq!(
+            initial_window_theme(&json!({"theme": "dark", "autoSwitchTheme": 1})),
+            None
+        );
+        assert_eq!(
+            initial_window_theme(&json!({"theme": "custom-dark-name", "autoSwitchTheme": 2})),
+            None
+        );
+    }
+
+    #[test]
+    fn native_theme_command_rejects_unknown_palettes() {
+        assert!(serde_json::from_value::<NativeWindowTheme>(json!("dark")).is_ok());
+        assert!(serde_json::from_value::<NativeWindowTheme>(json!("light")).is_ok());
+        assert!(serde_json::from_value::<NativeWindowTheme>(json!("not-a-theme")).is_err());
+    }
+
+    #[test]
+    fn initial_settings_theme_read_failure_falls_back_without_blocking_window_creation() {
+        assert_eq!(
+            initial_window_theme_from_snapshot(Err(crate::error::AppError::Other(
+                "preference snapshot unreadable".into()
+            ))),
+            None
+        );
+    }
 
     #[test]
     fn editor_destroy_command_rejects_non_editor_windows() {

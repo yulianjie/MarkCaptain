@@ -126,6 +126,12 @@ async function ensureAgentPanelOpen(page: Page) {
   await expect(button).toHaveAttribute('aria-expanded', 'true')
 }
 
+async function ensureContextOpen(page: Page) {
+  const toggle = page.locator('.agent-composer-context')
+  if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click()
+  await expect(page.locator('#agent-context-drawer')).toBeVisible()
+}
+
 async function propose(page: Page) {
   await page.getByRole('textbox', {name:'发送给写作助手的消息'}).fill('修改首尾两段')
   await page.getByRole('button', {name:'发送',exact:true}).click()
@@ -218,8 +224,10 @@ test('sends item-level review feedback and rewrites only the requested rejected 
   const first = page.locator('.agent-change').nth(0), second = page.locator('.agent-change').nth(1)
   const firstId = await first.getAttribute('data-change-id'), secondId = await second.getAttribute('data-change-id')
   expect(firstId).not.toBe(secondId)
+  await first.locator('.agent-review-feedback > summary').click()
   await first.getByRole('textbox', { name: '审阅意见（可选）' }).fill('保留这处扩写')
   await first.getByRole('button', { name: '应用此处', exact: true }).click()
+  await second.locator('.agent-review-feedback > summary').click()
   await second.getByRole('textbox', { name: '审阅意见（可选）' }).fill('保持克制，不要增加新事实')
   await second.getByRole('button', { name: '忽略此处', exact: true }).click()
   const accepted = await markdown(page)
@@ -423,6 +431,7 @@ test('full-document reference preserves an independently bounded selection edit'
   await page.keyboard.press('Home')
   await page.keyboard.press('Shift+End')
   await page.getByRole('textbox',{name:'发送给写作助手的消息'}).click()
+  await ensureContextOpen(page)
   await page.getByLabel('参考全文，仅修改选区',{exact:true}).check()
   await page.getByRole('textbox',{name:'发送给写作助手的消息'}).fill('按全文风格改写选区')
   await page.getByRole('button',{name:'发送',exact:true}).click()
@@ -448,6 +457,7 @@ test('chapter summary resumes after stopping and completes synthesis without cha
     ;(window as unknown as {__pauseSummaryAt:number}).__pauseSummaryAt=2
   },longMarkdown)
   const original=await markdown(page)
+  await ensureContextOpen(page)
   await page.getByRole('button',{name:'分章总结',exact:true}).click()
   await expect.poll(()=>page.evaluate(()=>(window as unknown as {__summaryRequests:unknown[]}).__summaryRequests?.length??0)).toBe(2)
   await page.getByRole('button',{name:'停止生成',exact:true}).click()
@@ -475,6 +485,7 @@ test('manual references use unsaved tab snapshots and citations navigate to the 
     e.setCurrent(primary)
     return tab.id as string
   })
+  await ensureContextOpen(page)
   await page.locator('.agent-references summary').click()
   await page.getByLabel('附加已打开的标签页',{exact:true}).selectOption(referenceId)
   await expect(page.locator('.agent-reference-chips')).toContainText('参考资料.md')
@@ -543,6 +554,7 @@ test('saved stopped summaries resume after reload without processing completed c
     tab.pendingBaselineUpdate=false
     ;(window as unknown as {__pauseSummaryAt:number}).__pauseSummaryAt=2
   })
+  await ensureContextOpen(page)
   await page.getByRole('button',{name:'分章总结',exact:true}).click()
   await expect.poll(()=>page.evaluate(()=>(window as unknown as {__summaryRequests:unknown[]}).__summaryRequests?.length??0)).toBe(2)
   const firstChunk=await page.evaluate(()=>(window as unknown as {__summaryRequests:{context:{markdown:string}}[]}).__summaryRequests[0].context.markdown)
@@ -555,6 +567,7 @@ test('saved stopped summaries resume after reload without processing completed c
   await ensureAgentPanelOpen(page)
   await page.getByRole('button',{name:'历史对话',exact:true}).click()
   await page.locator('.agent-history-item').filter({hasText:'分章总结'}).getByRole('button',{name:'恢复',exact:true}).click()
+  await ensureContextOpen(page)
   const attachment = page.locator('.agent-context-row input[type="checkbox"]')
   await expect(attachment).not.toBeChecked()
   await page.getByRole('button',{name:'继续分章总结',exact:true}).click()

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * File-tree pane in the sidebar. Two sections: Opened Files (always shown)
- * and Project (file tree or empty state).
+ * Project navigation only. Open documents are managed by the editor tab bar,
+ * so the sidebar does not repeat them above the workspace tree.
  */
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { ElMessageBox } from 'element-plus'
@@ -22,14 +22,12 @@ import {
 } from '@element-plus/icons-vue'
 import { t } from '@/i18n'
 import TreeRow from './TreeRow.vue'
-import OpenedFileRow from './OpenedFileRow.vue'
 
 const project = useProjectStore()
 const editor = useEditorStore()
 const notify = useNotificationStore()
 const cloud = useCloudStorageStore()
 
-const openedCollapsed = ref(false)
 const projectCollapsed = ref(false)
 const filterText = ref('')
 const refreshing = ref(false)
@@ -150,37 +148,6 @@ async function syncProject() {
 
 <template>
   <div class="tree-pane">
-    <section class="section" aria-labelledby="opened-files-heading">
-      <header class="section-header">
-        <button
-          id="opened-files-heading"
-          type="button"
-          class="section-toggle"
-          :aria-expanded="!openedCollapsed"
-          aria-controls="opened-files-content"
-          @click="openedCollapsed = !openedCollapsed"
-        >
-          <el-icon class="caret" :class="{ open: !openedCollapsed }"><CaretRight /></el-icon>
-          <span class="label">{{ t('sideBar.openedFiles') }}</span>
-        </button>
-      </header>
-      <div
-        v-show="!openedCollapsed"
-        id="opened-files-content"
-        class="section-body"
-        :role="editor.tabs.length ? 'list' : undefined"
-        :aria-label="editor.tabs.length ? t('sideBar.openedFiles') : undefined"
-      >
-        <div v-if="editor.tabs.length === 0" class="empty-line">{{ t('sideBar.noOpenedFiles') }}</div>
-        <OpenedFileRow
-          v-for="tab in editor.tabs"
-          :key="tab.id"
-          :tab="tab"
-          :active="tab.id === editor.currentFileId"
-        />
-      </div>
-    </section>
-
     <section
       class="section project-section"
       :class="{ 'has-project': project.projectTree }"
@@ -198,7 +165,8 @@ async function syncProject() {
           <el-icon class="caret" :class="{ open: !projectCollapsed }"><CaretRight /></el-icon>
           <span class="label">{{ project.projectTree ? project.projectTree.name : t('sideBar.project') }}</span>
         </button>
-        <span v-if="project.projectTree" class="storage-mode" :class="project.storageMode">
+        <div v-if="project.projectTree" class="project-meta">
+        <span class="storage-mode" :class="project.storageMode">
           {{ t(`sideBar.storageMode.${project.storageMode}`) }}
         </span>
         <el-button v-if="project.projectTree" size="small" link @click.stop="openSettings">
@@ -216,6 +184,7 @@ async function syncProject() {
         <el-button v-if="project.projectTree" size="small" link class="change-btn" @click.stop="pickFolder">
           {{ t('sideBar.change') }}
         </el-button>
+        </div>
       </header>
       <div v-show="!projectCollapsed" id="project-content" class="section-body project-body">
         <div v-if="!project.projectTree" class="empty-state">
@@ -305,6 +274,7 @@ async function syncProject() {
 <style scoped>
 .tree-pane {
   height: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -323,20 +293,21 @@ async function syncProject() {
 .section-header {
   display: flex;
   align-items: center;
-  min-height: 30px;
-  padding: 0 8px;
+  min-height: 39px;
+  padding: 3px 13px;
+  flex-wrap: wrap;
   user-select: none;
   font-size: 11px;
   font-weight: 600;
   color: var(--mt-fg-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0;
   flex-shrink: 0;
 }
-.section-header:hover { background: var(--mt-row-hover); }
+.project-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; width: 100%; padding: 0 4px 6px; }
+.project-meta :deep(.el-button) { font-size: 10px; padding: 2px 0; height: auto; margin: 0; }
 .storage-mode {
   flex: 0 0 auto;
-  margin-left: 6px;
+  margin-left: 0;
   padding: 2px 6px;
   border-radius: 999px;
   background: var(--mt-row-hover);
@@ -346,8 +317,8 @@ async function syncProject() {
   text-transform: none;
   letter-spacing: 0;
 }
-.storage-mode.git { color: #b35c00; }
-.storage-mode.cloud { color: #0969da; }
+.storage-mode.git { color: var(--mt-warning); }
+.storage-mode.cloud { color: var(--mt-info); }
 .section-toggle {
   display: flex;
   align-items: center;
@@ -388,25 +359,25 @@ async function syncProject() {
 .section-body {
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  min-height: 0;
+  overflow-y: auto;
 }
 .project-body {
   flex: 1;
   overflow-y: auto;
-  padding: 4px 0;
+  padding: 4px 0 16px;
 }
 .project-controls {
   position: sticky;
   top: -4px;
   z-index: 2;
-  padding: 4px 8px 6px;
-  background: var(--mt-bg);
-  border-bottom: 1px solid var(--mt-border);
+  padding: 5px 15px 8px;
+  background: var(--mt-sidebar-bg);
 }
 .project-actions {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 2px;
   margin-top: 4px;
 }
@@ -414,8 +385,8 @@ async function syncProject() {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 25px;
-  height: 23px;
+  width: 28px;
+  height: 27px;
   padding: 0;
   border: 0;
   border-radius: 4px;
@@ -452,16 +423,17 @@ async function syncProject() {
   cursor: pointer;
 }
 .empty-line {
-  padding: 6px 12px;
+  padding: 8px 18px;
   color: var(--mt-fg-muted);
   font-size: 12px;
-  font-style: italic;
+  line-height: 1.6;
 }
 .empty-state {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  padding: 14px 18px 20px;
   text-align: left;
 }
 .empty-msg {
@@ -470,5 +442,6 @@ async function syncProject() {
   margin: 0;
   color: var(--mt-fg-muted);
   font-size: 12px;
+  line-height: 1.7;
 }
 </style>

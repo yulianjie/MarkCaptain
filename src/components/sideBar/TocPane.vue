@@ -10,6 +10,12 @@ const editor = useEditorStore()
 const prefs = usePreferencesStore()
 const layout = useLayoutStore()
 const query = ref('')
+function onSearchEscape(event: KeyboardEvent) {
+  if (!query.value) return
+  event.preventDefault()
+  event.stopPropagation()
+  query.value = ''
+}
 const collapsed = ref(new Set<string>())
 const activeSlug = ref<string | null>(null)
 const progress = ref(0)
@@ -99,7 +105,8 @@ function scheduleUpdate() {
 function connectScrollHost() {
   scrollHost?.removeEventListener('scroll', scheduleUpdate)
   observer?.disconnect()
-  scrollHost = document.querySelector<HTMLElement>('.muya-host')
+  scrollHost = document.querySelector<HTMLElement>('.editing-region.active .muya-host')
+    || document.querySelector<HTMLElement>('.muya-host')
   scrollHost?.addEventListener('scroll', scheduleUpdate, { passive: true })
   if (scrollHost) observer?.observe(scrollHost)
   const content = scrollHost?.querySelector('.muya-container')
@@ -135,7 +142,7 @@ watch(() => editor.currentFileId, () => {
   collapsed.value = new Set()
   activeSlug.value = null
 })
-watch([flat, () => editor.sourceCodeMode], async () => {
+watch([flat, () => editor.sourceCodeMode, () => editor.activePaneId], async () => {
   await nextTick()
   connectScrollHost()
 }, { flush: 'post' })
@@ -173,7 +180,7 @@ onBeforeUnmount(() => {
     <label class="toc-search">
       <Search aria-hidden="true" />
       <input v-model="query" type="search" :placeholder="t('chrome.searchHeadings')"
-        :aria-label="t('chrome.searchHeadings')" @keydown.esc="query = ''">
+        :aria-label="t('chrome.searchHeadings')" @keydown.esc="onSearchEscape">
     </label>
     <nav class="toc-list" :aria-label="t('chrome.outline')">
       <div v-for="(item, index) in visible" :key="item.key" class="toc-entry"
@@ -207,23 +214,23 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.toc-pane { height: 100%; min-height: 0; display: flex; flex-direction: column; }
-.toc-header { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px 0; gap: 8px; min-height: 30px; }
+.toc-pane { box-sizing: border-box; height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.toc-header { display: flex; align-items: center; justify-content: space-between; padding: 15px 16px 0; gap: 8px; min-height: 30px; flex-shrink: 0; }
 .toc-heading { display: flex; align-items: center; gap: 8px; padding-left: 4px; min-width: 0; }
-.toc-header h2 { margin: 0; font-size: 13px; line-height: 1.4; font-weight: 600; color: var(--mt-fg); }
+.toc-header h2 { margin: 0; font-size: 11px; line-height: 1.4; font-weight: 500; color: var(--mt-fg-muted); }
 .toc-header span { font-size: 11px; color: var(--mt-fg-muted); }
 .collapse-outline { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: var(--mt-radius-control); background: transparent; color: var(--mt-fg-muted); cursor: pointer; flex-shrink: 0; }
 .collapse-outline:hover { background: var(--mt-icon-hover-bg); color: var(--mt-fg); }
 .collapse-outline svg { width: 16px; height: 16px; }
-.toc-search { box-sizing: border-box; margin: 9px 10px 15px; min-height: 28px; display: flex; align-items: center; gap: 7px; padding: 0 8px; border: 1px solid var(--mt-border); border-radius: var(--mt-radius-tab); background: var(--mt-bg); color: var(--mt-fg-muted); }
+.toc-search { box-sizing: border-box; margin: 10px 18px 16px; min-height: 30px; display: flex; align-items: center; gap: 7px; padding: 0 8px; border: 1px solid var(--mt-border); border-radius: 6px; background: var(--mt-surface, var(--mt-bg)); color: var(--mt-fg-muted); flex-shrink: 0; }
 .toc-search:focus-within { outline: 2px solid var(--mt-accent); outline-offset: 1px; }
 .toc-search svg { width: 14px; height: 14px; flex-shrink: 0; }
 .toc-search input { width: 100%; min-width: 0; padding: 0; background: none; border: none; outline: none; color: var(--mt-fg); font: inherit; font-size: 12px; }
 .toc-search input::placeholder { color: var(--mt-fg-muted); opacity: .8; }
-.toc-list { flex: 1; min-height: 0; overflow-y: auto; padding: 0 10px 16px; scrollbar-width: thin; scrollbar-color: var(--mt-border) transparent; }
-.toc-entry { position: relative; display: flex; align-items: center; min-height: 31px; padding-inline: calc(4px + var(--outline-depth) * 12px) 7px; border-radius: var(--mt-radius-control); color: var(--mt-fg-muted); }
+.toc-list { flex: 1 1 0; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 0 16px 18px; scrollbar-width: thin; scrollbar-color: var(--mt-border) transparent; }
+.toc-entry { position: relative; display: flex; align-items: center; min-height: 34px; padding-inline: calc(4px + var(--outline-depth) * 12px) 7px; border-radius: 5px; color: var(--mt-fg-muted); }
 .toc-entry:hover { background: var(--mt-row-hover); }
-.toc-entry.current { background: var(--mt-icon-active-bg); color: color-mix(in srgb, var(--mt-accent) 65%, var(--mt-fg)); }
+.toc-entry.current { background: var(--mt-accent-soft, var(--mt-icon-active-bg)); color: var(--mt-accent); }
 .toc-entry.current::before { content: ''; position: absolute; inset: 8px auto 8px 0; width: 2px; border-radius: 1px; background: var(--mt-accent); }
 .toc-guide { position: absolute; left: calc(4px + var(--outline-depth) * 12px); top: 0; bottom: 0; border-left: 1px solid var(--mt-border); pointer-events: none; }
 .toc-guide::after { content: ''; position: absolute; left: 0; top: 15px; width: 5px; border-top: 1px solid var(--mt-border); }
@@ -242,9 +249,9 @@ onBeforeUnmount(() => {
 .toc-row.wrap .toc-label { white-space: normal; overflow-wrap: anywhere; }
 button:focus-visible { outline: 2px solid var(--mt-accent); outline-offset: -2px; border-radius: 5px; }
 .empty { padding: 20px 10px; text-align: center; color: var(--mt-fg-muted); font-size: 12px; }
-.toc-progress { display: flex; align-items: center; gap: 8px; padding: 10px 14px; color: var(--mt-fg-muted); font-size: 11px; }
+.toc-progress { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px 8px; flex: 0 0 auto; padding: 17px 20px 20px; border-top: 1px solid var(--mt-border); background: var(--mt-bg); color: var(--mt-fg-muted); font-size: 11px; }
 .toc-progress strong { color: var(--mt-fg-muted); font-size: 11px; font-weight: 400; font-variant-numeric: tabular-nums; }
-.toc-progress progress { flex: 1; min-width: 24px; width: 0; height: 5px; border: 0; border-radius: 8px; overflow: hidden; appearance: none; }
+.toc-progress progress { grid-column: 1 / -1; min-width: 24px; width: 100%; height: 4px; border: 0; border-radius: 8px; overflow: hidden; appearance: none; }
 progress::-webkit-progress-bar { background: var(--mt-border); }
 progress::-webkit-progress-value { background: var(--mt-accent); border-radius: 8px; }
 progress::-moz-progress-bar { background: var(--mt-accent); border-radius: 8px; }

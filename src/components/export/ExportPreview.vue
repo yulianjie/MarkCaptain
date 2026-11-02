@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref, watch } from 'vue'
+import { FileText, LoaderCircle, RefreshCw } from '@lucide/vue'
 
 const props = defineProps<{
   html: string
@@ -99,8 +100,8 @@ defineExpose({ print })
 
 <template>
   <div class="preview-shell" :class="{ 'is-stale': stale }">
-    <div v-if="loading" class="preview-state" role="status">{{ loadingMessage }}</div>
-    <div v-if="!html" class="preview-state">{{ emptyMessage }}</div>
+    <div v-if="loading" class="preview-state" role="status"><LoaderCircle :size="24" class="loading-icon" aria-hidden="true" /><span>{{ loadingMessage }}</span></div>
+    <div v-if="!html" class="preview-state"><FileText :size="34" aria-hidden="true" /><span>{{ emptyMessage }}</span></div>
     <iframe
       v-if="html"
       ref="frame"
@@ -111,7 +112,7 @@ defineExpose({ print })
       referrerpolicy="no-referrer"
       @load="onLoad"
     />
-    <div v-if="stale" class="preview-stale" role="status">{{ staleMessage }}</div>
+    <div v-if="stale" class="preview-stale" role="status"><RefreshCw :size="14" aria-hidden="true" /><span>{{ staleMessage }}</span></div>
   </div>
 </template>
 
@@ -119,11 +120,12 @@ defineExpose({ print })
 .preview-shell {
   position: relative;
   height: min(70vh, 760px);
-  min-height: 360px;
+  min-height: 300px;
   overflow: hidden;
-  border: 1px solid var(--el-border-color);
-  border-radius: 6px;
-  background: #eef0f2;
+  border: 1px solid var(--mt-border);
+  border-radius: 8px;
+  background: var(--mt-bg);
+  box-shadow: 0 3px 18px color-mix(in srgb, var(--mt-fg) 4%, transparent);
 }
 
 .preview-frame {
@@ -139,13 +141,21 @@ defineExpose({ print })
   inset: 0;
   z-index: 1;
   pointer-events: none;
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
   width: 100%;
   height: 100%;
-  color: var(--el-text-color-secondary);
+  color: var(--mt-fg-muted);
   font-size: 13px;
+  text-align: center;
+  background: var(--mt-bg);
 }
+.preview-state span { max-width: 280px; padding: 0 20px; line-height: 1.7; }
+.preview-state > svg { color: var(--mt-accent); opacity: .6; stroke-width: 1.3; }
+.loading-icon { animation: preview-spin 1.2s linear infinite; }
 
 .preview-stale {
   position: absolute;
@@ -153,10 +163,17 @@ defineExpose({ print })
   bottom: 12px;
   left: 12px;
   padding: 9px 12px;
-  border: 1px solid var(--el-color-warning-light-5);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid color-mix(in srgb, var(--mt-warning) 35%, var(--mt-border));
   border-radius: 4px;
-  background: var(--el-color-warning-light-9);
-  color: var(--el-color-warning-dark-2);
+  background: var(--mt-warning-soft);
+  color: var(--mt-warning);
   font-size: 12px;
+  line-height: 1.6;
 }
+.preview-stale > svg { flex-shrink: 0; }
+@keyframes preview-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .loading-icon { animation: none; } }
 </style>

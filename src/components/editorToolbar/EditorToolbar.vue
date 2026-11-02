@@ -146,7 +146,7 @@ const paragraphTrigger = ref<HTMLButtonElement | null>(null)
 const moreTrigger = ref<HTMLButtonElement | null>(null)
 const menuElement = ref<HTMLElement | null>(null)
 const openMenu = ref<ToolbarMenu | null>(null)
-const menuPosition = ref({ top: 0, left: 0 })
+const menuPosition = ref({ top: 0, left: 0, maxHeight: 520 })
 const cloudUploadOpen = ref(false)
 
 const hasDocument = computed(() => editor.currentFile !== null)
@@ -233,6 +233,7 @@ function positionMenu(menu: ToolbarMenu): void {
   menuPosition.value = {
     top: rect.bottom + 5,
     left: Math.min(Math.max(8, rect.left), window.innerWidth - menuWidth - 8),
+    maxHeight: Math.min(520, Math.max(80, window.innerHeight - rect.bottom - 13)),
   }
 }
 
@@ -562,7 +563,7 @@ onBeforeUnmount(() => {
       :class="`toolbar-menu-${openMenu}`"
       role="menu"
       :aria-label="openMenu === 'paragraph' ? copy.paragraphMenu : copy.more"
-      :style="{ top: `${menuPosition.top}px`, left: `${menuPosition.left}px` }"
+      :style="{ top: `${menuPosition.top}px`, left: `${menuPosition.left}px`, maxHeight: `${menuPosition.maxHeight}px` }"
       @mousedown.prevent
       @keydown="onMenuKeydown"
     >
@@ -729,7 +730,7 @@ onBeforeUnmount(() => {
   container-type: inline-size;
   flex: 0 0 auto;
   min-width: 0;
-  height: 34px;
+  height: 38px;
   color: var(--mt-fg-muted, #586069);
   background: var(--mt-bg, #fff);
   border-bottom: 1px solid var(--mt-border, #e1e4e8);
@@ -753,7 +754,7 @@ onBeforeUnmount(() => {
   width: max-content;
   min-width: 100%;
   height: 100%;
-  padding: 0 7px;
+  padding: 0 20px;
   box-sizing: border-box;
   justify-content: flex-start;
 }
@@ -781,8 +782,8 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 27px;
-  height: 27px;
+  width: 29px;
+  height: 28px;
   padding: 0;
   border: 1px solid transparent;
   border-radius: var(--mt-radius-control);
@@ -879,10 +880,10 @@ onBeforeUnmount(() => {
   overflow-y: auto;
   box-sizing: border-box;
   color: var(--mt-fg, #24292e);
-  background: var(--mt-bg, #fff);
+  background: var(--mt-surface-raised, var(--mt-bg));
   border: 1px solid var(--mt-border, #dfe2e5);
   border-radius: var(--mt-radius-menu);
-  box-shadow: 0 10px 28px rgb(0 0 0 / 16%);
+  box-shadow: var(--mt-shadow-panel, 0 10px 28px rgb(0 0 0 / 16%));
   user-select: none;
 }
 

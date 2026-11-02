@@ -8,6 +8,7 @@ import { agentExternalGrant, agentExternalRevoke, agentExternalTake, agentExtern
 import { ExternalDocumentSession, type ExternalConnection } from '@/services/agent-external'
 
 const editor = useEditorStore(), agent = useAgentStore()
+const emit = defineEmits<{ 'access-change': [active: boolean] }>()
 const { locale } = useI18n()
 const labels = computed(() => ({
   'zh-CN': { title: '外部 Agent（MCP）', grant: '授权当前文档', revoke: '撤销授权', description: '读取当前未保存正文和选区，提交修改供你审阅。关闭面板、切换或关闭文档即撤销。', active: '此文档已授权', reveal: '查看临时连接凭据', copy: '复制临时环境变量', copied: '已复制', error: '外部 Agent 连接不可用，请重新授权。', secret: '凭据仅本次授权有效。仅交给你信任的本机 MCP 客户端，不要保存到项目配置或提交到 Git。', native: '请在桌面应用中授权。' },
@@ -16,6 +17,7 @@ const labels = computed(() => ({
 }[locale.value]))
 const native = '__TAURI_INTERNALS__' in window
 const connection = ref<ExternalConnection | null>(null)
+watch(() => Boolean(connection.value), active => emit('access-change', active))
 const revealed = ref(false), copied = ref(false), error = ref(false), granting = ref(false)
 let session: ExternalDocumentSession | null = null
 let tabId: string | null = null
@@ -89,7 +91,7 @@ onBeforeUnmount(revoke)
 
 <template>
   <details class="agent-external">
-    <summary>{{ labels.title }}</summary>
+    <summary>{{ labels.title }}<small v-if="connection" class="agent-external-active">{{ labels.active }}</small></summary>
     <p>{{ labels.description }}</p>
     <p v-if="!native">{{ labels.native }}</p>
     <template v-else-if="connection">
@@ -105,9 +107,12 @@ onBeforeUnmount(revoke)
 </template>
 
 <style scoped>
-.agent-external { padding: 8px 14px; border-bottom: 1px solid var(--el-border-color); font-size: 12px; }
-summary { cursor: pointer; }
-p { margin: 8px 0; line-height: 1.5; }
-button { margin: 0 8px 6px 0; cursor: pointer; }
-pre { white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+.agent-external { padding: 12px; border: 1px solid var(--mt-border); border-radius: 10px; background: var(--mt-surface-raised, var(--mt-bg)); font-size: 12px; }
+summary { cursor: pointer; color: var(--mt-fg); font-weight: 600; line-height: 1.6; }
+.agent-external-active { display: block; margin: 5px 0 0 14px; color: var(--mt-success); font-size: 10px; font-weight: 500; }
+p { margin: 10px 0; line-height: 1.7; color: var(--mt-fg-muted); }
+button { margin: 0 6px 6px 0; cursor: pointer; }
+code { font-family: var(--mt-code-font, ui-monospace, monospace); color: var(--mt-fg); }
+pre { padding: 10px; border: 1px solid var(--mt-border); border-radius: 7px; background: var(--mt-surface, var(--mt-bg)); color: var(--mt-fg); white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+[role='alert'] { color: var(--mt-error); }
 </style>

@@ -6,20 +6,90 @@
  * HTML5 native drag API (no extra dependency). The drag-over indicator is
  * just a left-border highlight on the tab being hovered.
  */
-import { nextTick, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useEditorStore } from '@/stores/editor'
 import { Close, Plus } from '@element-plus/icons-vue'
-import { FileText } from '@lucide/vue'
-import { t } from '@/i18n'
+import { ChevronLeft, ChevronRight, FileText, Focus, Share, Sparkles } from '@lucide/vue'
+import { usePreferencesStore } from '@/stores/preferences'
+import { useAgentStore } from '@/stores/agent'
+import { useWorkspaceCopy } from '@/components/welcome/workspace-copy'
+import { t, useI18n } from '@/i18n'
 import { bus } from '@/bus'
 import { writeText } from '@tauri-apps/plugin-clipboard-manager'
 import { open as shellOpen } from '@tauri-apps/plugin-shell'
 
 const editor = useEditorStore()
+const prefs = usePreferencesStore()
+const agent = useAgentStore()
+const copy = useWorkspaceCopy()
+const { locale } = useI18n()
+const scrollCopy = computed(() => locale.value === 'zh-CN'
+  ? { previous: '向左滚动页签', next: '向右滚动页签' }
+  : locale.value === 'ja'
+    ? { previous: '前のタブを表示', next: '次のタブを表示' }
+    : { previous: 'Scroll tabs left', next: 'Scroll tabs right' })
 
 const draggingId = ref<string | null>(null)
 const hoverId = ref<string | null>(null)
 const tabRefs = new Map<string, HTMLButtonElement>()
+const scrollElement = ref<HTMLElement | null>(null)
+const hasOverflow = ref(false)
+const canScrollPrevious = ref(false)
+const canScrollNext = ref(false)
+let resizeObserver: ResizeObserver | null = null
+
+function updateScrollState() {
+  const element = scrollElement.value
+  if (!element) return
+  hasOverflow.value = element.scrollWidth > element.clientWidth + 1
+  canScrollPrevious.value = element.scrollLeft > 1
+  canScrollNext.value = element.scrollLeft + element.clientWidth < element.scrollWidth - 1
+}
+
+function revealTab(element: HTMLElement) {
+  const viewport = scrollElement.value
+  if (!viewport) return
+  const bounds = viewport.getBoundingClientRect()
+  const tab = element.getBoundingClientRect()
+  // Change only this horizontal scroller; scrollIntoView may also move an
+  // editor pane or the application document when it reveals a focused tab.
+  if (tab.left < bounds.left) viewport.scrollLeft -= bounds.left - tab.left
+  else if (tab.right > bounds.right) viewport.scrollLeft += tab.right - bounds.right
+  updateScrollState()
+}
+
+function revealCurrentTab() {
+  const tab = editor.currentFileId ? tabRefs.get(editor.currentFileId)?.parentElement : null
+  if (tab) revealTab(tab)
+  else updateScrollState()
+}
+
+function scrollTabs(direction: -1 | 1) {
+  const viewport = scrollElement.value
+  if (!viewport) return
+  const bounds = viewport.getBoundingClientRect()
+  const tabs = Array.from(viewport.querySelectorAll<HTMLElement>('.tab-shell'))
+  const target = direction > 0
+    ? tabs.find(tab => tab.getBoundingClientRect().right > bounds.right + 1)
+    : tabs.reverse().find(tab => tab.getBoundingClientRect().left < bounds.left - 1)
+  if (target) revealTab(target)
+}
+
+watch([() => editor.currentFileId, () => editor.tabs.map(tab => [tab.id, tab.filename, tab.isSaved])], async () => {
+  await nextTick()
+  updateScrollState()
+  // Overflow controls reserve space of their own after the first layout.
+  await nextTick()
+  revealCurrentTab()
+}, { flush: 'post' })
+
+onMounted(() => {
+  resizeObserver = new ResizeObserver(() => { updateScrollState(); revealCurrentTab() })
+  if (scrollElement.value) resizeObserver.observe(scrollElement.value)
+  updateScrollState()
+  void nextTick(revealCurrentTab)
+})
+onBeforeUnmount(() => resizeObserver?.disconnect())
 
 function activate(id: string) {
   editor.setCurrent(id)
@@ -159,7 +229,11 @@ function onDragEnd() {
 
 <template>
   <div class="tabs-bar">
-    <div class="tabs-scroll" role="tablist">
+    <button v-if="hasOverflow" type="button" class="scroll-tabs scroll-tabs-previous" :disabled="!canScrollPrevious"
+      :aria-label="scrollCopy.previous" :title="scrollCopy.previous" aria-controls="document-tabs" @click="scrollTabs(-1)">
+      <ChevronLeft :size="14" />
+    </button>
+    <div id="document-tabs" ref="scrollElement" class="tabs-scroll" role="tablist" @scroll.passive="updateScrollState">
       <div
         v-for="tab in editor.tabs"
         :key="tab.id"
@@ -205,9 +279,18 @@ function onDragEnd() {
         </button>
       </div>
     </div>
+    <button v-if="hasOverflow" type="button" class="scroll-tabs scroll-tabs-next" :disabled="!canScrollNext"
+      :aria-label="scrollCopy.next" :title="scrollCopy.next" aria-controls="document-tabs" @click="scrollTabs(1)">
+      <ChevronRight :size="14" />
+    </button>
     <button class="new-tab" @click="newTab" :aria-label="t('tabs.newTab')">
       <el-icon :size="14"><Plus /></el-icon>
     </button>
+    <div class="document-actions">
+      <button type="button" :title="t('menu.toggleFocus')" :aria-label="t('menu.toggleFocus')" :aria-pressed="prefs.focus" @click="prefs.toggleViewMode('focus')"><Focus :size="15" :stroke-width="1.6" /></button>
+      <button type="button" :title="copy.export" :aria-label="copy.export" :disabled="!editor.currentFile" @click="bus.emit('show-export-dialog', { format: 'html' })"><Share :size="15" :stroke-width="1.6" /></button>
+      <button type="button" class="agent-action" :title="t('agent.toggle')" aria-label="Agent" :aria-expanded="agent.visible" @click="agent.toggle()"><Sparkles :size="14" :stroke-width="1.6" /><span>Agent</span><i v-if="agent.busy" /></button>
+    </div>
   </div>
 </template>
 
@@ -215,9 +298,9 @@ function onDragEnd() {
 .tabs-bar {
   box-sizing: border-box;
   display: flex;
-  height: 32px;
-  padding: 3px 6px 0;
-  background: var(--mt-tab-bg);
+  height: 45px;
+  padding: 5px 14px 0;
+  background: var(--mt-bg);
   border-bottom: 1px solid var(--mt-border);
   flex-shrink: 0;
   position: relative;
@@ -229,8 +312,9 @@ function onDragEnd() {
   overflow-y: hidden;
   flex: 0 1 auto;
   min-width: 0;
-  gap: 3px;
+  gap: 4px;
   scrollbar-width: none;
+  overscroll-behavior-x: contain;
 }
 .tabs-scroll::-webkit-scrollbar { display: none; }
 
@@ -239,21 +323,19 @@ function onDragEnd() {
   display: flex;
   align-items: center;
   height: 100%;
-  border: 1px solid transparent;
-  border-bottom: 0;
-  border-radius: var(--mt-radius-tab) var(--mt-radius-tab) 0 0;
-  flex-shrink: 0;
+  border: 0;
+  border-radius: 6px 6px 0 0;
+  flex: 0 0 auto;
   min-width: 100px;
-  max-width: 190px;
+  max-width: 215px;
   position: relative;
   transition: background-color 100ms, box-shadow 100ms;
 }
 .tab-shell:hover { background: var(--mt-row-hover); }
 .tab-shell.active {
-  background: var(--mt-tab-bg-active);
-  border-color: var(--mt-border);
+  background: var(--mt-row-hover);
 }
-.tab-shell.active::after { content: ''; position: absolute; bottom: 0; left: 7px; right: 7px; height: 2px; border-radius: 1px; background: var(--mt-accent); pointer-events: none; }
+.tab-shell.active::after { content: ''; position: absolute; bottom: 0; left: 9px; right: 9px; height: 2px; border-radius: 1px; background: var(--mt-accent); pointer-events: none; }
 .tab-shell.dragging { opacity: 0.5; }
 .tab-shell.drop-target { box-shadow: inset 3px 0 0 var(--mt-accent); }
 .tab {
@@ -263,7 +345,7 @@ function onDragEnd() {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 0 4px 0 8px;
+  padding: 0 6px 0 11px;
   border: 0;
   color: var(--mt-fg-muted);
   background: transparent;
@@ -298,6 +380,9 @@ function onDragEnd() {
   flex: 0 0 auto;
 }
 .close {
+  position: sticky;
+  right: 4px;
+  z-index: 1;
   display: inline-flex;
   flex: 0 0 24px;
   align-items: center;
@@ -306,11 +391,14 @@ function onDragEnd() {
   height: 24px;
   margin-right: 4px;
   border: none;
-  background: transparent;
+  background: var(--mt-bg);
+  box-shadow: -3px 0 0 var(--mt-bg);
   color: var(--mt-fg-muted);
   cursor: pointer;
   padding: 0;
   border-radius: var(--mt-radius-control);
+  opacity: 1;
+  pointer-events: auto;
   transition: opacity 100ms, background-color 100ms, color 100ms;
 }
 .tab-shell:hover .close,
@@ -320,6 +408,11 @@ function onDragEnd() {
   pointer-events: auto;
 }
 .close:hover { background: var(--mt-row-hover); color: var(--mt-fg); }
+.tab-shell:hover .close, .tab-shell.active .close { background: var(--mt-row-hover); box-shadow: -3px 0 0 var(--mt-row-hover); }
+.scroll-tabs { display: grid; place-items: center; width: 23px; height: 28px; flex: 0 0 23px; align-self: center; margin-bottom: 5px; border: 0; border-radius: 5px; padding: 0; background: var(--mt-bg); color: var(--mt-fg-muted); cursor: pointer; }
+.scroll-tabs:hover:enabled { background: var(--mt-row-hover); color: var(--mt-fg); }
+.scroll-tabs:disabled { opacity: .35; cursor: default; }
+.scroll-tabs:focus-visible { outline: 2px solid var(--mt-accent); outline-offset: -2px; }
 
 .new-tab {
   border: none;
@@ -342,4 +435,13 @@ function onDragEnd() {
 .tabs-bar:hover .new-tab,
 .new-tab:focus-visible { opacity: 1; }
 .new-tab:hover { background: var(--mt-row-hover); color: var(--mt-fg); }
+.document-actions { display: flex; align-items: center; gap: 3px; margin-left: auto; padding: 0 0 5px 12px; flex-shrink: 0; background: var(--mt-bg); }
+.document-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; width: 29px; height: 28px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--mt-fg-muted); font: inherit; font-size: 11px; cursor: pointer; }
+.document-actions button:hover, .document-actions button[aria-pressed="true"] { background: var(--mt-row-hover); color: var(--mt-accent); }
+.document-actions button:disabled { opacity: .35; cursor: default; }
+.document-actions button:focus-visible { outline: 2px solid var(--mt-accent); outline-offset: -2px; }
+.document-actions .agent-action { width: auto; padding-inline: 9px; margin-left: 4px; color: var(--mt-accent); background: var(--mt-accent-soft, var(--mt-icon-active-bg)); }
+.agent-action i { width: 4px; height: 4px; border-radius: 50%; background: currentColor; }
+@media (max-width: 900px) { .tabs-bar { padding-inline: 8px; } .tab-shell { min-width: 90px; max-width: 175px; } .document-actions { padding-left: 6px; } }
+@media (max-width: 580px) { .agent-action span { display: none; } .document-actions .agent-action { padding-inline: 7px; } }
 </style>

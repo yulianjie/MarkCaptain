@@ -308,10 +308,12 @@ function folderMenu(f: TreeFolder, ev: MouseEvent) {
   display: flex;
   align-items: center;
   gap: 4px;
-  height: 30px;
+  height: 33px;
+  margin-inline: 12px;
+  border-radius: 5px;
   padding-right: 8px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--mt-fg);
   white-space: nowrap;
   overflow: hidden;
@@ -320,7 +322,7 @@ function folderMenu(f: TreeFolder, ev: MouseEvent) {
 .row:hover { background: var(--mt-row-hover); }
 .row.cut { opacity: 0.5; }
 .row.active {
-  box-shadow: inset 2px 0 0 var(--mt-accent);
+  background: var(--mt-accent-soft, var(--mt-icon-active-bg));
   color: var(--mt-accent);
 }
 .caret {
@@ -337,7 +339,7 @@ function folderMenu(f: TreeFolder, ev: MouseEvent) {
   font-size: 14px;
   flex-shrink: 0;
 }
-.icon.folder { color: #f6c344; }
+.icon.folder { color: var(--mt-accent); opacity: .8; }
 .name {
   flex: 1;
   overflow: hidden;

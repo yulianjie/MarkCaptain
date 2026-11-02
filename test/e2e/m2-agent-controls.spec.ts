@@ -83,6 +83,8 @@ async function setup(page: Page) {
   })
   await page.getByRole('button', { name: /^AI 助手(?: \(.+\))?$/ }).click()
   await expect(page.locator('.agent-panel')).toBeVisible()
+  await page.locator('.agent-tools-toggle').click()
+  await expect(page.locator('#agent-tools-drawer')).toBeVisible()
   await expect.poll(() => page.evaluate(async () => (await import('/src/stores/agent.ts')).useAgentStore().projectConfigRoot)).toBe('C:/M2-notes')
 }
 

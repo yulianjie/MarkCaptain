@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { ArrowLeft } from '@lucide/vue'
 import { useAgentStore } from '@/stores/agent'
 import { useI18n } from '@/i18n'
 const agent = useAgentStore()
@@ -10,6 +11,7 @@ const items = computed(() => agent.historyItems.filter(item => item.title.toLoca
 
 <template>
   <section class="agent-history">
+    <button class="agent-back" type="button" @click="agent.historyOpen = false"><ArrowLeft :size="16" />{{ t('agent.settings.back') }}</button>
     <h3>{{ t('agent.history.title') }}</h3>
     <label><input type="checkbox" :checked="agent.historyEnabled" :disabled="agent.historyLoading" @change="agent.setHistoryEnabled(($event.target as HTMLInputElement).checked)">{{ t('agent.history.enable') }}</label>
     <p class="agent-muted">{{ t('agent.history.detail') }}</p>

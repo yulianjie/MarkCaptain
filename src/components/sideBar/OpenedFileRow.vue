@@ -94,9 +94,11 @@ function onContextMenu(ev: MouseEvent) {
 .row {
   display: flex;
   align-items: center;
-  gap: 5px;
-  min-height: 32px;
+  gap: 8px;
+  min-height: 33px;
+  margin: 1px 12px;
   padding: 0 8px;
+  border-radius: 5px;
   cursor: pointer;
   font-size: 12px;
   color: var(--mt-fg);
@@ -106,8 +108,7 @@ function onContextMenu(ev: MouseEvent) {
 }
 .row:hover { background: var(--mt-row-hover); }
 .row.active {
-  background: color-mix(in srgb, var(--mt-accent) 7%, transparent);
-  box-shadow: inset 2px 0 0 var(--mt-accent);
+  background: var(--mt-accent-soft, var(--mt-icon-active-bg));
   color: var(--mt-accent);
 }
 .row:focus-visible {
@@ -115,7 +116,8 @@ function onContextMenu(ev: MouseEvent) {
   outline-offset: -2px;
 }
 .indicator {
-  width: 24px;
+  order: 3;
+  width: 20px;
   height: 24px;
   position: relative;
   flex-shrink: 0;

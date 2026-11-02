@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ElMessageBox } from 'element-plus'
+import { FileText, Layers, Check, ArrowUpRight, Bookmark } from '@lucide/vue'
 import { bus } from '@/bus'
 import { useI18n } from '@/i18n'
 import { useEditorStore } from '@/stores/editor'
@@ -719,7 +720,7 @@ onBeforeUnmount(() => {
   <el-dialog
     v-model="visible"
     :title="copy.title"
-    width="96vw"
+    width="min(1180px, 96vw)"
     top="2vh"
     :close-on-click-modal="false"
     :show-close="!busy && !previewBusy"
@@ -729,30 +730,28 @@ onBeforeUnmount(() => {
     @closed="clearPreview"
   >
     <div class="export-layout">
-      <section class="export-options" aria-label="Export options">
+      <section class="export-options" :aria-label="copy.output">
         <div class="document-summary">
-          <strong>{{ activeDocument?.filename || copy.untitled }}</strong>
-          <span>{{ activeDocument?.pathname || copy.noDocument }}</span>
-          <el-tag v-if="activeDocument && !activeDocument.isSaved" size="small" type="warning">{{ copy.unsavedBuffer }}</el-tag>
+          <FileText :size="19" aria-hidden="true" />
+          <div>
+            <strong>{{ activeDocument?.filename || copy.untitled }}</strong>
+            <span>{{ activeDocument ? activeDocument.pathname || copy.unsavedBuffer : copy.noDocument }}</span>
+            <el-tag v-if="activeDocument && !activeDocument.isSaved" size="small" type="warning">{{ copy.unsavedBuffer }}</el-tag>
+          </div>
         </div>
         <el-button
+          class="project-export-entry"
           data-testid="project-export-open"
           :disabled="busy || previewBusy || !workspaceRoot"
           @click="visible = false; bus.emit('show-project-export-dialog', undefined)"
         >
+          <Layers :size="15" aria-hidden="true" />
           {{ projectExportCopy(locale).open }}
+          <ArrowUpRight :size="14" aria-hidden="true" />
         </el-button>
 
-        <el-form label-position="top" size="small">
-          <el-form-item :label="copy.preset">
-            <el-select v-model="selectedProfileId" :disabled="configLoading" @change="selectProfile">
-              <el-option v-for="item in profileChoices" :key="item.id" :label="item.name" :value="item.id" />
-            </el-select>
-            <div class="field-source">{{ sourceStatus(currentProfileSource) }}</div>
-          </el-form-item>
-          <el-form-item :label="copy.presetName">
-            <el-input v-model="profileName" maxlength="80" @input="setOverride('name')" />
-          </el-form-item>
+        <el-form label-position="top" size="default">
+          <div class="option-section-label">{{ copy.output }}</div>
           <el-form-item :label="copy.format">
             <el-select v-model="format">
               <el-option
@@ -763,12 +762,23 @@ onBeforeUnmount(() => {
                 :disabled="!profileDraft.formats.includes(item.value)"
               />
             </el-select>
-            <div class="field-source">{{ sourceStatus('this-export') }}</div>
+          </el-form-item>
+          <el-form-item :label="copy.preset">
+            <el-select v-model="selectedProfileId" :disabled="configLoading" @change="selectProfile">
+              <el-option v-for="item in profileChoices" :key="item.id" :label="item.name" :value="item.id" />
+            </el-select>
+            <details class="preset-source">
+              <summary>{{ sourceStatus(currentProfileSource) }}</summary>
+              <p>{{ copy.source }} · {{ sourceName(currentProfileSource) }}</p>
+              <p v-if="projectRoot" class="source-path">{{ projectRoot }}/.markcaptain/export.json</p>
+              <div class="source-legend"><span>{{ copy.builtIn }}</span><span>→ {{ copy.personal }}</span><span>→ {{ copy.project }}</span><span>→ {{ copy.temporary }}</span></div>
+            </details>
           </el-form-item>
           <el-form-item :label="copy.theme">
             <el-select :model-value="profileDraft.theme" @update:model-value="selectTheme">
               <el-option v-for="item in themes" :key="item.id" :label="item.label" :value="item.id" />
             </el-select>
+            <div class="theme-summary" aria-hidden="true"><span>Aa</span><strong>{{ themes.find(item => item.id === profileDraft.theme)?.label }}</strong><Check :size="14" /></div>
             <div class="field-source">{{ sourceStatus(fieldSource('theme')) }}</div>
           </el-form-item>
           <el-form-item v-if="format === 'pdf'" :label="copy.pdf">
@@ -813,6 +823,9 @@ onBeforeUnmount(() => {
           <details class="export-advanced">
             <summary>{{ copy.advanced }}</summary>
             <div class="advanced-content">
+              <el-form-item :label="copy.presetName" class="full-width">
+                <el-input v-model="profileName" maxlength="80" @input="setOverride('name')" />
+              </el-form-item>
               <el-form-item :label="copy.bodyFont">
                 <el-select v-model="profileDraft.typography.bodyFont" @change="setOverride('typography.bodyFont')">
                   <el-option value="system-cjk" :label="copy.systemCjk" />
@@ -888,8 +901,8 @@ onBeforeUnmount(() => {
         </el-form>
 
         <div class="preset-actions">
-          <el-button size="small" :disabled="!canSaveProjectPreset" @click="saveProjectPreset">{{ copy.saveProject }}</el-button>
-          <el-button size="small" @click="savePersonal">{{ copy.savePersonal }}</el-button>
+          <el-button size="small" :disabled="busy || previewBusy || !canSaveProjectPreset" @click="saveProjectPreset"><Bookmark :size="13" aria-hidden="true" />{{ copy.saveProject }}</el-button>
+          <el-button size="small" :disabled="busy || previewBusy" @click="savePersonal">{{ copy.savePersonal }}</el-button>
           <span v-if="!projectRoot" class="field-source">{{ projectScopeHint }}</span>
         </div>
         <el-alert v-if="configLoading" :title="copy.loading" type="info" :closable="false" />
@@ -897,11 +910,13 @@ onBeforeUnmount(() => {
         <el-alert v-if="projectRoot && !projectProfileIsValid" :title="copy.profileInvalid" type="warning" :closable="false" />
       </section>
 
-      <section class="export-preview-column" aria-label="Export preview">
+      <section class="export-preview-column" :aria-label="copy.preview">
         <div class="preview-heading">
-          <p>{{ displayPreviewMessage }}</p>
+          <strong>{{ copy.preview }} <span>· {{ formatLabel(format) }}</span></strong>
           <el-tag v-if="previewStale" type="warning" size="small">{{ copy.stale }}</el-tag>
+          <span v-else-if="previewReady && !preflightBlocking.length && !visibleWarnings.length" class="preview-ready"><Check :size="13" aria-hidden="true" />{{ copy.noWarnings }}</span>
         </div>
+        <p class="preview-caption">{{ displayPreviewMessage }}</p>
         <ExportPreview
           ref="previewRef"
           :html="previewHtml"
@@ -936,6 +951,9 @@ onBeforeUnmount(() => {
     </div>
 
     <template #footer>
+      <div class="export-footer">
+      <p class="export-footer-note">{{ previewStale ? copy.previewFirst : displayPreviewMessage }}</p>
+      <div class="export-footer-actions">
       <el-button @click="visible = false">{{ copy.cancel }}</el-button>
       <el-button :loading="previewBusy" :disabled="busy || !activeDocument" @click="preview">
         {{ previewHtml ? copy.refreshPreview : copy.preview }}
@@ -952,34 +970,80 @@ onBeforeUnmount(() => {
         {{ copy.export }} {{ formatLabel(format) }}
       </el-button>
       <el-button v-if="busy || previewBusy" type="danger" plain @click="cancelCurrent">{{ copy.cancel }}</el-button>
+      </div>
+      </div>
     </template>
   </el-dialog>
 </template>
 
 <style scoped>
+:global(.export-dialog.el-dialog) {
+  width: min(1180px, 96vw);
+  max-height: 96dvh;
+  height: min(96dvh, 1000px);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--mt-border);
+  border-radius: 12px;
+  background: var(--mt-bg);
+  color: var(--mt-fg);
+  font-family: var(--mt-ui-font);
+}
+:global(.export-dialog .el-dialog__header) { flex: 0 0 auto; margin: 0; padding: 19px 24px 16px; border-bottom: 1px solid var(--mt-border); }
+:global(.export-dialog .el-dialog__title) { color: var(--mt-fg); font-size: 16px; font-weight: 600; }
+:global(.export-dialog .el-dialog__headerbtn) { top: 11px; right: 10px; }
+:global(.export-dialog .el-dialog__body) { flex: 1; padding: 0; min-height: 0; overflow: hidden; }
+:global(.export-dialog .el-dialog__footer) { flex: 0 0 auto; padding: 15px 22px; border-top: 1px solid var(--mt-border); background: var(--mt-bg); }
 .export-layout {
   display: grid;
-  grid-template-columns: minmax(300px, 370px) minmax(0, 1fr);
-  gap: 18px;
-  align-items: start;
+  grid-template-columns: minmax(265px, 310px) minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+  color: var(--mt-fg);
 }
 
 .export-options {
-  max-height: 76vh;
   overflow: auto;
-  padding-right: 5px;
+  min-height: 0;
+  padding: 22px;
+  border-right: 1px solid var(--mt-border);
+  scrollbar-width: thin;
 }
 
 .document-summary {
-  display: grid;
-  gap: 4px;
-  margin-bottom: 14px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 18px;
   overflow-wrap: anywhere;
 }
+.document-summary > svg { flex-shrink: 0; margin-top: 2px; color: var(--mt-accent); }
+.document-summary > div { min-width: 0; display: grid; gap: 5px; }
+.document-summary strong { font-size: 13px; font-weight: 600; }
+.document-summary span { line-height: 1.6; }
+.project-export-entry { width: 100%; margin-bottom: 24px; justify-content: flex-start; gap: 7px; }
+.project-export-entry svg:last-child { margin-left: auto; }
+.option-section-label { margin-bottom: 16px; color: var(--mt-fg-muted); font-size: 11px; letter-spacing: .05em; }
+.export-options :deep(.el-form-item) { margin-bottom: 18px; }
+.export-options :deep(.el-form-item__label) { padding-bottom: 7px; line-height: 1.5; font-size: 12px; color: var(--mt-fg-muted); }
+.export-options :deep(.el-select), .export-options :deep(.el-input-number) { width: 100%; }
+.export-options :deep(.el-radio-group) { gap: 5px; }
+.export-options :deep(.el-radio) { margin-right: 12px; height: auto; min-height: 25px; }
+.preset-source { width: 100%; margin-top: 7px; color: var(--mt-fg-muted); font-size: 11px; line-height: 1.6; }
+.preset-source summary { cursor: pointer; }
+.preset-source p { margin: 8px 0; }
+.source-path { overflow-wrap: anywhere; }
+.source-legend { display: flex; flex-wrap: wrap; gap: 3px 7px; }
+.theme-summary { display: flex; align-items: center; width: 100%; gap: 10px; padding: 12px; margin-top: 8px; border: 1px solid var(--mt-border); border-radius: 7px; background: var(--mt-surface); }
+.theme-summary > span { font: 24px/1.2 Georgia, serif; color: var(--mt-accent); }
+.theme-summary strong { flex: 1; font-size: 12px; font-weight: 500; }
+.theme-summary > svg { color: var(--mt-accent); }
 
 .document-summary span,
 .field-source {
-  color: var(--el-text-color-secondary);
+  color: var(--mt-fg-muted);
   font-size: 11px;
 }
 
@@ -988,7 +1052,7 @@ onBeforeUnmount(() => {
 .two-columns {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: 12px;
 }
 
 .inline-option :deep(.el-form-item__content) {
@@ -1004,29 +1068,30 @@ onBeforeUnmount(() => {
 .export-advanced {
   grid-column: 1 / -1;
   margin: 3px 0 12px;
-  border-top: 1px solid var(--el-border-color-lighter);
-  border-bottom: 1px solid var(--el-border-color-lighter);
+  border-top: 1px solid var(--mt-border);
+  border-bottom: 1px solid var(--mt-border);
 }
 
 .export-advanced > summary {
-  padding: 10px 2px;
-  color: var(--el-text-color-primary);
+  padding: 15px 2px;
+  color: var(--mt-fg);
   cursor: pointer;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .advanced-content {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0 14px;
   padding: 4px 2px 10px;
 }
 
 .advanced-content :deep(.el-form-item) { margin-bottom: 12px; }
-.advanced-setting-group { grid-column: 1 / -1; }
+.advanced-setting-group, .full-width { grid-column: 1 / -1; }
 .advanced-group-label { margin: 0 0 8px; font-size: 12px; font-weight: 600; }
 .margin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
-.setting-note { margin-top: 4px; color: var(--el-text-color-secondary); font-size: 11px; }
+.setting-note { margin-top: 4px; color: var(--mt-fg-muted); font-size: 11px; line-height: 1.6; }
 
 .preset-actions {
   display: flex;
@@ -1036,37 +1101,63 @@ onBeforeUnmount(() => {
 }
 
 .preset-actions .field-source { flex-basis: 100%; }
+.preset-actions :deep(.el-button) { margin-left: 0; height: auto; min-height: 28px; padding: 6px 9px; }
+.preset-actions :deep(.el-button > span) { gap: 5px; }
 .remote-warning { color: var(--el-color-warning); }
 .remote-warning div { font-size: 11px; }
 
-.export-preview-column { min-width: 0; }
-.preview-heading { display: flex; justify-content: space-between; gap: 12px; align-items: center; min-height: 28px; }
-.preview-heading p { margin: 0 0 8px; color: var(--el-text-color-secondary); font-size: 12px; }
+.export-preview-column { min-width: 0; min-height: 0; display: flex; flex-direction: column; padding: 19px 24px 18px; overflow: auto; background: var(--mt-surface); }
+.preview-heading { display: flex; flex: 0 0 auto; justify-content: space-between; gap: 12px; align-items: center; min-height: 25px; font-size: 12px; }
+.preview-heading strong { font-weight: 500; }
+.preview-heading strong > span { color: var(--mt-fg-muted); font-weight: 400; }
+.preview-ready { display: inline-flex; align-items: center; gap: 5px; color: var(--mt-accent); font-size: 11px; }
+.preview-caption { flex: 0 0 auto; margin: 5px 0 14px; font-size: 11px; line-height: 1.6; color: var(--mt-fg-muted); }
+.export-preview-column :deep(.preview-shell) { flex: 1 0 300px; height: auto; min-height: 250px; }
 
 .diagnostics,
 .task-error,
 .print-status {
-  margin-top: 10px;
-  padding: 9px 11px;
-  border-radius: 5px;
+  flex: 0 0 auto;
+  max-height: 180px;
+  overflow: auto;
+  margin-top: 12px;
+  padding: 11px 13px;
+  border-radius: 7px;
   font-size: 12px;
+  line-height: 1.65;
 }
 
-.diagnostics { background: var(--el-color-danger-light-9); color: var(--el-color-danger-dark-2); }
-.warning-list { background: var(--el-color-warning-light-9); color: var(--el-color-warning-dark-2); }
+.diagnostics { background: var(--mt-error-soft); color: var(--mt-error); }
+.warning-list { background: var(--mt-warning-soft); color: var(--mt-warning); }
 .diagnostics ul { margin: 5px 0; padding-left: 18px; }
-.success-text { background: var(--el-color-success-light-9); color: var(--el-color-success-dark-2); }
-.task-error { white-space: pre-wrap; background: var(--el-color-danger-light-9); color: var(--el-color-danger-dark-2); }
-.print-status { display: flex; justify-content: space-between; align-items: center; background: var(--el-color-info-light-9); }
+.success-text { background: var(--mt-accent-soft); color: var(--mt-accent); }
+.task-error { white-space: pre-wrap; background: var(--mt-error-soft); color: var(--mt-error); }
+.print-status { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: center; background: var(--mt-accent-soft); color: var(--mt-accent); }
+.export-footer { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.export-footer-note { margin: 0; text-align: left; font-size: 11px; line-height: 1.6; color: var(--mt-fg-muted); }
+.export-footer-actions { display: flex; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.export-footer-actions :deep(.el-button) { margin-left: 0; }
+summary:focus-visible { outline: 2px solid var(--mt-accent); outline-offset: 3px; border-radius: 4px; }
 
-@media (max-width: 920px) {
+@media (max-width: 760px) {
   .export-layout { grid-template-columns: 1fr; }
-  .export-options { max-height: 35vh; }
-  .preview-shell { height: 55vh; }
+  .export-layout { overflow: auto; display: block; }
+  .export-options { max-height: none; border-right: 0; border-bottom: 1px solid var(--mt-border); padding: 20px; }
+  .export-options :deep(.el-form) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 16px; }
+  .option-section-label, .export-advanced, .two-columns, .remote-warning { grid-column: 1 / -1; }
+  .export-preview-column { min-height: 460px; padding: 18px 20px; overflow: visible; }
+  .export-preview-column :deep(.preview-shell) { min-height: 380px; }
+  .export-footer { gap: 10px; flex-wrap: wrap; }
+  .export-footer-actions { margin-left: auto; }
+  .preview-ready { display: none; }
 }
 
 @media (max-width: 500px) {
+  .export-options :deep(.el-form),
   .advanced-content,
   .margin-grid { grid-template-columns: 1fr; }
+  :global(.export-dialog .el-dialog__footer) { padding: 12px 16px; }
+  .export-footer-note { display: none; }
+  .export-footer-actions { gap: 6px; }
 }
 </style>

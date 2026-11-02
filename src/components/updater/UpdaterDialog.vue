@@ -61,7 +61,8 @@ onBeforeUnmount(() => {
   <el-dialog
     v-model="state.visible"
     :title="t('updater.title')"
-    width="440px"
+    width="min(440px, calc(100vw - 32px))"
+    class="updater-dialog"
     :close-on-click-modal="false"
     :close-on-press-escape="!busy"
     :show-close="!busy"
@@ -94,14 +95,7 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.notes {
-  max-height: 200px;
-  overflow: auto;
-  background: var(--el-fill-color-light);
-  padding: 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  white-space: pre-wrap;
-}
-.error { color: var(--el-color-danger); overflow-wrap: anywhere; }
+.updater-dialog p { margin: 0 0 14px; line-height: 1.7; }
+.notes { max-height: min(240px, 40vh); overflow: auto; background: var(--mt-surface); border: 1px solid var(--mt-border); color: var(--mt-fg); padding: 16px; border-radius: 8px; font-size: 12px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; margin: 0 0 16px; font-family: var(--mt-ui-font); }
+.error { color: var(--mt-error); background: var(--mt-error-soft); border-radius: 7px; padding: 12px 14px; margin-top: 16px; font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
 </style>

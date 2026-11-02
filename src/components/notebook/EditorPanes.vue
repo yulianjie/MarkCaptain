@@ -6,6 +6,7 @@ import { useEditorStore } from '@/stores/editor'
 import { t } from '@/i18n'
 import { createPaneLayoutSnapshot, normalizePaneViewState, parsePaneLayout, resolvePaneDocumentId } from '@/services/pane-layouts'
 import { getPaneViewState, paneViewStateRevision, restorePaneViewState } from '@/services/pane-view-state'
+import { CodeXml, X } from '@lucide/vue'
 const props = defineProps<{ restoredSessionTabIdsByIndex?: Record<number, string> }>()
 const editor = useEditorStore()
 let initialLayout: ReturnType<typeof parsePaneLayout> = null
@@ -95,15 +96,15 @@ onBeforeUnmount(() => {
 })
 </script>
 <template>
-  <div class="editor-panes" :class="editor.splitDirection" :inert="editor.fileMutationBusy" @keydown.capture="key">
+  <div class="editor-panes" :class="[editor.splitDirection, { 'has-multiple-panes': editor.panes.length > 1 }]" :inert="editor.fileMutationBusy" @keydown.capture="key">
     <template v-for="(pane, index) in editor.panes" :key="pane.id">
       <section class="editing-region" :class="{ active: editor.activePaneId === pane.id }" :style="{ flex: editor.panes.length === 2 ? index === 0 ? editor.splitRatio : 1 - editor.splitRatio : editor.paneSizes[pane.id] ?? 1 }" @pointerdown.capture="editor.activatePane(pane.id)" @focusin.capture="editor.activatePane(pane.id)">
         <header v-if="editor.panes.length > 1">
           <select :value="pane.documentId ?? ''" :aria-label="t('notes.paneDocument')" @change="editor.activatePane(pane.id); editor.setCurrent(($event.target as HTMLSelectElement).value || null)">
             <option value="">{{ t('notes.none') }}</option><option v-for="tab in editor.tabs" :key="tab.id" :value="tab.id">{{ tab.isSaved ? '' : '● ' }}{{ tab.pathname || tab.filename }}</option>
           </select>
-          <button :title="t('notes.source')" @click="editor.activatePane(pane.id); editor.toggleSourceCode()">&lt;/&gt;</button>
-          <button :title="t('notes.closePane')" @click="editor.closePane(pane.id)">×</button>
+          <button :title="t('notes.source')" :aria-label="t('notes.source')" :aria-pressed="pane.sourceMode" @click="editor.activatePane(pane.id); editor.toggleSourceCode()"><CodeXml :size="14" aria-hidden="true" /></button>
+          <button :title="t('notes.closePane')" :aria-label="t('notes.closePane')" @click="editor.closePane(pane.id)"><X :size="14" aria-hidden="true" /></button>
         </header>
         <MuyaEditor :pane-id="pane.id" v-show="pane.documentId && !pane.sourceMode" />
         <SourceCodePane :pane-id="pane.id" v-show="pane.documentId && pane.sourceMode" />
@@ -116,10 +117,17 @@ onBeforeUnmount(() => {
 .editor-panes { display: flex; flex: 1; min-width: 0; min-height: 0; overflow: hidden; }
 .editor-panes.vertical { flex-direction: column; }
 .editing-region { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
-.editing-region.active { box-shadow: inset 0 0 0 1px var(--mt-border); }
-header { display: flex; height: 30px; background: var(--mt-sidebar-bg); border-bottom: 1px solid var(--mt-border); }
-select { min-width: 0; flex: 1; border: 0; background: transparent; color: var(--mt-fg); }
-button { border: 0; color: var(--mt-fg-muted); background: transparent; cursor: pointer; }
-.pane-resizer { flex: 0 0 5px; cursor: col-resize; background: var(--mt-border); }
+.has-multiple-panes .editing-region.active > header { box-shadow: inset 0 -2px var(--mt-accent); background: var(--mt-bg); }
+header { display: flex; align-items: center; gap: 5px; flex: 0 0 39px; min-height: 0; padding: 0 9px; background: var(--mt-surface); border-bottom: 1px solid var(--mt-border); }
+select { min-width: 0; flex: 1; height: 28px; padding: 0 4px; border: 0; border-radius: 5px; background: transparent; color: var(--mt-fg-muted); font: 11px var(--mt-ui-font); text-overflow: ellipsis; }
+.active select { color: var(--mt-fg); }
+button { display: grid; place-items: center; width: 26px; height: 26px; flex-shrink: 0; padding: 0; border: 0; border-radius: 5px; color: var(--mt-fg-muted); background: transparent; cursor: pointer; }
+button:hover { background: var(--mt-row-hover); color: var(--mt-fg); }
+button[aria-pressed=true] { color: var(--mt-accent); background: var(--mt-accent-soft); }
+button:focus-visible, select:focus-visible { outline: 2px solid var(--mt-accent); outline-offset: 1px; }
+.pane-resizer { position: relative; flex: 0 0 5px; cursor: col-resize; background: var(--mt-surface); border-inline: 1px solid var(--mt-border-subtle); }
+.pane-resizer:hover, .pane-resizer:focus-visible { background: var(--mt-accent-soft); outline: 0; }
+.pane-resizer:focus-visible::after, .pane-resizer:hover::after { content: ''; position: absolute; inset: 0 1px; background: var(--mt-accent); border-radius: 2px; }
 .vertical .pane-resizer { cursor: row-resize; }
+.vertical .pane-resizer:focus-visible::after, .vertical .pane-resizer:hover::after { inset: 1px 0; }
 </style>

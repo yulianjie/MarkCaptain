@@ -109,10 +109,10 @@ onBeforeUnmount(() => { unsubRequest?.() })
       <span class="match-info">{{ matchInfo }}</span>
       <button class="btn" :title="t('find.previous')" @click="prev"><el-icon :size="14"><ArrowUp /></el-icon></button>
       <button class="btn" :title="t('find.next')" @click="next"><el-icon :size="14"><ArrowDown /></el-icon></button>
-      <button class="btn toggle" :class="{ on: opts.caseSensitive }" :title="t('find.caseSensitive')" @click="opts.caseSensitive = !opts.caseSensitive">Aa</button>
-      <button class="btn toggle" :class="{ on: opts.wholeWord }" :title="t('find.wholeWord')" @click="opts.wholeWord = !opts.wholeWord">ab</button>
-      <button class="btn toggle" :class="{ on: opts.regex }" :title="t('find.regex')" @click="opts.regex = !opts.regex">.*</button>
-      <button class="btn toggle" :class="{ on: showReplace }" :title="t('find.toggleReplace')" @click="showReplace = !showReplace">↳</button>
+      <button class="btn toggle" :class="{ on: opts.caseSensitive }" :aria-pressed="opts.caseSensitive" :title="t('find.caseSensitive')" @click="opts.caseSensitive = !opts.caseSensitive">Aa</button>
+      <button class="btn toggle" :class="{ on: opts.wholeWord }" :aria-pressed="opts.wholeWord" :title="t('find.wholeWord')" @click="opts.wholeWord = !opts.wholeWord">ab</button>
+      <button class="btn toggle" :class="{ on: opts.regex }" :aria-pressed="opts.regex" :title="t('find.regex')" @click="opts.regex = !opts.regex">.*</button>
+      <button class="btn toggle" :class="{ on: showReplace }" :aria-expanded="showReplace" :title="t('find.toggleReplace')" @click="showReplace = !showReplace">↳</button>
       <button class="btn close" :title="t('find.closeEsc')" @click="close"><el-icon :size="14"><Close /></el-icon></button>
     </div>
     <div v-if="showReplace" class="row">
@@ -134,17 +134,17 @@ onBeforeUnmount(() => { unsubRequest?.() })
 <style scoped>
 .find-bar {
   position: absolute;
-  top: 8px;
+  top: 10px;
   right: 16px;
   z-index: 10;
-  background: var(--mt-bg, #fff);
+  background: var(--mt-surface-raised, var(--mt-bg));
   border: 1px solid var(--mt-border, #d1d5da);
-  border-radius: 6px;
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.08);
-  padding: 6px;
+  border-radius: 9px;
+  box-shadow: var(--mt-shadow-panel, 0 6px 20px #0002);
+  padding: 9px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 7px;
   font-size: 12px;
   width: 440px;
   max-width: calc(100% - 32px);
@@ -163,11 +163,11 @@ onBeforeUnmount(() => { unsubRequest?.() })
   min-width: 80px;
   border: 1px solid var(--mt-border, #d1d5da);
   border-radius: 4px;
-  padding: 4px 8px;
+  padding: 6px 8px;
   font-size: 12px;
   outline: none;
   color: var(--mt-fg, #24292e);
-  background: var(--mt-row-active, #fff);
+  background: var(--mt-bg);
 }
 .input:focus { border-color: var(--mt-accent, #0366d6); }
 .match-info {
@@ -183,7 +183,7 @@ onBeforeUnmount(() => { unsubRequest?.() })
   color: var(--mt-fg-muted, #586069);
   cursor: pointer;
   padding: 4px 6px;
-  border-radius: 3px;
+  border-radius: 5px;
   font-size: 11px;
   font-family: ui-monospace, monospace;
   min-width: 26px;
@@ -194,9 +194,9 @@ onBeforeUnmount(() => { unsubRequest?.() })
 .btn:hover { background: var(--mt-row-hover, #eaecef); color: var(--mt-fg, #24292e); }
 .btn:focus-visible { outline: 2px solid var(--mt-accent, #0366d6); outline-offset: 1px; }
 .btn.toggle.on {
-  background: var(--mt-row-active, #dbedff);
-  color: var(--mt-accent, #0366d6);
-  border-color: var(--mt-accent, #79b8ff);
+  background: var(--mt-accent-soft, var(--mt-icon-active-bg));
+  color: var(--mt-accent);
+  border-color: transparent;
 }
 .btn.close:hover { background: var(--mt-row-hover, #f1f3f5); }
 

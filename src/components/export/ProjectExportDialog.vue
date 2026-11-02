@@ -13,6 +13,7 @@ import type { ProjectExportCandidate, ProjectExportChapter, ProjectExportMode, P
 import type { ExportConfigSnapshot, ExportFormat, ExportProfile, ExportThemeId } from '@/services/export/types'
 import { EXPORT_THEME_LABELS } from '@/export-themes'
 import ExportPreview from './ExportPreview.vue'
+import { Layers, ArrowUpRight, RefreshCw, Bookmark, LockKeyhole, FileText } from '@lucide/vue'
 
 const { locale } = useI18n()
 const editor = useEditorStore()
@@ -208,13 +209,17 @@ onBeforeUnmount(() => { loadGeneration++; unsubscribe?.(); controller.dispose() 
 </script>
 
 <template>
-  <el-dialog v-model="visible" :title="copy.title" width="94vw" top="3vh" append-to-body :close-on-click-modal="false"
+  <el-dialog v-model="visible" :title="copy.title" width="min(1320px, 96vw)" top="2vh" append-to-body :close-on-click-modal="false"
     :show-close="!busy" :close-on-press-escape="!busy" class="project-export-dialog" @close="close">
     <div data-testid="project-export-dialog" class="project-export">
-      <p v-if="!root" role="alert">{{ copy.noProject }}</p>
-      <p v-if="loading" role="status">{{ copy.loading }}</p>
-      <p v-if="error || state.error" class="error" role="alert">{{ error || displayError(state.error, copy.taskFailed) }}</p>
-      <p v-if="notice" role="status">{{ notice }}</p>
+      <div class="project-messages">
+      <p v-if="!root" class="project-banner" role="alert">{{ copy.noProject }}</p>
+      <p v-if="loading" class="project-banner" role="status">{{ copy.loading }}</p>
+      <p v-if="error || state.error" class="project-banner error" role="alert">{{ error || displayError(state.error, copy.taskFailed) }}</p>
+      <p v-if="notice" class="project-banner notice" role="status">{{ notice }}</p>
+      </div>
+      <aside class="project-options">
+      <div class="project-summary"><Layers :size="20" aria-hidden="true" /><div><strong>{{ copy.title }}</strong><small>{{ root || copy.noProject }}</small></div></div>
       <fieldset :disabled="locked || !root" class="settings">
         <label>{{ copy.mode }}<select v-model="mode" data-testid="project-export-mode"><option value="batch">{{ copy.batch }}</option><option value="book">{{ copy.book }}</option></select></label>
         <label>{{ copy.profile }}<select v-model="profile.id" data-testid="project-export-profile" @change="selectProfile"><option v-for="item in profileChoices" :key="item.id" :value="item.id">{{ item.name }}</option></select></label>
@@ -227,84 +232,151 @@ onBeforeUnmount(() => { loadGeneration++; unsubscribe?.(); controller.dispose() 
         <label class="overwrite"><input v-model="overwrite" type="checkbox" data-testid="project-export-overwrite">{{ copy.overwrite }}</label>
         <p class="hint">{{ mode === 'batch' ? copy.fileNameHelp : copy.pdfHelp }}<span v-if="mode === 'batch' && formats.includes('pdf')"> {{ copy.pdfHelp }}</span></p>
       </fieldset>
+      <div class="actions plan-actions"><button data-testid="project-export-save" :disabled="locked || !root || !configReady" @click="savePlan"><Bookmark :size="13" aria-hidden="true" />{{ copy.save }}</button><button :disabled="locked || !root" @click="load()"><RefreshCw :size="13" aria-hidden="true" />{{ copy.reload }}</button><span class="hint">{{ copy.saveHelp }}</span></div>
+      </aside>
+      <main class="project-content">
       <div class="selection-layout">
         <section :aria-label="copy.candidates" class="candidates">
-          <h3>{{ copy.candidates }}</h3>
+          <h3>{{ copy.candidates }}<span class="section-count">{{ filteredCandidates.length }}</span></h3>
           <label class="filter-label">{{ copy.filter }}<input v-model="filter" type="search" :disabled="locked" data-testid="project-export-filter"></label>
           <div class="actions"><button :disabled="locked || !root" @click="load(false)">{{ copy.refresh }}</button><button :disabled="locked" @click="selectFiltered">{{ copy.selectAll }}</button></div>
           <div class="candidate-list">
-            <label v-for="candidate in filteredCandidates" :key="candidate.relative" data-testid="project-export-candidate"><input type="checkbox" :checked="selected(candidate.relative)" :disabled="locked" :aria-label="`${copy.select}: ${candidate.relative}`" @change="toggleCandidate(candidate, ($event.target as HTMLInputElement).checked, $event.target as HTMLInputElement)"><span>{{ candidate.relative }}</span></label>
+            <label v-for="candidate in filteredCandidates" :key="candidate.relative" data-testid="project-export-candidate" :class="{ 'candidate-selected': selected(candidate.relative) }"><input type="checkbox" :checked="selected(candidate.relative)" :disabled="locked" :aria-label="`${copy.select}: ${candidate.relative}`" @change="toggleCandidate(candidate, ($event.target as HTMLInputElement).checked, $event.target as HTMLInputElement)"><span>{{ candidate.relative }}</span></label>
             <label v-for="tab in untitledTabs" :key="tab.id" data-testid="project-export-untitled"><input type="checkbox" :checked="selected(`tab:${tab.id}`)" :disabled="locked" :aria-label="`${copy.select}: ${tab.filename}`" @change="toggleUntitled(tab, ($event.target as HTMLInputElement).checked, $event.target as HTMLInputElement)"><span>{{ tab.filename }}<small>{{ copy.untitled }}</small></span></label>
           </div>
         </section>
         <section :aria-label="copy.selected" class="chapters">
           <div class="section-heading"><h3>{{ copy.selected }} ({{ chapters.length }}/64)</h3><button :disabled="locked" @click="chapters = []">{{ copy.clear }}</button></div>
-          <p v-if="!chapters.length">{{ copy.empty }}</p>
+          <div v-if="!chapters.length" class="chapter-empty"><FileText :size="28" aria-hidden="true" /><p>{{ copy.empty }}</p></div>
           <ol>
             <li v-for="(chapter, index) in chapters" :key="chapter.key" data-testid="project-export-chapter">
-              <div><span class="chapter-path">{{ chapter.relativePath || copy.untitled }}</span><small v-if="chapter.relativePath && !candidates.some(item => item.relative === chapter.relativePath)" class="error">{{ copy.missing }}</small></div>
+              <div class="chapter-identity"><span class="chapter-number">{{ String(index + 1).padStart(2, '0') }}</span><span class="chapter-path">{{ chapter.relativePath || copy.untitled }}</span><small v-if="chapter.relativePath && !candidates.some(item => item.relative === chapter.relativePath)" class="error">{{ copy.missing }}</small></div>
               <div class="chapter-controls"><label>{{ copy.chapterTitle }}<input v-model="chapter.title" :disabled="locked" maxlength="200"></label><label>{{ copy.level }}<input v-model.number="chapter.level" :disabled="locked || mode === 'batch'" type="number" min="1" max="5"></label></div>
               <div class="actions"><button :disabled="locked || index === 0" :aria-label="`${copy.up}: ${chapter.title}`" @click="move(index, -1)">↑</button><button :disabled="locked || index === chapters.length - 1" :aria-label="`${copy.down}: ${chapter.title}`" @click="move(index, 1)">↓</button><button :disabled="locked" :aria-label="`${copy.remove}: ${chapter.title}`" @click="chapters.splice(index, 1)">{{ copy.remove }}</button></div>
             </li>
           </ol>
         </section>
       </div>
-      <div class="actions plan-actions"><button data-testid="project-export-save" :disabled="locked || !root || !configReady" @click="savePlan">{{ copy.save }}</button><button :disabled="locked || !root" @click="load()">{{ copy.reload }}</button><span class="hint">{{ copy.saveHelp }}</span></div>
-      <p v-if="state.stage === 'stale'" role="status">{{ copy.stale }}</p>
+      <p v-if="state.stage === 'stale'" class="stale-status" role="status">{{ copy.stale }}</p>
       <section v-if="state.snapshot" class="review" :aria-label="copy.snapshots">
-        <h3>{{ copy.snapshots }}</h3><p>{{ copy.reviewHelp }}</p><small>{{ state.snapshot.capturedAt }} · {{ state.snapshot.revision }}</small>
+        <details class="snapshot-details">
+        <summary>{{ copy.snapshots }}</summary><p>{{ copy.reviewHelp }}</p><small>{{ state.snapshot.capturedAt }} · {{ state.snapshot.revision }}</small>
         <ul><li v-for="source in state.snapshot.sources" :key="source.sourceId">{{ source.relativePath || source.snapshot.fileName }} · {{ source.origin === 'disk' ? copy.disk : copy.buffer }} · <code>{{ source.revision.slice(0, 12) }}</code></li></ul>
+        </details>
         <ExportPreview v-if="state.previewHtml" :html="state.previewHtml" :stale="state.stage === 'stale'" :title="copy.title" :loading-message="copy.busy" :empty-message="copy.empty" :stale-message="copy.stale" :failed-message="copy.taskFailed" :timeout-message="copy.taskFailed" @ready="previewReady = true" @failed="error = $event" />
       </section>
-      <section v-if="state.blocking.length" role="alert"><h3>{{ copy.errors }}</h3><ul><li v-for="(issue, index) in state.blocking" :key="index">{{ projectExportDiagnostic(locale, issue.code, issue.message) }} <code>{{ issue.code }}</code><small v-if="issue.resource">{{ issue.resource }}</small></li></ul></section>
-      <section v-if="state.warnings.length"><h3>{{ copy.warnings }}</h3><ul><li v-for="(issue, index) in state.warnings" :key="index">{{ projectExportDiagnostic(locale, issue.code, issue.message) }} <code>{{ issue.code }}</code><small v-if="issue.resource">{{ issue.resource }}</small></li></ul><label><input v-model="acknowledged" type="checkbox" data-testid="project-export-acknowledge" :disabled="busy">{{ copy.acknowledge }}</label></section>
-      <section v-if="state.items.length" data-testid="project-export-output-preview">
+      <section v-if="state.blocking.length" class="diagnostic-section blocking-section" role="alert"><h3>{{ copy.errors }}</h3><ul><li v-for="(issue, index) in state.blocking" :key="index">{{ projectExportDiagnostic(locale, issue.code, issue.message) }} <code>{{ issue.code }}</code><small v-if="issue.resource">{{ issue.resource }}</small></li></ul></section>
+      <section v-if="state.warnings.length" class="diagnostic-section warnings-section"><h3>{{ copy.warnings }}</h3><ul><li v-for="(issue, index) in state.warnings" :key="index">{{ projectExportDiagnostic(locale, issue.code, issue.message) }} <code>{{ issue.code }}</code><small v-if="issue.resource">{{ issue.resource }}</small></li></ul><label class="acknowledge"><input v-model="acknowledged" type="checkbox" data-testid="project-export-acknowledge" :disabled="busy">{{ copy.acknowledge }}</label></section>
+      <section v-if="state.items.length" class="output-results" data-testid="project-export-output-preview">
 <h3>{{ state.stage === 'ready' ? copy.outputs : copy.results }}</h3>
         <p role="status" aria-live="polite">{{ busy ? copy.busy : copy.results }} · {{ completed }} / {{ state.items.length }}</p>
         <div class="table-scroll"><table><thead><tr><th>{{ copy.output }}</th><th>{{ copy.status }}</th><th>{{ copy.error }}</th></tr></thead><tbody><tr v-for="item in state.items" :key="item.id" data-testid="project-export-result"><td>{{ item.outputPath || item.name }}</td><td>{{ item.status === 'rendering' || item.status === 'writing' ? copy.running : copy[item.status] }}</td><td>{{ item.error ? projectExportDiagnostic(locale, item.error) : '' }}</td></tr></tbody></table></div>
       </section>
+      </main>
     </div>
     <template #footer>
+<div class="project-export-footer">
+      <span v-if="state.items.length" class="footer-status" role="status">{{ copy.results }} · {{ completed }} / {{ state.items.length }}</span>
+      <span v-else class="footer-status">{{ copy.selected }} · {{ chapters.length }} / 64</span>
 <div class="actions footer-actions">
-      <button data-testid="project-export-review" :disabled="locked || !root || !chapters.length || chapters.length > 64 || !formats.length" @click="review">{{ copy.review }}</button>
-      <button data-testid="project-export-run" class="primary" :disabled="!canRun" @click="run()">{{ copy.run }}</button>
+      <button data-testid="project-export-review" :disabled="locked || !root || !chapters.length || chapters.length > 64 || !formats.length" @click="review"><LockKeyhole :size="14" aria-hidden="true" />{{ copy.review }}</button>
+      <button data-testid="project-export-run" class="primary" :disabled="!canRun" @click="run()">{{ copy.run }}<ArrowUpRight :size="14" aria-hidden="true" /></button>
       <button v-if="canRetry" data-testid="project-export-retry" @click="run(true)">{{ copy.retry }}</button>
       <button v-if="busy" data-testid="project-export-cancel" @click="controller.cancel()">{{ copy.cancel }}</button>
       <button v-else :disabled="saving" @click="visible = false">{{ copy.close }}</button>
+    </div>
     </div>
 </template>
   </el-dialog>
 </template>
 
 <style scoped>
-.project-export { max-height: 73vh; overflow: auto; color: var(--el-text-color-primary); }
-.project-export h3 { margin: 12px 0 8px; font-size: 14px; }
-.settings { display: grid; grid-template-columns: repeat(3, minmax(160px, 1fr)); gap: 12px; margin: 0; padding: 12px; border: 1px solid var(--el-border-color); border-radius: 6px; }
-.settings > label, .filter-label, .chapter-controls label { display: flex; flex-direction: column; gap: 5px; }
-input:not([type=checkbox]), select { box-sizing: border-box; min-width: 0; width: 100%; padding: 6px 8px; color: var(--el-text-color-primary); background: var(--el-bg-color); border: 1px solid var(--el-border-color); border-radius: 4px; }
-button { padding: 6px 10px; color: var(--el-text-color-primary); background: var(--el-fill-color-blank); border: 1px solid var(--el-border-color); border-radius: 4px; cursor: pointer; }
-button:disabled { opacity: .5; cursor: default; }
-button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--el-color-primary); outline-offset: 2px; }
-.primary { color: white; background: var(--el-color-primary); }
-.formats { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; grid-column: 1 / -1; }
-.settings > .overwrite { flex-direction: row; align-items: center; grid-column: 1 / -1; }
-.hint { color: var(--el-text-color-secondary); font-size: 12px; margin: 0; grid-column: 1 / -1; }
-.selection-layout { display: grid; grid-template-columns: 1fr 1.2fr; gap: 20px; margin: 12px 0; }
-.candidate-list { max-height: 310px; overflow: auto; padding: 8px 0; }
-.candidate-list > label { display: flex; align-items: start; gap: 6px; padding: 6px 0; overflow-wrap: anywhere; }
-small { display: block; color: var(--el-text-color-secondary); overflow-wrap: anywhere; }
-.chapters ol { max-height: 360px; overflow: auto; padding-left: 28px; }
-.chapters li { padding: 8px; border-bottom: 1px solid var(--el-border-color); }
-.chapter-path { font-size: 12px; overflow-wrap: anywhere; }
-.chapter-controls { display: grid; grid-template-columns: 1fr 100px; gap: 8px; margin: 6px 0; }
-.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
-.section-heading { display: flex; align-items: center; justify-content: space-between; }
-.plan-actions { padding: 10px 0; border-bottom: 1px solid var(--el-border-color); }
-.footer-actions { justify-content: flex-end; }
-.error { color: var(--el-color-danger); }
-.table-scroll { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-td, th { padding: 8px; text-align: left; border-bottom: 1px solid var(--el-border-color); overflow-wrap: anywhere; }
-.review { margin-top: 12px; }
-@media (max-width: 850px) { .settings { grid-template-columns: 1fr 1fr; } .selection-layout { grid-template-columns: 1fr; } }
+:global(.project-export-dialog.el-dialog) { height: min(96dvh, 1000px); max-height: 96dvh; padding: 0; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--mt-border); border-radius: 12px; background: var(--mt-bg); }
+:global(.project-export-dialog .el-dialog__header) { flex-shrink: 0; margin: 0; padding: 19px 24px 16px; border-bottom: 1px solid var(--mt-border); }
+:global(.project-export-dialog .el-dialog__title) { color: var(--mt-fg); font-size: 16px; font-weight: 600; }
+:global(.project-export-dialog .el-dialog__headerbtn) { top: 11px; right: 10px; }
+:global(.project-export-dialog .el-dialog__body) { flex: 1; min-height: 0; padding: 0; overflow: hidden; }
+:global(.project-export-dialog .el-dialog__footer) { flex-shrink: 0; padding: 14px 22px; border-top: 1px solid var(--mt-border); background: var(--mt-bg); }
+.project-export { height: 100%; min-height: 0; display: grid; grid-template-columns: 275px minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); overflow: hidden; color: var(--mt-fg); font: 12px/1.6 var(--mt-ui-font); }
+.project-messages { grid-column: 1 / -1; max-height: min(20dvh, 140px); overflow: auto; }
+.project-export h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 15px; font-size: 12px; font-weight: 500; }
+.project-banner { grid-column: 1 / -1; margin: 0; padding: 10px 22px; background: var(--mt-surface); color: var(--mt-fg-muted); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.project-banner.error { background: var(--mt-error-soft); }
+.project-banner.notice { background: var(--mt-accent-soft); color: var(--mt-accent); }
+.project-options { grid-row: 2; min-height: 0; padding: 23px 20px; border-right: 1px solid var(--mt-border); overflow: auto; scrollbar-width: thin; }
+.project-content { grid-row: 2; min-height: 0; padding: 22px; background: var(--mt-surface); overflow: auto; scrollbar-width: thin; }
+.project-summary { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 24px; }
+.project-summary > svg { flex-shrink: 0; margin-top: 2px; color: var(--mt-accent); }
+.project-summary > div { min-width: 0; }
+.project-summary strong { display: block; font-weight: 500; font-size: 13px; margin-bottom: 5px; }
+.project-summary small { font-size: 11px; line-height: 1.6; }
+.settings { display: grid; grid-template-columns: minmax(0, 1fr); gap: 17px; margin: 0; padding: 0; border: 0; min-width: 0; }
+.settings > label, .filter-label, .chapter-controls label { display: flex; flex-direction: column; gap: 7px; color: var(--mt-fg-muted); font-size: 11px; }
+input:not([type=checkbox]), select { box-sizing: border-box; min-width: 0; width: 100%; padding: 8px 10px; color: var(--mt-fg); font: inherit; background: var(--mt-surface-raised); border: 1px solid var(--mt-border); border-radius: 6px; }
+input[type=checkbox] { accent-color: var(--mt-accent); width: 14px; height: 14px; margin: 2px 0 0; flex-shrink: 0; }
+button { display: inline-flex; justify-content: center; align-items: center; gap: 6px; padding: 7px 10px; color: var(--mt-fg); font: inherit; background: var(--mt-surface-raised); border: 1px solid var(--mt-border); border-radius: 6px; cursor: pointer; }
+button:hover:not(:disabled) { background: var(--mt-row-hover); }
+button:disabled, fieldset:disabled { opacity: .5; cursor: default; }
+fieldset:disabled input, fieldset:disabled select { cursor: default; }
+button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid var(--mt-accent); outline-offset: 2px; }
+.primary { color: var(--mt-text-on-accent); background: var(--mt-accent); border-color: var(--mt-accent); }
+.primary:hover:not(:disabled) { background: var(--mt-accent); filter: brightness(1.08); }
+.formats { display: flex; flex-wrap: wrap; gap: 9px 12px; align-items: center; }
+.formats > span { flex-basis: 100%; color: var(--mt-fg-muted); font-size: 11px; }
+.formats label { display: flex; gap: 5px; align-items: center; }
+.settings > .overwrite { flex-direction: row; gap: 7px; align-items: center; color: var(--mt-fg); }
+.hint { color: var(--mt-fg-muted); font-size: 11px; line-height: 1.7; margin: 0; }
+.selection-layout { display: grid; grid-template-columns: minmax(190px, .8fr) minmax(0, 1.2fr); gap: 20px; }
+.candidates, .chapters { min-width: 0; }
+.section-count { margin-left: auto; color: var(--mt-fg-muted); font-size: 11px; }
+.candidate-list { max-height: 440px; overflow: auto; padding: 9px 0; margin-top: 7px; scrollbar-width: thin; }
+.candidate-list > label { display: flex; align-items: flex-start; gap: 8px; padding: 10px 8px; overflow-wrap: anywhere; border-radius: 6px; cursor: pointer; margin-bottom: 3px; }
+.candidate-list > label:hover { background: var(--mt-row-hover); }
+.candidate-list .candidate-selected { background: var(--mt-accent-soft); color: var(--mt-accent); }
+small { display: block; color: var(--mt-fg-muted); overflow-wrap: anywhere; }
+.chapters ol { max-height: 540px; overflow: auto; padding: 0; margin: 0; list-style: none; scrollbar-width: thin; }
+.chapters li { padding: 14px; border: 1px solid var(--mt-border); border-radius: 8px; background: var(--mt-bg); margin-bottom: 10px; }
+.chapter-identity { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.chapter-number { flex-shrink: 0; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--mt-accent); }
+.chapter-path { min-width: 0; flex: 1; font-size: 11px; color: var(--mt-fg-muted); overflow-wrap: anywhere; }
+.chapter-controls { display: grid; grid-template-columns: minmax(0, 1fr) 78px; gap: 10px; margin: 12px 0; }
+.chapter-empty { min-height: 245px; padding: 25px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: var(--mt-fg-muted); border: 1px dashed var(--mt-border); border-radius: 8px; }
+.chapter-empty svg { color: var(--mt-accent); opacity: .5; stroke-width: 1.3; }
+.actions { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; margin-top: 8px; }
+.section-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 15px; }
+.section-heading h3 { margin: 0; }
+.section-heading > button { border: 0; background: transparent; color: var(--mt-fg-muted); padding: 0 3px; font-size: 11px; }
+.plan-actions { margin-top: 22px; padding-top: 17px; border-top: 1px solid var(--mt-border); }
+.plan-actions .hint { flex-basis: 100%; margin-top: 7px; }
+.plan-actions button { font-size: 11px; }
+.project-export-footer { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.footer-status { color: var(--mt-fg-muted); font-size: 11px; text-align: left; }
+.footer-actions { justify-content: flex-end; margin-top: 0; }
+.footer-actions button { font-size: 12px; }
+.error { color: var(--mt-error); }
+.stale-status { padding: 11px 13px; color: var(--mt-warning); background: var(--mt-warning-soft); border-radius: 7px; }
+.table-scroll { overflow-x: auto; border: 1px solid var(--mt-border); border-radius: 7px; background: var(--mt-bg); }
+table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 11px; }
+td, th { padding: 11px 12px; text-align: left; border-bottom: 1px solid var(--mt-border); overflow-wrap: anywhere; }
+th { background: var(--mt-surface); color: var(--mt-fg-muted); font-weight: 500; }
+th:first-child { width: 48%; }
+th:nth-child(2) { width: 18%; }
+tbody tr:last-child td { border-bottom: 0; }
+.review, .output-results { margin-top: 22px; }
+.snapshot-details { padding: 12px 14px; border: 1px solid var(--mt-border); border-radius: 7px; background: var(--mt-bg); margin-bottom: 16px; font-size: 11px; }
+.snapshot-details summary { font-size: 12px; cursor: pointer; color: var(--mt-accent); }
+.snapshot-details li, .snapshot-details small { overflow-wrap: anywhere; line-height: 1.8; }
+.snapshot-details p { color: var(--mt-fg-muted); }
+.review :deep(.preview-shell) { height: 440px; }
+.diagnostic-section { padding: 14px 16px; margin-top: 15px; border-radius: 8px; line-height: 1.7; font-size: 12px; }
+.diagnostic-section h3 { margin-bottom: 8px; }
+.diagnostic-section ul { padding-left: 18px; margin: 0 0 10px; }
+.diagnostic-section li { overflow-wrap: anywhere; margin-bottom: 6px; }
+.blocking-section { background: var(--mt-error-soft); color: var(--mt-error); }
+.warnings-section { background: var(--mt-warning-soft); color: var(--mt-warning); }
+.acknowledge { display: flex; gap: 8px; align-items: flex-start; }
+.output-results > p { color: var(--mt-fg-muted); font-size: 11px; }
+@media (max-width: 1080px) { .project-export { grid-template-columns: 250px minmax(0, 1fr); } .selection-layout { grid-template-columns: minmax(0, 1fr); } .candidate-list { max-height: 220px; } .chapters ol { max-height: 430px; } }
+@media (max-width: 720px) { .project-export { display: block; overflow: auto; } .project-options { border-right: 0; border-bottom: 1px solid var(--mt-border); padding: 20px; overflow: visible; } .settings { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; } .formats, .settings .overwrite, .settings .hint { grid-column: 1 / -1; } .project-content { overflow: visible; padding: 20px; } .project-export-footer { flex-wrap: wrap; gap: 9px; } .footer-actions { margin-left: auto; } .project-summary { margin-bottom: 20px; } }
+@media (max-width: 440px) { .settings { grid-template-columns: minmax(0, 1fr); } .chapter-controls { grid-template-columns: minmax(0, 1fr) 70px; } :global(.project-export-dialog .el-dialog__footer) { padding: 12px 15px; } .footer-actions { gap: 6px; } .footer-actions button { padding: 6px 8px; } }
 </style>

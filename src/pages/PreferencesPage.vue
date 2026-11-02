@@ -10,6 +10,7 @@
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, watchEffect } from 'vue'
 import { getCurrentWindow } from '@tauri-apps/api/window'
+import { Check, Cloud, Code2, Image, Keyboard, Layout, Monitor, Palette, Search, Settings2, SpellCheck, Type } from '@lucide/vue'
 import {
   usePreferencesStore,
   type AutoSwitchTheme,
@@ -44,7 +45,7 @@ const themeRefreshFailed = ref(false)
 const availableDictionaries = ref<string[]>([])
 const dictionariesLoading = ref(false)
 const dictionariesLoadFailed = ref(false)
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const shortcutPlatform = shortcutPlatformFromNavigator(navigator.platform)
 
 // Keep text input responsive while avoiding one IPC write per keystroke. Dirty
@@ -406,6 +407,81 @@ const sections = computed<{ id: SectionId; label: string }[]>(() => [
   { id: 'keybindings', label: t('prefs.sections.keybindings') },
 ])
 
+const sectionIcons = { general: Settings2, editor: Type, markdown: Code2, theme: Palette, image: Image, cloud: Cloud, spellchecker: SpellCheck, view: Layout, search: Search, keybindings: Keyboard }
+// Page-specific editorial copy stays together so the settings hierarchy remains
+// translated without adding presentation-only keys to the shared catalog.
+const pageCopy = {
+  en: {
+    workspace: 'Writing space', resources: 'Resources', advanced: 'Advanced',
+    instant: 'Changes take effect immediately', application: 'Application & saving',
+    appearance: 'Appearance', files: 'Files & startup', typography: 'Typography',
+    code: 'Code blocks', editing: 'Editing behavior', fileFormat: 'File format',
+    syntax: 'Markdown syntax', extensions: 'Extensions & diagrams',
+    imageLocation: 'Image location', uploading: 'Image uploads', themeOptions: 'Theme options',
+    general: 'File saving, startup, and your everyday preferences.',
+    editor: 'Fonts, paragraphs, and the way you write.',
+    markdown: 'Choose how Markdown is written and rendered.',
+    theme: 'Make your writing space feel comfortable.',
+    image: 'Choose where images are stored and how they are uploaded.',
+    cloud: 'Manage connections and synchronize your local documents.',
+    spellchecker: 'Languages and spelling feedback while you write.',
+    view: 'Choose the parts of your writing space you want to see.',
+    search: 'Control which files are included in project search.',
+    keybindings: 'Keep your most frequent actions close at hand.',
+  },
+  'zh-CN': {
+    workspace: '写作空间', resources: '资源与服务', advanced: '高级',
+    instant: '更改会立即生效', application: '应用与保存',
+    appearance: '界面外观', files: '文件与启动', typography: '正文排版',
+    code: '代码块', editing: '编辑习惯', fileFormat: '文件格式',
+    syntax: 'Markdown 语法', extensions: '扩展与图表',
+    imageLocation: '图片位置', uploading: '图片上传', themeOptions: '主题选项',
+    general: '文件保存、启动行为，以及日常使用偏好。',
+    editor: '字体、段落与编辑习惯。',
+    markdown: '选择 Markdown 的书写与呈现方式。',
+    theme: '让写作空间，适合你的习惯。',
+    image: '配置图片的存放位置与上传方式。',
+    cloud: '管理连接，同步保存在本地的文档。',
+    spellchecker: '设置写作时使用的语言与拼写提示。',
+    view: '选择写作空间中需要显示的界面元素。',
+    search: '控制项目搜索包含的文件范围。',
+    keybindings: '让常用操作保持顺手。',
+  },
+  ja: {
+    workspace: '執筆スペース', resources: 'リソースとサービス', advanced: '詳細設定',
+    instant: '変更はすぐに適用されます', application: 'アプリと保存',
+    appearance: '外観', files: 'ファイルと起動', typography: '文字と段落',
+    code: 'コードブロック', editing: '編集動作', fileFormat: 'ファイル形式',
+    syntax: 'Markdown 構文', extensions: '拡張と図表',
+    imageLocation: '画像の保存先', uploading: '画像のアップロード', themeOptions: 'テーマの設定',
+    general: 'ファイルの保存、起動時の動作、日常の設定。',
+    editor: 'フォント、段落、書き方を整えます。',
+    markdown: 'Markdown の記述と表示を設定します。',
+    theme: '自分に合った、心地よい執筆スペースに。',
+    image: '画像の保存先とアップロード方法を選びます。',
+    cloud: '接続を管理し、ローカルの文書を同期します。',
+    spellchecker: '執筆中の言語とスペルチェックを設定します。',
+    view: '執筆スペースに表示する要素を選びます。',
+    search: 'プロジェクト内の検索対象を設定します。',
+    keybindings: 'よく使う操作を、手の届く場所に。',
+  },
+} as const
+const copy = computed(() => pageCopy[locale.value])
+const themeChoices = computed(() => [
+  { id: 'light', label: t('prefs.theme.themeLight') },
+  { id: 'dark', label: t('prefs.theme.themeDark') },
+  { id: 'system', label: t('prefs.theme.autoSwitchFollowOs') },
+] as const)
+
+function isThemeChoiceSelected(choice: string): boolean {
+  return choice === 'system' ? prefs.autoSwitchTheme === 1 : prefs.autoSwitchTheme !== 1 && prefs.theme === choice
+}
+
+async function selectThemeChoice(choice: 'light' | 'dark' | 'system') {
+  if (choice === 'system') await prefs.set('autoSwitchTheme', 1)
+  else await prefs.patch({ theme: choice, autoSwitchTheme: 2 })
+}
+
 const active = ref<SectionId>('general')
 const prefsBody = ref<HTMLElement | null>(null)
 const compactNavigation = ref(false)
@@ -529,13 +605,16 @@ watchEffect(() => {
 <template>
   <div class="prefs-page">
     <aside class="prefs-nav">
-      <h2 class="prefs-title">{{ t('prefs.title') }}</h2>
+      <div class="prefs-brand"><Settings2 :size="19" aria-hidden="true" /><h2 class="prefs-title">{{ t('prefs.title') }}</h2></div>
       <nav :aria-label="t('prefs.navigationLabel')">
         <ul
           role="tablist"
           :aria-orientation="compactNavigation ? 'horizontal' : 'vertical'"
         >
           <li v-for="(sec, index) in sections" :key="sec.id" role="presentation">
+            <div v-if="index === 0 || index === 4 || index === 7" class="prefs-nav-group" aria-hidden="true">
+              {{ index === 0 ? copy.workspace : index === 4 ? copy.resources : copy.advanced }}
+            </div>
             <button
               :id="`prefs-tab-${sec.id}`"
               type="button"
@@ -548,11 +627,13 @@ watchEffect(() => {
               @click="selectSection(sec.id)"
               @keydown="onSectionKeydown($event, index)"
             >
-              {{ sec.label }}
+              <component :is="sectionIcons[sec.id]" :size="16" :stroke-width="1.7" aria-hidden="true" />
+              <span>{{ sec.label }}</span>
             </button>
           </li>
         </ul>
       </nav>
+      <div class="prefs-nav-note"><Check :size="13" aria-hidden="true" /><span>{{ copy.instant }}</span></div>
     </aside>
 
     <main ref="prefsBody" class="prefs-body">
@@ -586,7 +667,9 @@ watchEffect(() => {
         tabindex="0"
       >
         <h3>{{ t('prefs.sections.general') }}</h3>
+        <p class="prefs-description">{{ copy.general }}</p>
         <el-form label-width="220px" label-position="left">
+          <h4 class="prefs-subheading">{{ copy.application }}</h4>
           <el-form-item :label="t('prefs.general.autoCheckUpdates')">
             <el-switch :model-value="prefs.autoCheckUpdates" @update:model-value="v => prefs.set('autoCheckUpdates', !!v)" />
             <span class="hint inline-hint">{{ t('prefs.general.autoCheckUpdatesHint') }}</span>
@@ -612,6 +695,7 @@ watchEffect(() => {
               {{ t('prefs.general.rememberWindowSizeHint') }}
             </span>
           </el-form-item>
+          <h4 class="prefs-subheading">{{ copy.appearance }}</h4>
           <el-form-item :label="t('prefs.general.appIcon')">
             <div
               class="icon-choices"
@@ -657,6 +741,7 @@ watchEffect(() => {
           <el-form-item :label="t('prefs.general.wordWrapInToc')">
             <el-switch :model-value="prefs.wordWrapInToc" @update:model-value="v => prefs.set('wordWrapInToc', !!v)" />
           </el-form-item>
+          <h4 class="prefs-subheading">{{ copy.files }}</h4>
           <el-form-item :label="t('prefs.general.sortBy')">
             <el-select
               :model-value="prefs.fileSortBy"
@@ -717,7 +802,9 @@ watchEffect(() => {
         tabindex="0"
       >
         <h3>{{ t('prefs.sections.editor') }}</h3>
+        <p class="prefs-description">{{ copy.editor }}</p>
         <el-form label-width="220px" label-position="left">
+          <h4 class="prefs-subheading">{{ copy.typography }}</h4>
           <el-form-item :label="t('prefs.editor.fontSize')">
             <el-input-number v-model="fontSize" :min="12" :max="32" />
           </el-form-item>
@@ -744,6 +831,7 @@ watchEffect(() => {
               style="width: 200px"
             />
           </el-form-item>
+          <h4 class="prefs-subheading">{{ copy.code }}</h4>
           <el-form-item :label="t('prefs.editor.codeFontSize')">
             <el-input-number
               :model-value="prefs.codeFontSize"
@@ -764,6 +852,7 @@ watchEffect(() => {
           <el-form-item :label="t('prefs.editor.trimEmpty')">
             <el-switch :model-value="prefs.trimUnnecessaryCodeBlockEmptyLines" @update:model-value="v => prefs.set('trimUnnecessaryCodeBlockEmptyLines', !!v)" />
           </el-form-item>
+          <h4 class="prefs-subheading">{{ copy.editing }}</h4>
           <el-form-item :label="t('prefs.editor.autoPairBracket')">
             <el-switch :model-value="prefs.autoPairBracket" @update:model-value="v => prefs.set('autoPairBracket', !!v)" />
           </el-form-item>
@@ -773,6 +862,7 @@ watchEffect(() => {
           <el-form-item :label="t('prefs.editor.autoPairQuote')">
             <el-switch :model-value="prefs.autoPairQuote" @update:model-value="v => prefs.set('autoPairQuote', !!v)" />
           </el-form-item>
+          <h4 class="prefs-subheading">{{ copy.fileFormat }}</h4>
           <el-form-item :label="t('prefs.editor.eol')">
             <el-select
               :model-value="prefs.endOfLine"
@@ -850,7 +940,9 @@ watchEffect(() => {
         tabindex="0"
       >
         <h3>{{ t('prefs.sections.markdown') }}</h3>
+        <p class="prefs-description">{{ copy.markdown }}</p>
         <el-form label-width="220px" label-position="left">
+          <h4 class="prefs-subheading">{{ copy.syntax }}</h4>
           <el-form-item :label="t('prefs.markdown.preferLooseListItem')">
             <el-switch :model-value="prefs.preferLooseListItem" @update:model-value="v => prefs.set('preferLooseListItem', !!v)" />
           </el-form-item>
@@ -918,6 +1010,7 @@ watchEffect(() => {
               <el-option :label="t('prefs.markdown.frontmatterEzhil')" value=";" />
             </el-select>
           </el-form-item>
+          <h4 class="prefs-subheading">{{ copy.extensions }}</h4>
           <el-form-item :label="t('prefs.markdown.sequenceTheme')">
             <el-select
               :model-value="prefs.sequenceTheme"
@@ -953,6 +1046,24 @@ watchEffect(() => {
         tabindex="0"
       >
         <h3>{{ t('prefs.sections.theme') }}</h3>
+        <p class="prefs-description">{{ copy.theme }}</p>
+        <h4 class="prefs-subheading">{{ copy.appearance }}</h4>
+        <div class="theme-choices" role="group" :aria-label="t('prefs.theme.theme')">
+          <button
+            v-for="choice in themeChoices"
+            :key="choice.id"
+            type="button"
+            class="theme-choice"
+            :class="[`theme-choice-${choice.id}`, { selected: isThemeChoiceSelected(choice.id) }]"
+            :aria-pressed="isThemeChoiceSelected(choice.id)"
+            :disabled="prefs.saving"
+            @click="selectThemeChoice(choice.id)"
+          >
+            <span class="theme-preview" aria-hidden="true"><span class="theme-preview-sidebar"></span><span class="theme-preview-page"><i></i><i></i><i></i><i></i></span><Monitor v-if="choice.id === 'system'" :size="21" /></span>
+            <span class="theme-choice-label">{{ choice.label }}<Check v-if="isThemeChoiceSelected(choice.id)" :size="15" aria-hidden="true" /></span>
+          </button>
+        </div>
+        <h4 class="prefs-subheading">{{ copy.themeOptions }}</h4>
         <el-form label-width="220px" label-position="left">
           <el-form-item :label="t('prefs.theme.theme')">
             <el-select
@@ -1020,7 +1131,9 @@ watchEffect(() => {
         tabindex="0"
       >
         <h3>{{ t('prefs.sections.image') }}</h3>
+        <p class="prefs-description">{{ copy.image }}</p>
         <el-form label-width="220px" label-position="left">
+          <h4 class="prefs-subheading">{{ copy.imageLocation }}</h4>
           <el-form-item :label="t('prefs.image.insertAction')">
             <el-select
               :model-value="prefs.imageInsertAction"
@@ -1053,6 +1166,7 @@ watchEffect(() => {
               :disabled="prefs.imageInsertAction !== 'folder'"
             />
           </el-form-item>
+          <h4 class="prefs-subheading">{{ copy.uploading }}</h4>
           <el-form-item :label="t('prefs.image.currentUploader')">
             <el-select
               :model-value="prefs.currentUploader"
@@ -1127,6 +1241,7 @@ watchEffect(() => {
         tabindex="0"
       >
         <h3>{{ t('prefs.sections.cloud') }}</h3>
+        <p class="prefs-description">{{ copy.cloud }}</p>
         <CloudStorageSettings />
       </section>
 
@@ -1140,6 +1255,7 @@ watchEffect(() => {
         tabindex="0"
       >
         <h3>{{ t('prefs.sections.spellchecker') }}</h3>
+        <p class="prefs-description">{{ copy.spellchecker }}</p>
         <el-form label-width="220px" label-position="left">
           <el-form-item :label="t('prefs.spellchecker.enabled')">
             <el-switch :model-value="prefs.spellcheckerEnabled" @update:model-value="v => prefs.set('spellcheckerEnabled', !!v)" />
@@ -1214,6 +1330,7 @@ watchEffect(() => {
         tabindex="0"
       >
         <h3>{{ t('prefs.sections.view') }}</h3>
+        <p class="prefs-description">{{ copy.view }}</p>
         <el-form label-width="220px" label-position="left">
           <el-form-item :label="t('prefs.view.sidebarVisibility')">
             <el-switch :model-value="prefs.sideBarVisibility" @update:model-value="v => prefs.set('sideBarVisibility', !!v)" />
@@ -1243,6 +1360,7 @@ watchEffect(() => {
         tabindex="0"
       >
         <h3>{{ t('prefs.sections.search') }}</h3>
+        <p class="prefs-description">{{ copy.search }}</p>
         <el-form label-width="220px" label-position="left">
           <el-form-item :label="t('prefs.search.exclusions')">
             <el-input
@@ -1281,6 +1399,7 @@ watchEffect(() => {
         tabindex="0"
       >
         <h3>{{ t('prefs.sections.keybindings') }}</h3>
+        <p class="prefs-description">{{ copy.keybindings }}</p>
         <p class="hint">{{ t('prefs.keybindings.hint') }}</p>
         <div
           class="kb-table-scroll"
@@ -1386,346 +1505,147 @@ watchEffect(() => {
   display: flex;
   height: 100%;
   min-width: 0;
-  background: var(--mt-bg, #fff);
-  color: var(--mt-fg, #24292e);
+  background: var(--mt-bg, #fdfcf9);
+  color: var(--mt-fg, #252923);
+  font-family: var(--mt-ui-font, inherit);
 }
 .prefs-nav {
-  width: 180px;
+  display: flex;
+  flex-direction: column;
+  width: 204px;
   box-sizing: border-box;
-  border-right: 1px solid var(--mt-border, #eaecef);
-  background: var(--mt-sidebar-bg, #fafbfc);
-  padding: 20px 0;
+  border-right: 1px solid var(--mt-border, #deded5);
+  background: var(--mt-sidebar-bg, #f1f0eb);
+  padding: 27px 14px 18px;
   flex-shrink: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: auto;
   scrollbar-gutter: stable;
 }
-.prefs-title {
-  margin: 0 0 16px 20px;
-  font-size: 16px;
-  font-weight: 600;
-}
-.prefs-nav ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
+.prefs-brand { display: flex; align-items: center; gap: 9px; padding: 0 12px 18px; color: var(--mt-accent, #3e6250); }
+.prefs-title { margin: 0; font-size: 17px; font-weight: 650; letter-spacing: -.02em; color: var(--mt-fg); }
+.prefs-nav nav { flex: 1; }
+.prefs-nav ul { list-style: none; padding: 0; margin: 0; }
+.prefs-nav-group { padding: 22px 12px 9px; color: var(--mt-fg-muted); font-size: 10px; letter-spacing: .08em; font-weight: 600; }
+.prefs-nav li:first-child .prefs-nav-group { padding-top: 8px; }
 .prefs-nav-button {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   width: 100%;
+  min-height: 38px;
   box-sizing: border-box;
-  border: 0;
-  border-left: 3px solid transparent;
-  padding: 8px 20px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  padding: 8px 11px;
+  margin: 2px 0;
   background: transparent;
   font: inherit;
   font-size: 13px;
   text-align: left;
   cursor: pointer;
-  color: var(--mt-fg-muted, #586069);
+  color: var(--mt-fg-muted, #74796e);
+  transition: background .14s, color .14s;
 }
-.prefs-nav-button:hover { background: var(--mt-row-hover, #ebedef); }
-.prefs-nav-button:focus-visible {
-  outline: 2px solid var(--mt-accent, #0366d6);
-  outline-offset: -3px;
+.prefs-nav-button svg { flex-shrink: 0; }
+.prefs-nav-button:hover { background: var(--mt-row-hover, #e9e9e1); color: var(--mt-fg); }
+.prefs-nav-button:focus-visible { outline: 2px solid var(--mt-accent, #3e6250); outline-offset: 1px; }
+.prefs-nav-button.active { background: var(--mt-accent-soft, #e5ece3); color: var(--mt-accent, #3e6250); font-weight: 600; }
+.prefs-nav-note { display: flex; align-items: flex-start; gap: 7px; padding: 26px 10px 0; font-size: 10px; line-height: 1.5; color: var(--mt-fg-muted); }
+.prefs-nav-note svg { flex-shrink: 0; margin-top: 1px; color: var(--mt-accent); }
+.prefs-body { flex: 1; min-width: 0; box-sizing: border-box; overflow: auto; padding: 38px 44px 48px; scrollbar-gutter: stable; }
+.prefs-section { max-width: 780px; margin: 0; }
+.prefs-save-status { position: sticky; top: -16px; z-index: 4; max-width: 780px; margin: -16px 0 18px; padding: 8px 0; background: var(--mt-bg); }
+.saving-indicator { display: inline-flex; align-items: center; gap: 7px; color: var(--mt-fg-muted); font-size: 12px; }
+.saving-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--mt-accent); animation: saving-pulse 1s ease-in-out infinite alternate; }
+@keyframes saving-pulse { from { opacity: .35; } to { opacity: 1; } }
+.prefs-section:focus-visible { outline: 2px solid var(--mt-accent); outline-offset: 8px; border-radius: 4px; }
+.prefs-section h3 { margin: 0; font-size: 27px; line-height: 1.35; font-weight: 620; letter-spacing: -.035em; }
+.prefs-description { color: var(--mt-fg-muted); margin: 9px 0 30px; font-size: 13px; line-height: 1.7; }
+.prefs-subheading { margin: 30px 0 5px; padding: 0 0 11px; font-size: 12px; font-weight: 650; letter-spacing: .025em; border-bottom: 1px solid var(--mt-border); color: var(--mt-fg); }
+.prefs-section :deep(.el-form) > .prefs-subheading:first-child { margin-top: 0; }
+.prefs-section :deep(.el-form-item) { margin-bottom: 0; padding: 15px 0; border-bottom: 1px solid color-mix(in srgb, var(--mt-border) 60%, transparent); }
+.prefs-section :deep(.el-form-item__label) { line-height: 1.6; align-items: center; height: auto; padding-right: 20px; font-size: 13px; color: var(--mt-fg); }
+.prefs-section :deep(.el-form-item__content) { min-width: 0; line-height: 1.6; gap: 5px 0; }
+.prefs-section :deep(.el-input), .prefs-section :deep(.el-select), .prefs-section :deep(.el-input-number), .prefs-section :deep(.el-textarea), .prefs-section :deep(.el-slider) { max-width: 100%; }
+.prefs-section :deep(.el-alert) { margin-top: 14px; }
+.hint { color: var(--mt-fg-muted); font-size: 12px; margin: -12px 0 16px; }
+.inline-hint { margin: 0 0 0 12px; display: inline-block; max-width: 300px; line-height: 1.5; }
+.field-hint { flex-basis: 100%; margin: 6px 0 0; line-height: 1.5; }
+.input-with-action { display: flex; width: min(100%, 460px); min-width: 0; align-items: flex-start; gap: 8px; }
+.input-with-action :deep(.el-input), .input-with-action :deep(.el-select) { flex: 1; min-width: 0; }
+.theme-choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 17px; }
+.theme-choice { padding: 8px 8px 10px; border: 1px solid var(--mt-border); border-radius: 10px; color: var(--mt-fg); background: var(--mt-surface-raised, #fff); cursor: pointer; font: inherit; }
+.theme-choice:hover { border-color: var(--mt-fg-muted); }
+.theme-choice.selected { border-color: var(--mt-accent); box-shadow: 0 0 0 1px var(--mt-accent); }
+.theme-choice:focus-visible { outline: 2px solid var(--mt-accent); outline-offset: 4px; }
+.theme-choice:disabled { cursor: progress; opacity: .6; }
+.theme-choice-label { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 18px; margin-top: 10px; font-size: 12px; }
+.theme-choice.selected .theme-choice-label { color: var(--mt-accent); font-weight: 600; }
+.theme-preview { --preview-bg: #fdfcf9; --preview-sidebar: #eeeee7; --preview-line: #b8c0b1; position: relative; display: flex; height: 82px; overflow: hidden; border: 1px solid #deded5; border-radius: 5px; background: var(--preview-bg); }
+.theme-choice-dark .theme-preview { --preview-bg: #202321; --preview-sidebar: #191c1a; --preview-line: #718573; border-color: #343b34; }
+.theme-preview-sidebar { width: 26%; border-right: 1px solid color-mix(in srgb, var(--preview-line) 30%, transparent); background: var(--preview-sidebar); }
+.theme-preview-page { display: flex; flex: 1; flex-direction: column; gap: 5px; padding: 17px 13px; }
+.theme-preview-page i { height: 3px; border-radius: 2px; background: var(--preview-line); opacity: .5; }
+.theme-preview-page i:first-child { width: 55%; height: 5px; margin-bottom: 5px; opacity: 1; }
+.theme-preview-page i:last-child { width: 72%; }
+.theme-choice-system .theme-preview { background: linear-gradient(110deg, #fdfcf9 50%, #202321 50%); }
+.theme-choice-system .theme-preview-page { opacity: .6; }
+.theme-preview > svg { position: absolute; top: 50%; left: 55%; transform: translate(-50%, -50%); padding: 7px; box-sizing: content-box; color: var(--mt-accent); border: 1px solid var(--mt-border); border-radius: 8px; background: var(--mt-surface-raised, #fff); }
+.kb-table-scroll { position: relative; box-sizing: border-box; width: 100%; overflow-x: auto; border: 1px solid var(--mt-border); border-radius: 9px; background: var(--mt-surface-raised); }
+.kb-table-scroll:focus-visible { outline: 2px solid var(--mt-accent); outline-offset: 2px; }
+.kb-table { width: 100%; min-width: 560px; border-collapse: collapse; font-size: 13px; }
+.kb-table th, .kb-table td { text-align: left; padding: 12px; border-bottom: 1px solid var(--mt-border); }
+.kb-table tr:last-child td { border-bottom: 0; }
+.kb-table th { font-weight: 600; color: var(--mt-fg-muted); background: var(--mt-surface, var(--mt-sidebar-bg)); font-size: 10px; letter-spacing: .06em; }
+.kb-id { color: var(--mt-fg); font-size: 13px; }
+.kb-action-id { display: block; margin-top: 3px; color: var(--mt-fg-muted); font-family: ui-monospace, monospace; font-size: 10px; }
+.kb-accel { min-width: 190px; }
+.kb-button, .kb-input { font-family: ui-monospace, monospace; font-size: 12px; padding: 6px 10px; border: 1px solid var(--mt-border); border-radius: 5px; background: var(--mt-surface, var(--mt-sidebar-bg)); color: var(--mt-fg); cursor: pointer; min-width: 160px; }
+.kb-button:hover { background: var(--mt-row-hover); }
+.kb-button:disabled { opacity: .5; cursor: default; }
+.kb-button:focus-visible, .kb-input:focus-visible, .icon-choice:focus-visible { outline: 2px solid var(--mt-accent); outline-offset: 2px; }
+.kb-input { border-color: var(--mt-accent); background: var(--mt-surface-raised); cursor: text; }
+.kb-error { display: block; max-width: 260px; margin-top: 5px; color: var(--el-color-danger); font-size: 11px; line-height: 1.4; }
+.kb-notice { margin-top: 12px; }
+.icon-choices { display: flex; gap: 10px; flex-wrap: wrap; }
+.icon-choice { width: 108px; min-height: 128px; padding: 12px 8px; border: 1px solid var(--mt-border); border-radius: 9px; background: var(--mt-surface-raised); color: var(--mt-fg); cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 7px; }
+.icon-choice:hover { background: var(--mt-row-hover); }
+.icon-choice.selected { border-color: var(--mt-accent); box-shadow: 0 0 0 1px var(--mt-accent); background: var(--mt-accent-soft); }
+.icon-choice img { width: 58px; height: 58px; object-fit: contain; flex-shrink: 0; }
+.icon-choice-title { font-size: 12px; font-weight: 600; line-height: 1.3; }
+.icon-choice-desc { font-size: 10px; color: var(--mt-fg-muted); line-height: 1.4; text-align: center; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+@media (max-width: 1000px) {
+  .prefs-nav { width: 190px; padding-left: 10px; padding-right: 10px; }
+  .prefs-body { padding: 32px 28px 40px; }
+  .prefs-section :deep(.el-form-item__label) { width: 185px !important; }
 }
-.prefs-nav-button.active {
-  background: var(--mt-row-active, #fff);
-  color: var(--mt-accent, #0366d6);
-  border-left: 3px solid var(--mt-accent, #0366d6);
-  font-weight: 500;
-}
-.prefs-body {
-  flex: 1;
-  min-width: 0;
-  box-sizing: border-box;
-  overflow: auto;
-  padding: 28px 36px;
-  scrollbar-gutter: stable;
-}
-.prefs-section {
-  max-width: 780px;
-}
-.prefs-save-status {
-  position: sticky;
-  top: -12px;
-  z-index: 4;
-  max-width: 780px;
-  margin: -12px 0 16px;
-  padding: 8px 0;
-  background: var(--mt-bg, #fff);
-}
-.saving-indicator {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  color: var(--mt-fg-muted, #586069);
-  font-size: 12px;
-}
-.saving-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--mt-accent, #0366d6);
-  animation: saving-pulse 1s ease-in-out infinite alternate;
-}
-@keyframes saving-pulse {
-  from { opacity: 0.35; }
-  to { opacity: 1; }
-}
-.prefs-section:focus-visible {
-  outline: 2px solid var(--mt-accent, #0366d6);
-  outline-offset: 6px;
-}
-.prefs-section h3 {
-  margin: 0 0 24px;
-  font-size: 18px;
-  font-weight: 600;
-  border-bottom: 1px solid var(--mt-border, #eaecef);
-  padding-bottom: 12px;
-}
-.prefs-section :deep(.el-form-item) {
-  margin-bottom: 18px;
-}
-.prefs-section :deep(.el-form-item__content) {
-  min-width: 0;
-}
-.prefs-section :deep(.el-input),
-.prefs-section :deep(.el-select),
-.prefs-section :deep(.el-input-number),
-.prefs-section :deep(.el-textarea),
-.prefs-section :deep(.el-slider) {
-  max-width: 100%;
-}
-.hint {
-  color: var(--mt-fg-muted, #6a737d);
-  font-size: 12px;
-  margin: -12px 0 16px;
-}
-.inline-hint {
-  margin: 0 0 0 12px;
-  display: inline-block;
-  max-width: 360px;
-  line-height: 1.4;
-}
-.field-hint {
-  flex-basis: 100%;
-  margin: 6px 0 0;
-  line-height: 1.4;
-}
-.input-with-action {
-  display: flex;
-  width: min(100%, 460px);
-  min-width: 0;
-  align-items: flex-start;
-  gap: 8px;
-}
-.input-with-action :deep(.el-input),
-.input-with-action :deep(.el-select) {
-  flex: 1;
-  min-width: 0;
-}
-.kb-table-scroll {
-  width: 100%;
-  overflow-x: auto;
-}
-.kb-table-scroll:focus-visible {
-  outline: 2px solid var(--mt-accent, #0366d6);
-  outline-offset: 2px;
-}
-.kb-table {
-  width: 100%;
-  min-width: 560px;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-.kb-table th, .kb-table td {
-  text-align: left;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--mt-border, #eaecef);
-}
-.kb-table th {
-  font-weight: 600;
-  color: var(--mt-fg-muted, #586069);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-.kb-id {
-  color: var(--mt-fg, #24292e);
-  font-size: 13px;
-}
-.kb-action-id {
-  display: block;
-  margin-top: 2px;
-  color: var(--mt-fg-muted, #586069);
-  font-family: ui-monospace, monospace;
-  font-size: 10px;
-}
-.kb-accel {
-  min-width: 190px;
-}
-.kb-button, .kb-input {
-  font-family: ui-monospace, monospace;
-  font-size: 12px;
-  padding: 4px 10px;
-  border: 1px solid var(--mt-border, #d1d5da);
-  border-radius: 4px;
-  background: var(--mt-tab-bg, #f5f6f7);
-  color: var(--mt-fg, #24292e);
-  cursor: pointer;
-  min-width: 160px;
-}
-.kb-button:hover { background: var(--mt-row-hover, #ebedef); }
-.kb-button:focus-visible,
-.kb-input:focus-visible,
-.icon-choice:focus-visible {
-  outline: 2px solid var(--mt-accent, #0366d6);
-  outline-offset: 2px;
-}
-.kb-input {
-  border-color: var(--mt-accent, #0366d6);
-  background: var(--mt-row-active, #fff);
-  cursor: text;
-}
-.kb-error {
-  display: block;
-  max-width: 260px;
-  margin-top: 5px;
-  color: var(--el-color-danger, #f56c6c);
-  font-size: 11px;
-  line-height: 1.35;
-}
-.kb-notice {
-  margin-top: 12px;
-}
-.icon-choices {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-.icon-choice {
-  width: 128px;
-  min-height: 142px;
-  padding: 12px;
-  border: 1px solid var(--mt-border, #d1d5da);
-  border-radius: 8px;
-  background: var(--mt-tab-bg, #f5f6f7);
-  color: var(--mt-fg, #24292e);
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-}
-.icon-choice:hover { background: var(--mt-row-hover, #ebedef); }
-.icon-choice.selected {
-  border-color: var(--mt-accent, #0366d6);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--mt-accent, #0366d6) 20%, transparent);
-  background: var(--mt-row-active, #fff);
-}
-.icon-choice img {
-  width: 72px;
-  height: 72px;
-  object-fit: contain;
-  flex-shrink: 0;
-}
-.icon-choice-title { font-size: 13px; font-weight: 600; line-height: 1.2; }
-.icon-choice-desc {
-  font-size: 11px;
-  color: var(--mt-fg-muted, #586069);
-  line-height: 1.2;
-  text-align: center;
-}
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
 @media (max-width: 760px) {
-  .prefs-page {
-    flex-direction: column;
-  }
-  .prefs-nav {
-    width: 100%;
-    max-height: 150px;
-    padding: 12px 0 0;
-    border-right: 0;
-    border-bottom: 1px solid var(--mt-border, #eaecef);
-    overflow-x: auto;
-    overflow-y: hidden;
-    scrollbar-gutter: auto;
-  }
-  .prefs-title {
-    margin: 0 16px 10px;
-  }
-  .prefs-nav ul {
-    display: flex;
-    min-width: max-content;
-  }
-  .prefs-nav-button {
-    width: auto;
-    padding: 9px 14px 10px;
-    border-left: 0;
-    border-bottom: 3px solid transparent;
-    white-space: nowrap;
-  }
-  .prefs-nav-button.active {
-    border-left: 0;
-    border-bottom-color: var(--mt-accent, #0366d6);
-  }
-  .prefs-body {
-    padding: 22px 24px 28px;
-  }
+  .prefs-page { flex-direction: column; }
+  .prefs-nav { width: 100%; max-height: 123px; padding: 15px 12px 9px; border-right: 0; border-bottom: 1px solid var(--mt-border); overflow-x: auto; overflow-y: hidden; scrollbar-gutter: auto; }
+  .prefs-brand { padding: 0 4px 10px; }
+  .prefs-title { font-size: 15px; }
+  .prefs-nav ul { display: flex; gap: 4px; min-width: max-content; }
+  .prefs-nav-button { width: auto; min-height: 34px; padding: 7px 11px; white-space: nowrap; font-size: 12px; }
+  .prefs-nav-group, .prefs-nav-note { display: none; }
+  .prefs-body { padding: 25px 24px 32px; }
+  .prefs-section h3 { font-size: 24px; }
 }
-
 @media (max-width: 620px) {
-  .prefs-body {
-    padding: 18px 16px 24px;
-  }
-  .prefs-section :deep(.el-form-item) {
-    display: block;
-  }
-  .prefs-section :deep(.el-form-item__label) {
-    width: 100% !important;
-    height: auto;
-    margin-bottom: 6px;
-    padding: 0;
-    line-height: 1.4;
-  }
-  .prefs-section :deep(.el-form-item__content) {
-    width: 100%;
-    margin-left: 0 !important;
-  }
-  .inline-hint {
-    display: block;
-    margin: 6px 0 0;
-  }
-  .kb-table th,
-  .kb-table td {
-    padding: 8px 6px;
-  }
-  .kb-action-id {
-    display: none;
-  }
-  .kb-button,
-  .kb-input {
-    min-width: 120px;
-  }
-  .icon-choice {
-    width: min(128px, calc(50% - 6px));
-  }
+  .prefs-body { padding: 23px 18px 28px; }
+  .prefs-description { margin-bottom: 24px; }
+  .prefs-section :deep(.el-form-item) { display: block; padding: 13px 0; }
+  .prefs-section :deep(.el-form-item__label) { width: 100% !important; height: auto; margin-bottom: 8px; padding: 0; line-height: 1.4; }
+  .prefs-section :deep(.el-form-item__content) { width: 100%; margin-left: 0 !important; }
+  .inline-hint { display: block; margin: 6px 0 0; }
+  .theme-choices { gap: 9px; }
+  .theme-preview { height: 66px; }
+  .theme-preview-page { padding: 13px 8px; }
+  .theme-choice-label { font-size: 11px; gap: 3px; }
+  .kb-table th, .kb-table td { padding: 9px 7px; }
+  .kb-action-id { display: none; }
+  .kb-button, .kb-input { min-width: 120px; }
+  .icon-choice { width: min(108px, calc(50% - 5px)); }
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .saving-dot { animation: none; }
-}
-
+@media (prefers-reduced-motion: reduce) { .saving-dot { animation: none; } .prefs-nav-button { transition: none; } }
 </style>

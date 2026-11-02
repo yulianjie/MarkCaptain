@@ -3,31 +3,29 @@
  * Theme variables expose a small palette consumed by every component.
  * Switch theme by setting `data-theme="dark"` (etc.) on <html>.
  *
- * The default values below are the "light" theme; dark variants override
- * each var inside the corresponding selector. Auxiliary themes
- * (graphite / one-dark / material-dark / ulysses) reuse one of the two
- * base palettes — they're cosmetic accent swaps until full theme files land.
+ * The light/dark pair uses the writing-workbench palette. Additional built-in
+ * and user themes keep their own identities through the same semantic tokens.
  */
 
 :root {
-  --mt-bg: #ffffff;
-  --mt-fg: #30363b;
-  --mt-fg-muted: #6b747c;
-  --mt-border: #e6e9ec;
-  --mt-accent: #1c9a69;
-  --mt-sidebar-bg: #f7f8f9;
-  --mt-row-hover: rgba(0, 0, 0, 0.03);
-  --mt-row-active: #e3eaef;
+  --mt-bg: #fdfcf9;
+  --mt-fg: #292f2b;
+  --mt-fg-muted: #666e66;
+  --mt-border: #e0e3da;
+  --mt-accent: #3e6250;
+  --mt-sidebar-bg: #f1f0eb;
+  --mt-row-hover: rgba(62, 98, 80, 0.055);
+  --mt-row-active: #e5ece3;
   --mt-active-bar: var(--mt-accent);
-  --mt-tab-bg: #f5f6f7;
-  --mt-tab-bg-active: #ffffff;
-  --mt-code-bg: #fafbfc;
+  --mt-tab-bg: #f7f6f2;
+  --mt-tab-bg-active: #fdfcf9;
+  --mt-code-bg: #f2f3ed;
   --mt-syntax-heading: #22863a;
   --mt-syntax-link: #0366d6;
   --mt-syntax-code: #d73a49;
   --mt-syntax-list: #005cc5;
-  --mt-shadow: rgba(27, 31, 35, 0.10);
-  --mt-shadow-tabs: 0 0 9px 2px rgba(0, 0, 0, 0.1);
+  --mt-shadow: rgba(39, 56, 44, 0.10);
+  --mt-shadow-tabs: 0 2px 8px rgba(39, 56, 44, 0.06);
 
   /* Live-applied editor display vars (defaults match preferences defaults). */
   --mt-zoom: 1;
@@ -56,18 +54,18 @@
  */
 
 [data-theme='dark'] {
-  --mt-bg: #282828;
-  --mt-fg: rgba(255, 255, 255, 0.7);
-  --mt-fg-muted: rgba(255, 255, 255, 0.5);
-  --mt-border: #363839;
-  --mt-accent: #409eff;
-  --mt-sidebar-bg: #1f1f1f;
-  --mt-row-hover: rgba(255, 255, 255, 0.04);
-  --mt-row-active: #424344;
-  --mt-tab-bg: #1f1f1f;
-  --mt-tab-bg-active: #282828;
-  --mt-code-bg: #424344;
-  --mt-shadow: rgba(0, 0, 0, 0.5);
+  --mt-bg: #202321;
+  --mt-fg: #e3e7e1;
+  --mt-fg-muted: #a3ada3;
+  --mt-border: #373e37;
+  --mt-accent: #a0c5a7;
+  --mt-sidebar-bg: #191c1a;
+  --mt-row-hover: rgba(160, 197, 167, 0.07);
+  --mt-row-active: #303e32;
+  --mt-tab-bg: #242825;
+  --mt-tab-bg-active: #202321;
+  --mt-code-bg: #292e29;
+  --mt-shadow: rgba(0, 0, 0, 0.28);
 }
 
 [data-theme='one-dark'] {

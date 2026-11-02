@@ -26,14 +26,14 @@ onBeforeUnmount(() => { unsub?.() })
 </script>
 
 <template>
-  <el-dialog v-model="visible" width="420px" align-center :show-close="true">
+  <el-dialog v-model="visible" width="min(420px, calc(100vw - 32px))" class="about-dialog" align-center :show-close="true" :aria-label="t('app.name')">
     <template #header>
       <h3 class="about-title">{{ t('app.name') }}</h3>
     </template>
     <div class="about-body">
       <img class="about-icon" :src="currentIcon.src" :alt="currentIcon.label" />
-      <p class="version">{{ t('about.version', { version: appVersion }) }}</p>
       <p class="tagline">{{ t('about.tagline') }}</p>
+      <p class="version">{{ t('about.version', { version: appVersion }) }}</p>
       <p class="meta">{{ t('about.copyright') }}</p>
     </div>
   </el-dialog>
@@ -43,22 +43,27 @@ onBeforeUnmount(() => { unsub?.() })
 .about-title {
   margin: 0;
   font-weight: 600;
-  font-size: 16px;
-  color: #24292e;
+  font-size: 15px;
+  color: var(--mt-fg);
 }
-.about-body { text-align: center; padding: 0 16px 8px; }
+.about-body { text-align: center; padding: 22px 16px 12px; }
 .about-icon {
-  width: 88px;
-  height: 88px;
+  width: 96px;
+  height: 96px;
   object-fit: contain;
-  margin: 2px auto 14px;
+  margin: 2px auto 24px;
   display: block;
 }
 .version {
-  font-size: 14px;
-  color: #586069;
-  margin-bottom: 12px;
+  display: inline-block;
+  border: 1px solid var(--mt-border);
+  border-radius: 20px;
+  background: var(--mt-surface);
+  font-size: 11px;
+  color: var(--mt-fg-muted);
+  margin: 0 0 28px;
+  padding: 5px 12px;
 }
-.tagline { color: #24292e; margin-bottom: 16px; }
-.meta { color: #959da5; font-size: 12px; }
+.tagline { color: var(--mt-fg); margin: 0 0 16px; font-size: 15px; line-height: 1.6; }
+.meta { color: var(--mt-fg-muted); font-size: 11px; border-top: 1px solid var(--mt-border); padding-top: 18px; margin: 0; }
 </style>

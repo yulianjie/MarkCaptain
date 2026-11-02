@@ -88,7 +88,7 @@ describe('document inspector layout and relation model', () => {
     expect(inspector).toContain('name="agent"')
     expect(inspector).toContain('pinnedLinksVisible')
     expect(inspector).toContain('document-inspector-rail')
-    expect(inspector).toContain('@media (max-width: 1050px)')
+    expect(inspector).toContain('@media (max-width: 1180px)')
     expect(inspector).toContain('setInspectorWidth')
     expect(notebook).toContain('notebook.navigateToRelation')
     expect(notebook).toContain('notebook.returnFromRelation')

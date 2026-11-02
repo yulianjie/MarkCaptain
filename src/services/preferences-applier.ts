@@ -3,7 +3,7 @@ import { effectScope, shallowRef, watch, type EffectScope } from 'vue'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { usePreferencesStore } from '@/stores/preferences'
 import { setLocale, type LocaleId } from '@/i18n'
-import { listThemes, readThemeCss, type UserTheme } from './tauri-invoke'
+import { listThemes, readThemeCss, setWindowTheme, type UserTheme } from './tauri-invoke'
 import { applyWindowIcon } from './app-icon'
 
 const BUILTIN_THEMES = new Set([
@@ -21,6 +21,7 @@ const SPELL_STYLE_ID = 'mt-spell-underline-style'
 let applierScope: EffectScope | null = null
 let userThemesIndex: Map<string, UserTheme> | null = null
 let themeRequest = 0
+let nativeThemeWrites: Promise<void> = Promise.resolve()
 
 /** The theme actually displayed (selected theme, or the current OS theme). */
 export const effectiveThemeId = shallowRef('light')
@@ -125,16 +126,55 @@ function setDarkThemeClass(dark: boolean): void {
 
 function computedThemeIsDark(fallback: boolean): boolean {
   if (typeof document === 'undefined' || typeof getComputedStyle !== 'function') return fallback
-  const color = getComputedStyle(document.documentElement).backgroundColor
+  // html/body can be transparent (notably with native Acrylic). Measure the
+  // theme's actual surface instead, after its user CSS has been installed.
+  const probe = document.createElement('span')
+  probe.style.backgroundColor = 'var(--mt-bg)'
+  probe.style.display = 'none'
+  document.documentElement.appendChild(probe)
+  const color = getComputedStyle(probe).backgroundColor
+  probe.remove()
   const match = color.match(/rgba?\(\s*([\d.]+)[, ]+\s*([\d.]+)[, ]+\s*([\d.]+)/i)
-  if (!match) return fallback
-  const [, r, g, b] = match.map(Number)
+  let channels: number[]
+  if (match) {
+    if ((color.startsWith('rgba(') && /,\s*0(?:\.0*)?\s*\)$/.test(color)) || /\/\s*0(?:\.0*)?\s*\)$/.test(color)) return fallback
+    channels = match.slice(1).map(Number)
+  } else {
+    // Chromium can retain Color 4 forms such as color(srgb), oklch or
+    // color-mix in computed styles. Canvas normalizes those to sRGB bytes.
+    const canvas = document.createElement('canvas')
+    canvas.width = canvas.height = 1
+    const context = canvas.getContext('2d')
+    if (!context) return fallback
+    context.fillStyle = color
+    context.fillRect(0, 0, 1, 1)
+    const pixel = context.getImageData(0, 0, 1, 1).data
+    if (!pixel[3]) return fallback
+    channels = Array.from(pixel).slice(0, 3)
+  }
+  const [r, g, b] = channels
   // Relative luminance is unnecessary for a binary UI palette decision;
   // weighted sRGB brightness handles theme background colours reliably.
   return (r * 0.299 + g * 0.587 + b * 0.114) < 128
 }
 
-async function applyResolvedTheme(theme: string): Promise<boolean> {
+async function syncNativeTheme(dark: boolean, mode: number, request: number): Promise<void> {
+  const nativeTheme = mode === 1 ? null : dark ? 'dark' : 'light'
+  const write = nativeThemeWrites.then(async () => {
+    if (request !== themeRequest) return
+    try {
+      await setWindowTheme(nativeTheme)
+    } catch (error) {
+      console.warn('[preferences] failed to apply native window theme', error)
+    }
+  })
+  // Keep rapid theme changes ordered even if an earlier native IPC completes
+  // later. A stale user-theme read is discarded before it reaches this queue.
+  nativeThemeWrites = write
+  await write
+}
+
+async function applyResolvedTheme(theme: string, mode: number): Promise<boolean> {
   effectiveThemeId.value = theme
   const builtInDark = /dark/i.test(theme)
   if (typeof document !== 'undefined') {
@@ -144,7 +184,11 @@ async function applyResolvedTheme(theme: string): Promise<boolean> {
   const request = ++themeRequest
   const applied = await applyUserTheme(theme, request)
   if (request === themeRequest) {
-    setDarkThemeClass(BUILTIN_THEMES.has(theme) ? builtInDark : computedThemeIsDark(false))
+    const dark = BUILTIN_THEMES.has(theme) ? builtInDark : computedThemeIsDark(false)
+    setDarkThemeClass(dark)
+    // Bootstrap awaits this before showing a native window. Every later
+    // local/cross-window preference event follows the same path.
+    await syncNativeTheme(dark, mode, request)
   }
   return applied
 }
@@ -154,7 +198,7 @@ export async function refreshUserTheme(themeId?: string): Promise<boolean> {
   const prefs = usePreferencesStore()
   invalidateUserThemes()
   const theme = themeId ?? resolveEffectiveTheme(prefs.theme, prefs.autoSwitchTheme)
-  return applyResolvedTheme(theme)
+  return applyResolvedTheme(theme, prefs.autoSwitchTheme)
 }
 
 function ensureSpellStyle(): void {
@@ -175,12 +219,12 @@ export async function applyPreferencesToDom(): Promise<void> {
   ensureSpellStyle()
   // User theme CSS is read from disk. Await it before the first Vue mount so
   // secondary/settings windows do not flash the default light palette.
-  await applyResolvedTheme(resolveEffectiveTheme(prefs.theme, prefs.autoSwitchTheme))
+  await applyResolvedTheme(resolveEffectiveTheme(prefs.theme, prefs.autoSwitchTheme), prefs.autoSwitchTheme)
   applierScope = effectScope()
   applierScope.run(() => {
     watch(
       () => [prefs.theme, prefs.autoSwitchTheme] as const,
-      ([theme, mode]) => { void applyResolvedTheme(resolveEffectiveTheme(theme, mode)) },
+      ([theme, mode]) => { void applyResolvedTheme(resolveEffectiveTheme(theme, mode), mode) },
       { immediate: true },
     )
 
@@ -189,7 +233,9 @@ export async function applyPreferencesToDom(): Promise<void> {
       (mode, _oldMode, onCleanup) => {
         if (mode !== 1 || typeof window === 'undefined' || !window.matchMedia) return
         const media = window.matchMedia('(prefers-color-scheme: dark)')
-        const listener = () => { void applyResolvedTheme(media.matches ? 'dark' : 'light') }
+        const listener = () => {
+          if (prefs.autoSwitchTheme === 1) void applyResolvedTheme(media.matches ? 'dark' : 'light', 1)
+        }
         media.addEventListener('change', listener)
         onCleanup(() => media.removeEventListener('change', listener))
       },
@@ -254,6 +300,7 @@ export async function applyPreferencesToDom(): Promise<void> {
 }
 
 export function disposePreferencesApplier(): void {
+  themeRequest += 1
   applierScope?.stop()
   applierScope = null
 }
