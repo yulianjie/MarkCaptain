@@ -1,8 +1,9 @@
+import { startWithNewDocument } from './helpers/editor'
 import { expect, test, type Page } from '@playwright/test'
 
 async function openDocument(page: Page, sourceMode = false) {
   await page.setViewportSize({ width: 1280, height: 800 })
-  await page.goto('/')
+  await startWithNewDocument(page)
   await page.locator('.muya-host [contenteditable="true"]').waitFor()
   await page.evaluate(async source => {
     const editorPath = '/src/stores/editor.ts'

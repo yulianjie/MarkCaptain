@@ -1,3 +1,4 @@
+import { startWithNewDocument } from './helpers/editor'
 import { expect, test, type Page } from '@playwright/test'
 import type { AgentRequest } from '../../src/services/agent'
 import type { AgentDocumentVersion } from '../../src/services/tauri-invoke'
@@ -66,7 +67,7 @@ async function setup(page: Page, source: boolean) {
   await page.route('**/src/services/agent-transport.ts*', route => route.fulfill({ contentType: 'text/javascript', body: transportFixture }))
   await page.route('**/src/services/tauri-invoke.ts*', route => route.request().url().includes('a07-original')
     ? route.continue() : route.fulfill({ contentType: 'text/javascript', body: ipcFixture }))
-  await page.goto('/')
+  await startWithNewDocument(page)
   await page.locator('.muya-host [contenteditable="true"]').first().waitFor()
   const ids = await page.evaluate(async source => {
     const editor = (await import('/src/stores/editor.ts')).useEditorStore()

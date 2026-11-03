@@ -1,3 +1,4 @@
+import { startWithNewDocument } from './helpers/editor'
 /**
  * Smoke tests — verify the renderer boots and the basic UI surfaces are
  * present. Doesn't drive Tauri-specific commands (those need the binary
@@ -25,7 +26,7 @@ test('command palette opens with Ctrl+Shift+P', async ({ page }) => {
 })
 
 test('source-code mode toggle wires to the editor', async ({ page }) => {
-  await page.goto('/')
+  await startWithNewDocument(page)
   await page.locator('.title-bar').waitFor()
   // Open the command palette and run "Toggle Source Code Mode"
   await page.keyboard.press('Control+Shift+P')
@@ -36,7 +37,7 @@ test('source-code mode toggle wires to the editor', async ({ page }) => {
 })
 
 test('WYSIWYG undo and both Windows redo shortcuts use Muya history', async ({ page }) => {
-  await page.goto('/')
+  await startWithNewDocument(page)
   const editor = page.locator('.muya-host [contenteditable="true"]')
   await editor.waitFor()
   await editor.click()
@@ -55,7 +56,7 @@ test('WYSIWYG undo and both Windows redo shortcuts use Muya history', async ({ p
 })
 
 test('editing shortcuts stay inside a focused command-palette input', async ({ page }) => {
-  await page.goto('/')
+  await startWithNewDocument(page)
   const editor = page.locator('.muya-host [contenteditable="true"]')
   await editor.waitFor()
   await editor.click()

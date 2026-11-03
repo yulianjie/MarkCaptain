@@ -15,6 +15,7 @@ watch(() => editor.startupHydrationPending, pending => {
   if (pending || !initialLayout) return
   const layout = initialLayout; initialLayout = null
   const activeDocument = editor.currentFileId
+  const homeWasActive = editor.homeActive
   const restoredPanes = layout.panes.map((p,i) => ({
     id: i === 0 ? 'main' : crypto.randomUUID(),
     documentId: resolvePaneDocumentId(p, activeDocument, props.restoredSessionTabIdsByIndex ?? {}, path => editor.findTabByPath(path)?.id ?? null),
@@ -33,6 +34,7 @@ watch(() => editor.startupHydrationPending, pending => {
   editor.splitDirection = layout.direction; editor.splitRatio = layout.ratio
   editor.paneSizes = Object.fromEntries(editor.panes.map((p,i) => [p.id, layout.sizes?.[i] ?? 1 / editor.panes.length]))
   editor.activePaneId = ''; editor.activatePane(editor.panes[layout.activeIndex ?? 0].id)
+  if (homeWasActive) editor.openHomeTab()
 }, { flush: 'post' })
 let stop: (() => void) | undefined
 function resize(event: PointerEvent, index: number) {

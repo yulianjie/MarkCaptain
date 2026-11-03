@@ -1,3 +1,4 @@
+import { startWithNewDocument } from './helpers/editor'
 import { expect, test, type Page } from '@playwright/test'
 
 interface M2Request {
@@ -68,7 +69,7 @@ async function setup(page: Page) {
     ? route.continue()
     : route.fulfill({ contentType: 'text/javascript', body: tauriFixture }))
   await page.route('**/src/services/agent-transport.ts*', route => route.fulfill({ contentType: 'text/javascript', body: transportFixture }))
-  await page.goto('/')
+  await startWithNewDocument(page)
   await page.locator('.muya-host [contenteditable="true"]').waitFor()
   await page.evaluate(async () => {
     const prefs = (await import('/src/stores/preferences.ts')).usePreferencesStore()

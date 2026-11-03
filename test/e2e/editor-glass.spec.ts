@@ -1,3 +1,4 @@
+import { startWithNewDocument } from './helpers/editor'
 import { test, expect, type Page } from '@playwright/test'
 
 test('outline inspector and navigation sidebar can be toggled independently', async ({ page }) => {
@@ -160,7 +161,7 @@ const markdown = [
 ].join('\n\n')
 
 async function seed(page: Page, showInspector = true) {
-  await page.goto('/')
+  await startWithNewDocument(page)
   await page.locator('.muya-host [contenteditable="true"]').waitFor()
   await page.evaluate(async ({ content, showInspector }) => {
     const editorPath = '/src/stores/editor.ts'

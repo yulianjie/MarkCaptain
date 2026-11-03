@@ -1,3 +1,4 @@
+import { startWithNewDocument } from './helpers/editor'
 import { test, expect, type Page } from '@playwright/test'
 
 const sample = [
@@ -13,7 +14,7 @@ const sample = [
 ].join('\n\n')
 
 async function openDocument(page: Page) {
-  await page.goto('/')
+  await startWithNewDocument(page)
   await page.locator('.muya-host [contenteditable="true"]').waitFor()
   await page.evaluate(async markdown => {
     const editorPath = '/src/stores/editor.ts'

@@ -194,15 +194,44 @@ describe('editor reliability', () => {
     expect(invokeMocks.saveMarkdown).toHaveBeenCalledTimes(2)
   })
 
-  it('holds the placeholder bootstrap until startup restoration is complete', () => {
+  it('shows Home after startup restoration without creating an Untitled document', () => {
     const editor = useEditorStore()
 
     editor.bootstrap()
     expect(editor.tabs).toHaveLength(0)
+    expect(editor.homeActive).toBe(false)
 
     editor.finishStartupHydration()
-    expect(editor.tabs).toHaveLength(1)
-    expect(editor.currentFile?.pathname).toBe('')
+    editor.bootstrap()
+    expect(editor.tabs).toHaveLength(0)
+    expect(editor.currentFile).toBeNull()
+    expect(editor.homeActive).toBe(true)
+    expect(editor.homeTabOpen).toBe(true)
+  })
+
+  it('keeps a restored document selected when startup hydration finishes', () => {
+    const editor = useEditorStore()
+    const tab = editor.restoreCleanSessionTab({
+      dirty: false, path: 'C:\\notes\\draft.md', sourceMode: false,
+    }, loaded('restored content'))
+
+    editor.finishStartupHydration()
+    editor.bootstrap()
+    expect(editor.tabs.map(tab => tab.id)).toEqual([tab.id])
+    expect(editor.currentFile?.id).toBe(tab.id)
+    expect(editor.homeActive).toBe(false)
+  })
+
+  it('opens a launch file after hydration without leaving an Untitled document', async () => {
+    const editor = useEditorStore()
+    editor.finishStartupHydration()
+    invokeMocks.readMarkdown.mockResolvedValueOnce(loaded('launch content'))
+
+    const tab = await editor.openFile('C:\\notes\\draft.md')
+    editor.bootstrap()
+    expect(editor.tabs.map(tab => tab.pathname)).toEqual(['C:\\notes\\draft.md'])
+    expect(editor.currentFile?.id).toBe(tab.id)
+    expect(editor.homeActive).toBe(false)
   })
 
   it('keeps a changed disk version attached to a recovered draft as a save conflict', () => {
@@ -230,7 +259,7 @@ describe('editor reliability', () => {
   it('restores source mode independently for each tab', () => {
     const editor = useEditorStore()
     editor.finishStartupHydration()
-    const first = editor.currentFile!
+    const first = editor.newUntitledTab()
     editor.toggleSourceCode()
     expect(first.sourceMode).toBe(true)
 

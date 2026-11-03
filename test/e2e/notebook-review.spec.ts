@@ -1,3 +1,4 @@
+import { startWithNewDocument } from './helpers/editor'
 import { test, expect } from '@playwright/test'
 
 // The desktop transport is delayed deliberately. Components and both editors
@@ -26,7 +27,7 @@ export const localHistoryCapture = async () => {
 `
 async function setup(page: import('@playwright/test').Page) {
   await page.route('**/src/services/tauri-invoke.ts*', route => route.request().url().includes('review-original') ? route.continue() : route.fulfill({ contentType: 'text/javascript', body: transport }))
-  await page.goto('/')
+  await startWithNewDocument(page)
   await page.locator('.muya-host [contenteditable=true]').first().waitFor()
   await page.evaluate(async () => {
     const p = '/src/stores/project.ts'; const n = '/src/stores/notebook.ts'; const e = '/src/stores/editor.ts'

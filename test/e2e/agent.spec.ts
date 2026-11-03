@@ -1,3 +1,4 @@
+import { startWithNewDocument } from './helpers/editor'
 import { test, expect, type Page } from '@playwright/test'
 
 // Replace only the transport boundary. The real Vue UI, Pinia state, Muya,
@@ -35,7 +36,7 @@ export const agentTransport = {
 
 async function setup(page: Page, source = false) {
   await page.route('**/src/services/agent-transport.ts*', route => route.fulfill({ contentType: 'text/javascript', body: transportFixture }))
-  await page.goto('/')
+  await startWithNewDocument(page)
   await page.locator('.muya-host [contenteditable="true"]').waitFor()
   await page.evaluate(async source => {
     const editorPath = '/src/stores/editor.ts', prefsPath = '/src/stores/preferences.ts', localePath = '/src/i18n/index.ts'

@@ -74,7 +74,7 @@
     "default": "modified"
   },
   "startUpAction": {
-    "description": "General--The action after MarkCaptain startup, open the last edited content, open the specified folder or blank page",
+    "description": "General--The action after MarkCaptain startup: restore the last edited content, open the specified folder or show Home (blank).",
     "enum": [
       "folder",
       "lastState",

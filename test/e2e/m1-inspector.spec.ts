@@ -1,3 +1,4 @@
+import { startWithNewDocument } from './helpers/editor'
 import { expect, test, type Page } from '@playwright/test'
 
 const notebookTransport = `
@@ -34,7 +35,7 @@ async function setupInspector(page: Page) {
     ? route.continue()
     : route.fulfill({ contentType: 'text/javascript', body: notebookTransport }))
   await page.route('**/src/services/agent-transport.ts*', route => route.fulfill({ contentType: 'text/javascript', body: agentTransport }))
-  await page.goto('/')
+  await startWithNewDocument(page)
   await page.evaluate(async () => {
     const project = (await import('/src/stores/project.ts')).useProjectStore()
     project.projectTree = { id:'root',name:'M1 notes',pathname:'C:/M1-notes',isDirectory:true,isFile:false,isRoot:true,folders:[],files:[],isCollapsed:false,childrenLoaded:true }

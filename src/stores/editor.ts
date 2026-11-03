@@ -252,7 +252,7 @@ export const useEditorStore = defineStore('editor', () => {
   }
   function hasSharedHistoryStep(direction: 'undo' | 'redo') { const history = currentFileId.value ? sharedHistory.get(currentFileId.value) : undefined; return Boolean(history?.[direction].length) }
   // Child editors mount before EditorPage's async startup restore. Keep their
-  // bootstrap from creating an Untitled placeholder until restoration ends.
+  // bootstrap from selecting Home until restoration ends.
   const startupHydrationPending = ref(true)
   const listToc = ref<{ lvl: number; content: string; slug?: string }[]>([])
   /** True when the editor shows raw markdown source instead of WYSIWYG Muya. */
@@ -1335,10 +1335,10 @@ export const useEditorStore = defineStore('editor', () => {
 
   /* ─── bootstrap ─────────────────────────────────────────────── */
 
-  /** Default state on fresh window — a single Untitled tab. */
+  /** An empty window starts at Home; documents are only created explicitly. */
   function bootstrap() {
     if (startupHydrationPending.value) return
-    if (!tabs.value.length) newUntitledTab()
+    if (!tabs.value.length) openHomeTab()
   }
 
   function finishStartupHydration() {

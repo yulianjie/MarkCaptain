@@ -1,8 +1,9 @@
+import { startWithNewDocument } from './helpers/editor'
 import { test, expect, type Page } from '@playwright/test'
 
 // Exercise the real editor instances and tab UI in the renderer; no disk writes.
 async function openDocuments(page: Page, sourceMode = false) {
-  await page.goto('/')
+  await startWithNewDocument(page)
   await page.locator('.muya-host [contenteditable="true"]').waitFor()
   await page.evaluate(async source => {
     const editorPath = '/src/stores/editor.ts'

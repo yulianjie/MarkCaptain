@@ -505,7 +505,7 @@ export default {
       sortByCreated: '作成日時',
       sortByTitle: 'タイトル',
       onStartup: '起動時',
-      startupBlank: '空のドキュメント',
+      startupBlank: 'ホームを表示',
       startupLastState: '最近のフォルダーとファイルを開く',
       startupFolder: 'フォルダーを開く',
       startupDirectory: '起動時のフォルダー',

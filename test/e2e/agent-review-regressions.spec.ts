@@ -1,3 +1,4 @@
+import { startWithNewDocument } from './helpers/editor'
 import { expect, test, type Page } from '@playwright/test'
 
 // Production stores and components; only provider transport is replaced.
@@ -10,7 +11,7 @@ const transport = `export const agentTransport = {
 async function setup(page: Page) {
   await page.addInitScript(() => localStorage.clear())
   await page.route('**/src/services/agent-transport.ts*', route => route.fulfill({ contentType: 'text/javascript', body: transport }))
-  await page.goto('/')
+  await startWithNewDocument(page)
   await page.locator('.editing-region').first().waitFor()
   await page.evaluate(async () => {
     const editor = (await import('/src/stores/editor.ts')).useEditorStore()

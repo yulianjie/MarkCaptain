@@ -1,8 +1,9 @@
+import { startWithNewDocument } from './helpers/editor'
 import { expect, test } from '@playwright/test'
 
 for (const ending of ['', '\n']) {
   test(`saving an existing file stays clean across repeated edits (${JSON.stringify(ending)})`, async ({ page }) => {
-    await page.goto('/')
+    await startWithNewDocument(page)
     await page.locator('.muya-host [contenteditable="true"]').waitFor()
     await page.evaluate(async ending => {
       const editorPath = '/src/stores/editor.ts'

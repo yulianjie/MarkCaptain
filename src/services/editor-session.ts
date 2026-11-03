@@ -117,9 +117,8 @@ export function buildEditorSessionSnapshot(input: SessionSnapshotInput): EditorS
   const included = input.tabs
     .map((tab, originalIndex) => ({ tab, originalIndex }))
     .filter(({ tab }) => !(input.excludeDirty && !tab.isSaved))
-    // The editor always creates one empty Untitled tab when no restorable
-    // documents exist. Persisting that rebuildable placeholder as a dirty
-    // draft would make an otherwise clean-shutdown snapshot invalid.
+    // An untouched new document has no content to recover. Persisting it as a
+    // dirty draft would make an otherwise clean-shutdown snapshot invalid.
     .filter(({ tab }) => !isRebuildableBlankPlaceholder(tab))
     .slice(0, MAX_EDITOR_SESSION_TABS)
 

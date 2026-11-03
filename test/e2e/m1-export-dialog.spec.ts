@@ -1,3 +1,4 @@
+import { startWithNewDocument } from './helpers/editor'
 import { expect, test, type Page } from '@playwright/test'
 
 const exportTransport = `
@@ -62,7 +63,7 @@ async function mockIpc(page: Page) {
   await page.route('**/src/services/tauri-bridge.ts*', route => route.request().url().includes('m1-export-bridge-original')
     ? route.continue()
     : route.fulfill({ contentType: 'text/javascript', body: bridgeTransport }))
-  await page.goto('/')
+  await startWithNewDocument(page)
   await expect(page.locator('.title-bar')).toBeVisible()
   await page.evaluate(async () => {
     const editor = (await import('/src/stores/editor.ts')).useEditorStore()

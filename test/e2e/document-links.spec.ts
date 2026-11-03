@@ -1,3 +1,4 @@
+import { startWithNewDocument } from './helpers/editor'
 import { expect, test, type Page } from '@playwright/test'
 
 async function setup(page: Page, href = 'M2_REVIEW_FIXES.md') {
@@ -27,7 +28,7 @@ async function setup(page: Page, href = 'M2_REVIEW_FIXES.md') {
   await page.route('**/node_modules/.vite/deps/@tauri-apps_plugin-shell.js*', route => route.fulfill({
     contentType: 'text/javascript', body: 'export const open = async href => { (globalThis.__externalLinks ??= []).push(href) }',
   }))
-  await page.goto('/')
+  await startWithNewDocument(page)
   await page.locator('.muya-host [contenteditable="true"]').waitFor()
   await page.evaluate(async href => {
     const path = '/src/stores/editor.ts'

@@ -1,3 +1,4 @@
+import { startWithNewDocument } from './helpers/editor'
 import { expect, test, type Locator, type Page } from '@playwright/test'
 
 const root = 'C:/M3-project'
@@ -100,7 +101,7 @@ async function setup(page: Page) {
   await page.route('**/src/services/tauri-bridge.ts*', route => route.request().url().includes('m3-project-bridge-original')
     ? route.continue()
     : route.fulfill({ contentType: 'text/javascript', body: bridgeTransport }))
-  await page.goto('/')
+  await startWithNewDocument(page)
   await expect(page.locator('.title-bar')).toBeVisible()
   await page.evaluate(async root => {
     const editor = (await import('/src/stores/editor.ts')).useEditorStore()

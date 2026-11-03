@@ -1,3 +1,4 @@
+import { startWithNewDocument } from './helpers/editor'
 import { test, expect, type Page } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
 
@@ -99,7 +100,7 @@ export const agentTransport = {
 
 async function setup(page: Page, source: boolean, initial = '# 独立审阅\n\n第一段 🌱\n\n```js\nconst untouched = true\n```\n\n最后一段\n') {
   await page.route('**/src/services/agent-transport.ts*', route => route.fulfill({ contentType: 'text/javascript', body: fixture }))
-  await page.goto('/')
+  await startWithNewDocument(page)
   await page.locator('.muya-host [contenteditable="true"]').waitFor()
   await page.evaluate(async ({ source, initial }) => {
     const ep='/src/stores/editor.ts', pp='/src/stores/preferences.ts', lp='/src/i18n/index.ts'
@@ -521,7 +522,7 @@ test('opt-in history survives reload, exports, restores safely and deletes witho
   expect(exported).toContain('这是一份可以保存的摘要。')
   expect(exported).toContain('首尾段落')
   await page.reload()
-  await page.locator('.editing-region [contenteditable="true"]:visible').first().waitFor()
+  await expect(page.locator('.home-tab [role="tab"]')).toHaveAttribute('aria-selected', 'true')
   await page.evaluate(async()=>{
     const lp='/src/i18n/index.ts',pp='/src/stores/preferences.ts';(await import(lp)).setLocale('zh-CN');(await import(pp)).usePreferencesStore().language='zh-CN'
   })
@@ -531,7 +532,7 @@ test('opt-in history survives reload, exports, restores safely and deletes witho
   await page.locator('.agent-history-item').first().getByRole('button',{name:'恢复',exact:true}).click()
   await expect(page.locator('.agent-markdown')).toContainText('这是一份可以保存的摘要。')
   expect(await markdown(page)).toBe(original)
-  expect(await page.evaluate(async()=>{const p='/src/stores/editor.ts';return (await import(p)).useEditorStore().tabs.length})).toBeGreaterThan(1)
+  expect(await page.evaluate(async()=>{const p='/src/stores/editor.ts';return (await import(p)).useEditorStore().tabs.length})).toBe(1)
   await page.getByRole('button',{name:'历史对话',exact:true}).click()
   const deletedId=await page.evaluate(async()=>{const p='/src/stores/agent.ts';return (await import(p)).useAgentStore().historyItems[0].id as string})
   await page.locator('.agent-history-item').first().getByRole('button',{name:'删除',exact:true}).click()
@@ -562,7 +563,7 @@ test('saved stopped summaries resume after reload without processing completed c
   await expect(page.getByRole('button',{name:'继续分章总结',exact:true})).toBeEnabled()
   await page.getByRole('button',{name:'新对话',exact:true}).click()
   await page.reload()
-  await page.locator('.editing-region [contenteditable="true"]:visible').first().waitFor()
+  await expect(page.locator('.home-tab [role="tab"]')).toHaveAttribute('aria-selected', 'true')
   await page.evaluate(async()=>{const lp='/src/i18n/index.ts',pp='/src/stores/preferences.ts';(await import(lp)).setLocale('zh-CN');(await import(pp)).usePreferencesStore().language='zh-CN'})
   await ensureAgentPanelOpen(page)
   await page.getByRole('button',{name:'历史对话',exact:true}).click()

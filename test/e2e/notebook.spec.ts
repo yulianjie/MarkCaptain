@@ -1,3 +1,4 @@
+import { startWithNewDocument } from './helpers/editor'
 import { test, expect } from '@playwright/test'
 const notebookTransport = `
 export * from '/src/services/tauri-invoke.ts?notebook-original';
@@ -24,7 +25,7 @@ export const localHistoryCapture = async (path, markdown, force) => {
 `
 async function setupNotebook(page: import('@playwright/test').Page) {
   await page.route('**/src/services/tauri-invoke.ts*', route => route.request().url().includes('notebook-original') ? route.continue() : route.fulfill({ contentType: 'text/javascript', body: notebookTransport }))
-  await page.goto('/')
+  await startWithNewDocument(page)
   await page.locator('.muya-host [contenteditable="true"]').first().waitFor()
   await page.evaluate(async () => {
     const projects = '/src/stores/project.ts'; const notes = '/src/stores/notebook.ts'; const editors = '/src/stores/editor.ts'; const layouts = '/src/stores/layout.ts'
@@ -44,7 +45,7 @@ async function startDelayedTemplateRead(page: import('@playwright/test').Page) {
   await expect.poll(() => page.evaluate(async () => (await import('/src/services/tauri-invoke.ts')).hasPendingTemplateRead())).toBe(true)
 }
 test('split regions share edits, dirty state, undo and the active Agent target', async ({ page }) => {
-  await page.goto('/')
+  await startWithNewDocument(page)
   await page.locator('.muya-host [contenteditable="true"]').first().waitFor()
   await page.evaluate(async () => {
     const path = '/src/stores/editor.ts'; const editor = (await import(path)).useEditorStore()
@@ -75,7 +76,7 @@ test('split regions share edits, dirty state, undo and the active Agent target',
   await expect(second.locator('.cm-content')).toHaveText('changed')
 })
 test('two visual regions share edits and keep independent documents when switching', async ({ page }) => {
-  await page.goto('/'); await page.locator('.muya-host [contenteditable="true"]').waitFor()
+  await startWithNewDocument(page); await page.locator('.muya-host [contenteditable="true"]').waitFor()
   await page.evaluate(async () => { const path = '/src/stores/editor.ts'; const editor = (await import(path)).useEditorStore(); const tab = editor.newUntitledTab('visual original\n'); tab.pendingBaselineUpdate = false; editor.splitPane('vertical') })
   const second = page.locator('.editing-region').nth(1).locator('.muya-host [contenteditable="true"]')
   await second.click(); await page.keyboard.press('Control+a'); await page.keyboard.type('visual changed')
@@ -87,7 +88,7 @@ test('two visual regions share edits and keep independent documents when switchi
   await expect(second).toContainText('visual changed')
 })
 test('same-document source regions restore their own selection on activation', async ({ page }) => {
-  await page.goto('/'); await page.locator('.muya-host [contenteditable="true"]').waitFor()
+  await startWithNewDocument(page); await page.locator('.muya-host [contenteditable="true"]').waitFor()
   await page.evaluate(async () => { const path = '/src/stores/editor.ts'; const editor = (await import(path)).useEditorStore(); const tab = editor.newUntitledTab('first line\nsecond line\n'); tab.pendingBaselineUpdate = false; editor.sourceCodeMode = true; await new Promise(r => setTimeout(r, 20)); editor.splitPane('horizontal') })
   const selection = () => page.evaluate(async () => { const path = '/src/stores/editor.ts'; return (await import(path)).useEditorStore().currentFile.sourceSelection })
   await page.locator('.editing-region').first().locator('.cm-line').first().click(); await page.keyboard.press('Home'); await page.keyboard.press('Shift+End')
@@ -98,7 +99,7 @@ test('same-document source regions restore their own selection on activation', a
   expect(await selection()).toEqual(leftSelection)
 })
 test('quick open, templates and notebook settings use localized command entries', async ({ page }) => {
-  await page.goto('/')
+  await startWithNewDocument(page)
   await page.locator('.muya-host [contenteditable="true"]').first().waitFor()
   await page.keyboard.press('Control+k')
   await expect(page.getByRole('dialog', { name: 'Quick open note' })).toBeVisible()

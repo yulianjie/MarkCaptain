@@ -505,7 +505,7 @@ export default {
       sortByCreated: '创建时间',
       sortByTitle: '标题',
       onStartup: '启动时',
-      startupBlank: '空白文档',
+      startupBlank: '显示主页',
       startupLastState: '打开最近的文件夹和文件',
       startupFolder: '打开文件夹',
       startupDirectory: '启动文件夹',

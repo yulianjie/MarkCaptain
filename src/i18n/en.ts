@@ -507,7 +507,7 @@ export default {
       sortByCreated: 'Created',
       sortByTitle: 'Title',
       onStartup: 'On startup',
-      startupBlank: 'Blank document',
+      startupBlank: 'Show Home',
       startupLastState: 'Open most recent folder and file',
       startupFolder: 'Open folder',
       startupDirectory: 'Startup folder',

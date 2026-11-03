@@ -1,3 +1,4 @@
+import { startWithNewDocument } from './helpers/editor'
 import { expect, test, type Page } from '@playwright/test'
 
 async function setPreferences(page: Page, values: Record<string, unknown>) {
@@ -9,7 +10,7 @@ async function setPreferences(page: Page, values: Record<string, unknown>) {
 }
 
 async function seed(page: Page) {
-  await page.goto('/')
+  await startWithNewDocument(page)
   await page.locator('.muya-host [contenteditable="true"]').waitFor()
   await setPreferences(page, { language: 'zh-CN', hideQuickInsertHint: false, autoSave: false })
   await page.evaluate(async () => {

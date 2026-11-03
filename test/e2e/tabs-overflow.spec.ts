@@ -1,3 +1,4 @@
+import { startWithNewDocument } from './helpers/editor'
 import { expect, test, type Page } from '@playwright/test'
 
 async function seedTabs(page: Page, count: number, theme: 'light' | 'dark') {
@@ -70,7 +71,7 @@ for (const theme of ['light', 'dark'] as const) {
   for (const width of [800, 1024, 1440]) {
     test(`${theme} ${width}px keeps close controls usable with 4, 8 and 12 long document tabs`, async ({ page }, testInfo) => {
       await page.setViewportSize({ width, height: 800 })
-      await page.goto('/')
+      await startWithNewDocument(page)
       await page.locator('.muya-host [contenteditable="true"]').waitFor()
       for (const count of [4, 8, 12]) {
         await seedTabs(page, count, theme)
@@ -120,7 +121,7 @@ for (const theme of ['light', 'dark'] as const) {
 
 test('overflow tabs preserve keyboard selection, drag order and dirty-close decisions', async ({ page }) => {
   await page.setViewportSize({ width: 800, height: 800 })
-  await page.goto('/')
+  await startWithNewDocument(page)
   await page.locator('.muya-host [contenteditable="true"]').waitFor()
   await seedTabs(page, 8, 'light')
   await activeTabIsFullyVisible(page)
@@ -161,7 +162,7 @@ test('overflow tabs preserve keyboard selection, drag order and dirty-close deci
 
 test('resizing the editor continues to reveal the active tab and its close control', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 800 })
-  await page.goto('/')
+  await startWithNewDocument(page)
   await page.locator('.muya-host [contenteditable="true"]').waitFor()
   await seedTabs(page, 12, 'dark')
   for (const width of [1440, 800, 1024, 1440]) {

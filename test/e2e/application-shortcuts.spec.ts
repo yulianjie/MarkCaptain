@@ -1,8 +1,9 @@
+import { startWithNewDocument } from './helpers/editor'
 import { test, expect } from '@playwright/test'
 
 // Real DOM/editor/store routing with mocked IPC; this does not drive WebView2.
 test('Save and Save As reach IPC once from Muya and CodeMirror', async ({ page }) => {
-  await page.goto('/')
+  await startWithNewDocument(page)
   const editor = page.locator('.muya-host [contenteditable="true"]')
   await editor.waitFor()
   await page.evaluate(() => {
@@ -47,7 +48,7 @@ test('Save and Save As reach IPC once from Muya and CodeMirror', async ({ page }
 })
 
 test('find and replace requests refocus, and source mode does not swallow WYSIWYG formatting', async ({ page }) => {
-  await page.goto('/')
+  await startWithNewDocument(page)
   const editor = page.locator('.muya-host [contenteditable="true"]')
   await editor.waitFor()
   await editor.click()
