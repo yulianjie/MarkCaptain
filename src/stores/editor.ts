@@ -127,6 +127,9 @@ export interface TocItem {
 
 export type WindowCloseDecision = 'clean' | 'save' | 'discard' | 'cancel'
 
+// The start page is a workspace tab, never a document or a saved draft.
+export const HOME_TAB_ID = 'workspace:home'
+
 function flatToTree(flat: { lvl: number; content: string; slug?: string }[]): TocItem[] {
   const root: TocItem[] = []
   const stack: { level: number; node: TocItem }[] = []
@@ -146,8 +149,21 @@ export const useEditorStore = defineStore('editor', () => {
 
   const tabs = ref<DocumentState[]>([])
   const currentFileId = ref<string | null>(null)
+  const homeTabOpen = ref(false)
+  const homeActive = ref(false)
+  const activeTabId = computed(() => homeActive.value ? HOME_TAB_ID : currentFileId.value)
+  const homeReturnDocumentId = ref<string | null>(null)
   const panes = ref([{ id: 'main', documentId: null as string | null, sourceMode: false }])
   const activePaneId = ref('main')
+  // Start is transient UI. Persist the document it replaced so reopening the
+  // window restores the writing session instead of an empty active pane.
+  const sessionCurrentFileId = computed(() => homeActive.value
+    ? tabs.value.find(tab => tab.id === homeReturnDocumentId.value)?.id ?? tabs.value.at(-1)?.id ?? null
+    : currentFileId.value)
+  const sessionPanes = computed(() => panes.value.map(pane => homeActive.value && pane.id === activePaneId.value
+    ? { ...pane, documentId: sessionCurrentFileId.value,
+      sourceMode: tabs.value.find(tab => tab.id === sessionCurrentFileId.value)?.sourceMode ?? pane.sourceMode }
+    : pane))
   const splitDirection = ref<'horizontal' | 'vertical'>('horizontal')
   const splitRatio = ref(0.5)
   const paneSizes = ref<Record<string, number>>({})
@@ -181,6 +197,7 @@ export const useEditorStore = defineStore('editor', () => {
     // The destination pane may still be mounting. Never expose the previous
     // pane's cursor through the global Muya handle during that gap.
     clearMuyaInstance()
+    homeActive.value = false
     activePaneId.value = id
     currentFileId.value = pane.documentId
     if (pane.documentId && panes.value.length > 1) sharedHistoryDocuments.value.add(pane.documentId)
@@ -337,6 +354,7 @@ export const useEditorStore = defineStore('editor', () => {
   function setCurrent(id: string | null) {
     const previous = currentFile.value
     if (previous) previous.sourceMode = sourceCodeMode.value
+    homeActive.value = false
     currentFileId.value = id
     if (id && panes.value.length > 1) sharedHistoryDocuments.value.add(id)
     const pane = panes.value.find(p => p.id === activePaneId.value)
@@ -352,6 +370,28 @@ export const useEditorStore = defineStore('editor', () => {
       currentSelectionFormats.value = []
       findReplaceOpen.value = false
     }
+  }
+
+  function openHomeTab() {
+    if (homeActive.value) return
+    captureCurrentViewState()
+    homeReturnDocumentId.value = currentFileId.value
+    // Use the normal document switch so both editors retain their cursor and
+    // undo history, and document commands cannot target a hidden buffer.
+    setCurrent(null)
+    homeTabOpen.value = true
+    homeActive.value = true
+  }
+
+  function closeHomeTab(): boolean {
+    if (!homeTabOpen.value) return false
+    homeTabOpen.value = false
+    if (homeActive.value) {
+      const previous = tabs.value.find(tab => tab.id === homeReturnDocumentId.value)
+      setCurrent(previous?.id ?? tabs.value.at(-1)?.id ?? null)
+    }
+    homeReturnDocumentId.value = null
+    return true
   }
 
   function newUntitledTab(initialMarkdown = '') {
@@ -459,6 +499,7 @@ export const useEditorStore = defineStore('editor', () => {
   }
 
   async function closeTab(id: string, force = false): Promise<boolean> {
+    if (id === HOME_TAB_ID) return closeHomeTab()
     const tab = tabs.value.find(t => t.id === id)
     if (!tab) return false
 
@@ -570,6 +611,7 @@ export const useEditorStore = defineStore('editor', () => {
     if (currentFileId.value === id) {
       const next = tabs.value[idx] || tabs.value[idx - 1] || null
       setCurrent(next?.id ?? null)
+      if (!next && homeTabOpen.value) openHomeTab()
     }
   }
 
@@ -1336,6 +1378,8 @@ export const useEditorStore = defineStore('editor', () => {
     tabs,
     panes, activePaneId, splitDirection, splitRatio, paneSizes, activatePane, splitPane, closePane, stepSharedHistory, hasSharedHistoryStep, resetSharedHistory, usesSharedHistory, fileMutationBusy, beginFileMutation, endFileMutation, flushDeferredFileEvents,
     currentFileId,
+    activeTabId, homeTabOpen, homeActive, openHomeTab, closeHomeTab,
+    sessionCurrentFileId, sessionPanes,
     startupHydrationPending,
     listToc,
     sourceCodeMode,

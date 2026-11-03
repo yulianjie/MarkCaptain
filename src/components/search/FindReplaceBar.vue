@@ -38,6 +38,7 @@ function close() {
  * Ctrl/Cmd+F must restore focus even if the bar was already visible.
  */
 async function requestOpen(mode: 'find' | 'replace') {
+  if (!editor.currentFile) return
   if (mode === 'replace') showReplace.value = true
   editor.findReplaceOpen = true
   await nextTick()

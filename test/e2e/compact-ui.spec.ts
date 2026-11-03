@@ -146,7 +146,7 @@ test('same-document keyboard activation from tabs, tree and search returns from 
   })
   const start = page.locator('.navigation-tabs').getByRole('button', { name: '开始', exact: true })
   await expect(page.locator('#opened-files-heading, #opened-files-content')).toHaveCount(0)
-  for (const row of [page.locator('.tab[aria-selected="true"]'), page.locator('.tree-pane .row.file')]) {
+  for (const row of [page.getByRole('tab', { name: '写作笔记.md', exact: true }), page.locator('.tree-pane .row.file')]) {
     for (const key of ['Enter', 'Space']) {
       await start.click()
       await expect(page.locator('.welcome-panel')).toBeVisible()
@@ -167,13 +167,17 @@ test('same-document keyboard activation from tabs, tree and search returns from 
   }
 })
 
-test('Find requests leave Start and focus the document search even when it was already open', async ({ page }) => {
+test('Find stays scoped to the selected document and does not leave the Start tab', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 })
   await openDocument(page)
   const start = page.locator('.navigation-tabs').getByRole('button', { name: '开始', exact: true })
   for (let attempt = 0; attempt < 2; attempt++) {
     await start.click()
     await expect(page.locator('.welcome-panel')).toBeVisible()
+    await page.keyboard.press('Control+f')
+    await expect(page.locator('.welcome-panel')).toBeVisible()
+    await expect(page.locator('.find-bar')).toBeHidden()
+    await page.getByRole('tab', { name: '写作笔记.md', exact: true }).click()
     await page.keyboard.press('Control+f')
     await expect(page.locator('.welcome-panel')).toHaveCount(0)
     await expect(page.locator('.find-bar')).toBeVisible()
@@ -194,7 +198,9 @@ test('start page and document tabs preserve unsaved text and the existing Muya i
   await page.locator('.navigation-tabs').getByRole('button', { name: '开始', exact: true }).click()
   await expect(page.locator('.welcome-panel')).toBeVisible()
   await expect(page.locator('.welcome-panel')).toContainText('今天，想写点什么？')
-  await page.locator('.tab[aria-selected="true"]').click()
+  await expect(page.getByRole('tab', { name: '开始', exact: true })).toHaveAttribute('aria-selected', 'true')
+  await page.screenshot({ path: 'output/home-tab-after.png' })
+  await page.getByRole('tab', { name: /写作笔记.md/ }).click()
   await expect(page.locator('.welcome-panel')).toHaveCount(0)
   await expect(editable).toHaveAttribute('data-instance-check', 'preserved')
   await expect(editable).toContainText('preserved draft')

@@ -7,9 +7,9 @@
  * just a left-border highlight on the tab being hovered.
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useEditorStore } from '@/stores/editor'
+import { HOME_TAB_ID, useEditorStore } from '@/stores/editor'
 import { Close, Plus } from '@element-plus/icons-vue'
-import { ChevronLeft, ChevronRight, FileText, Focus, Share, Sparkles } from '@lucide/vue'
+import { ChevronLeft, ChevronRight, FileText, Focus, Home, Share, Sparkles } from '@lucide/vue'
 import { usePreferencesStore } from '@/stores/preferences'
 import { useAgentStore } from '@/stores/agent'
 import { useWorkspaceCopy } from '@/components/welcome/workspace-copy'
@@ -22,6 +22,10 @@ const editor = useEditorStore()
 const prefs = usePreferencesStore()
 const agent = useAgentStore()
 const copy = useWorkspaceCopy()
+const tabIds = computed(() => [
+  ...(editor.homeTabOpen ? [HOME_TAB_ID] : []),
+  ...editor.tabs.map(tab => tab.id),
+])
 const { locale } = useI18n()
 const scrollCopy = computed(() => locale.value === 'zh-CN'
   ? { previous: '向左滚动页签', next: '向右滚动页签' }
@@ -59,7 +63,7 @@ function revealTab(element: HTMLElement) {
 }
 
 function revealCurrentTab() {
-  const tab = editor.currentFileId ? tabRefs.get(editor.currentFileId)?.parentElement : null
+  const tab = editor.activeTabId ? tabRefs.get(editor.activeTabId)?.parentElement : null
   if (tab) revealTab(tab)
   else updateScrollState()
 }
@@ -75,7 +79,7 @@ function scrollTabs(direction: -1 | 1) {
   if (target) revealTab(target)
 }
 
-watch([() => editor.currentFileId, () => editor.tabs.map(tab => [tab.id, tab.filename, tab.isSaved])], async () => {
+watch([() => editor.activeTabId, () => editor.homeTabOpen, () => editor.tabs.map(tab => [tab.id, tab.filename, tab.isSaved])], async () => {
   await nextTick()
   updateScrollState()
   // Overflow controls reserve space of their own after the first layout.
@@ -92,14 +96,15 @@ onMounted(() => {
 onBeforeUnmount(() => resizeObserver?.disconnect())
 
 function activate(id: string) {
-  editor.setCurrent(id)
+  if (id === HOME_TAB_ID) editor.openHomeTab()
+  else editor.setCurrent(id)
 }
 
 async function close(id: string, ev: MouseEvent) {
   ev.stopPropagation()
   if (!await editor.closeTab(id)) return
   await nextTick()
-  if (editor.currentFileId) tabRefs.get(editor.currentFileId)?.focus()
+  if (editor.activeTabId) tabRefs.get(editor.activeTabId)?.focus()
 }
 
 function onMiddleClick(id: string, ev: MouseEvent) {
@@ -123,21 +128,21 @@ function tabAriaLabel(filename: string, isSaved: boolean): string {
 }
 
 async function focusTabAt(index: number) {
-  const tab = editor.tabs[index]
-  if (!tab) return
-  activate(tab.id)
+  const id = tabIds.value[index]
+  if (!id) return
+  activate(id)
   await nextTick()
-  tabRefs.get(tab.id)?.focus()
+  tabRefs.get(id)?.focus()
 }
 
 function onTabKeydown(id: string, ev: KeyboardEvent) {
-  const index = editor.tabs.findIndex(tab => tab.id === id)
+  const index = tabIds.value.indexOf(id)
   if (index < 0) return
   let target = index
-  if (ev.key === 'ArrowRight') target = (index + 1) % editor.tabs.length
-  else if (ev.key === 'ArrowLeft') target = (index - 1 + editor.tabs.length) % editor.tabs.length
+  if (ev.key === 'ArrowRight') target = (index + 1) % tabIds.value.length
+  else if (ev.key === 'ArrowLeft') target = (index - 1 + tabIds.value.length) % tabIds.value.length
   else if (ev.key === 'Home') target = 0
-  else if (ev.key === 'End') target = editor.tabs.length - 1
+  else if (ev.key === 'End') target = tabIds.value.length - 1
   else if (ev.key === 'Delete') {
     ev.preventDefault()
     void close(id, new MouseEvent('click'))
@@ -164,26 +169,28 @@ function onTabContextMenu(id: string, ev: MouseEvent) {
   ev.preventDefault()
   ev.stopPropagation()
   const tab = editor.tabs.find(x => x.id === id)
-  if (!tab) return
+  if (!tab && id !== HOME_TAB_ID) return
   bus.emit('openContextMenu', {
     x: ev.clientX,
     y: ev.clientY,
     items: [
       { label: t('tabs.closeTab'), action: () => { void editor.closeTab(id) } },
       { label: t('tabs.closeOthers'), action: async () => {
-        await closeTabsInOrder(editor.tabs.filter(tab => tab.id !== id).map(tab => tab.id))
+        await closeTabsInOrder(tabIds.value.filter(tabId => tabId !== id))
       } },
       { label: t('tabs.closeAll'), action: async () => {
-        await closeTabsInOrder(editor.tabs.map(tab => tab.id))
+        await closeTabsInOrder(tabIds.value)
       } },
-      { divider: true },
-      { label: t('tabs.rename'), action: () => { editor.setCurrent(id); bus.emit('rename', undefined) } },
-      { label: t('tabs.copyPath'), disabled: !tab.pathname, action: async () => {
-        if (tab.pathname) await writeText(tab.pathname)
-      } },
-      { label: t('tabs.showInFolder'), disabled: !tab.pathname, action: async () => {
-        if (tab.pathname) await shellOpen(parentDirOf(tab.pathname))
-      } },
+      ...(tab ? [
+        { divider: true },
+        { label: t('tabs.rename'), action: () => { editor.setCurrent(id); bus.emit('rename', undefined) } },
+        { label: t('tabs.copyPath'), disabled: !tab.pathname, action: async () => {
+          if (tab.pathname) await writeText(tab.pathname)
+        } },
+        { label: t('tabs.showInFolder'), disabled: !tab.pathname, action: async () => {
+          if (tab.pathname) await shellOpen(parentDirOf(tab.pathname))
+        } },
+      ] : []),
     ],
   })
 }
@@ -234,6 +241,18 @@ function onDragEnd() {
       <ChevronLeft :size="14" />
     </button>
     <div id="document-tabs" ref="scrollElement" class="tabs-scroll" role="tablist" @scroll.passive="updateScrollState">
+      <div v-if="editor.homeTabOpen" class="tab-shell home-tab" :class="{ active: editor.homeActive }"
+        @contextmenu="onTabContextMenu(HOME_TAB_ID, $event)" @mousedown.middle="onMiddleClick(HOME_TAB_ID, $event)">
+        <button :ref="element => setTabRef(HOME_TAB_ID, element)" type="button" class="tab" role="tab"
+          :title="copy.start" :aria-label="copy.start" :aria-selected="editor.homeActive" :tabindex="editor.homeActive ? 0 : -1"
+          @click="activate(HOME_TAB_ID)" @keydown="onTabKeydown(HOME_TAB_ID, $event)">
+          <Home class="file-icon" :size="13" :stroke-width="1.6" aria-hidden="true" />
+          <span class="label">{{ copy.start }}</span>
+        </button>
+        <button type="button" class="close" :aria-label="`${t('tabs.closeTab')}: ${copy.start}`" @click="close(HOME_TAB_ID, $event)">
+          <el-icon :size="13"><Close /></el-icon>
+        </button>
+      </div>
       <div
         v-for="tab in editor.tabs"
         :key="tab.id"

@@ -107,7 +107,7 @@ describe('status bar component contract', () => {
 describe('tab bar component contract', () => {
   it('stops ordered bulk close at the first cancelled tab and preserves close-others target', () => {
     expect(tabsBar).toMatch(/async function closeTabsInOrder\(ids: string\[\]\): Promise<boolean> \{[\s\S]*?for \(const tabId of ids\)[\s\S]*?if \(!await editor\.closeTab\(tabId\)\) return false[\s\S]*?return true/)
-    expect(tabsBar).toContain('editor.tabs.filter(tab => tab.id !== id).map(tab => tab.id)')
-    expect(tabsBar).toContain('closeTabsInOrder(editor.tabs.map(tab => tab.id))')
+    expect(tabsBar).toContain('tabIds.value.filter(tabId => tabId !== id)')
+    expect(tabsBar).toContain('closeTabsInOrder(tabIds.value)')
   })
 })

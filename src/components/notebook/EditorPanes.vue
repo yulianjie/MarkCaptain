@@ -75,14 +75,14 @@ function persistPaneLayout() {
     editor.splitDirection,
     editor.splitRatio,
     editor.panes.findIndex(p => p.id === editor.activePaneId),
-    editor.panes,
+    editor.sessionPanes,
     editor.paneSizes,
     editor.tabs,
     getPaneViewState,
   )
   try { localStorage.setItem('mt:panes', JSON.stringify(snapshot)) } catch { /* storage unavailable */ }
 }
-watch(() => [editor.panes, editor.activePaneId, editor.paneSizes, editor.splitDirection, editor.splitRatio,
+watch(() => [editor.sessionPanes, editor.activePaneId, editor.paneSizes, editor.splitDirection, editor.splitRatio,
   editor.tabs.map(t => [t.id, t.pathname, t.markdown]), paneViewStateRevision.value], () => {
   if (editor.startupHydrationPending) return
   if (layoutPersistTimer) clearTimeout(layoutPersistTimer)

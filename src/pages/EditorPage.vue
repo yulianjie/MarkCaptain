@@ -5,7 +5,7 @@
  * Owns the keyboard shortcuts, the file-association open-on-launch handoff,
  * the native menu action router, and webview drag-drop file opens.
  */
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type WatchStopHandle } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch, type WatchStopHandle } from 'vue'
 import { ChevronDown, ChevronRight, FileText } from '@lucide/vue'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { getCurrentWindow } from '@tauri-apps/api/window'
@@ -104,24 +104,19 @@ const keys = useKeybindingsStore()
 const project = useProjectStore()
 const notebook = useNotebookStore()
 const workspaceCopy = useWorkspaceCopy()
-const welcomeVisible = ref(false)
-const stopDocumentActivation = editor.$onAction(({ name }) => {
-  if (name === 'setCurrent' || name === 'openFile' || name === 'newUntitledTab' || name === 'activatePane') welcomeVisible.value = false
-})
+const welcomeVisible = computed(() => editor.homeActive || !editor.tabs.length)
 function revealEditorCommand() {
-  welcomeVisible.value = false
+  if (!editor.currentFile) return
   if (window.innerWidth <= 900) layout.setNavigationPanel('')
   if (window.innerWidth <= 1180) layout.showInspector = false
 }
 const stopFindActivation = bus.on('request-find-replace', revealEditorCommand)
-watch(() => editor.findReplaceOpen, visible => { if (visible) welcomeVisible.value = false })
 const documentDirectory = computed(() => {
   const pathname = editor.currentFile?.pathname
   if (!pathname) return workspaceCopy.value.document
   const parts = pathname.split(/[\\/]/).filter(Boolean)
   return parts.at(-2) || workspaceCopy.value.document
 })
-watch(() => editor.currentFileId, () => { welcomeVisible.value = false })
 
 const dragOver = ref(false)
 const restoredSessionTabIdsByIndex = ref<Record<number, string>>({})
@@ -139,7 +134,7 @@ function currentEditorSessionSnapshot(flags: { cleanShutdown: boolean; excludeDi
   editor.captureCurrentViewState()
   return buildEditorSessionSnapshot({
     tabs: editor.tabs,
-    currentFileId: editor.currentFileId,
+    currentFileId: editor.sessionCurrentFileId,
     workspacePath: project.projectTree?.pathname,
     cleanShutdown: flags.cleanShutdown,
     excludeDirty: flags.excludeDirty,
@@ -503,7 +498,7 @@ function installSessionPersistence() {
   )
   stopSessionTransitions = watch(
     () => [
-      editor.currentFileId,
+      editor.sessionCurrentFileId,
       editor.tabs.length,
       editor.tabs.map(tab => `${tab.id}:${tab.isSaved}:${tab.pathname}`).join('|'),
       project.projectTree?.pathname ?? '',
@@ -556,7 +551,7 @@ const MENU_ACTIONS: Record<string, () => void | Promise<void>> = {
   'file.exportEpub': () => doExportPandoc('epub'),
   'file.print': doPrint,
   'file.preferences': async () => { const { openSettings } = await import('@/services/tauri-invoke'); await openSettings() },
-  'file.closeTab': async () => { if (editor.currentFileId) await editor.closeTab(editor.currentFileId) },
+  'file.closeTab': async () => { if (editor.activeTabId) await editor.closeTab(editor.activeTabId) },
   'file.closeWindow': requestWindowClose,
   'edit.find': () => { bus.emit('request-find-replace', { mode: 'find' }) },
   'edit.replace': () => { bus.emit('request-find-replace', { mode: 'replace' }) },
@@ -678,12 +673,6 @@ async function routeMenuAction(id: string, source: MenuActionSource = 'menu'): P
 
 async function executeMenuAction(id: string, source: MenuActionSource = 'menu'): Promise<void> {
   try {
-    if (welcomeVisible.value && editor.currentFile && (
-      id.startsWith('edit.') || id.startsWith('paragraph.') || id.startsWith('format.') || id === 'view.toggleSourceCode'
-    )) {
-      revealEditorCommand()
-      await nextTick()
-    }
     await routeMenuAction(id, source)
   } catch (error) {
     notify.pushToast({
@@ -863,7 +852,6 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
-  stopDocumentActivation()
   stopFindActivation()
   startupAbortController?.abort()
   window.removeEventListener('keydown', onKey)
@@ -886,21 +874,21 @@ onBeforeUnmount(() => {
   <div class="editor-page" :class="{ 'drag-over': dragOver }">
     <TitleBar />
     <div class="page-body">
-      <SideBar v-if="layout.showSideBar" @home="welcomeVisible = true" @opened="welcomeVisible = false" />
+      <SideBar v-if="layout.showSideBar" @home="editor.openHomeTab()" />
       <div class="editor-column">
-        <TabsBar v-if="layout.showTabBar" @click="welcomeVisible = false" />
+        <TabsBar v-if="layout.showTabBar" />
         <div v-if="editor.currentFile && !welcomeVisible" class="document-location">
           <div class="document-breadcrumb" :title="editor.currentFile.pathname || editor.currentFile.filename"><span>{{ documentDirectory }}</span><ChevronRight :size="12" /><FileText :size="13" /><strong>{{ editor.currentFile.filename }}</strong></div>
           <button type="button" class="format-toggle" :title="workspaceCopy.format" :aria-label="workspaceCopy.format" :aria-expanded="layout.showToolBar" @click="layout.toggleToolBar()"><span>Aa</span><ChevronDown :size="12" /></button>
         </div>
         <EditorToolbar v-if="layout.showToolBar && editor.currentFile && !welcomeVisible" />
         <div class="editor-stage">
-          <WelcomePanel v-if="!editor.tabs.length || welcomeVisible" @open="welcomeVisible = false; doOpen()" @folder="doOpenFolder()" @opened="welcomeVisible = false" />
+          <WelcomePanel v-if="welcomeVisible" @open="doOpen()" @folder="doOpenFolder()" />
           <EditorPanes v-show="editor.tabs.length && !welcomeVisible" :restored-session-tab-ids-by-index="restoredSessionTabIdsByIndex" />
           <div v-show="!welcomeVisible" class="find-layer"><FindReplaceBar /></div>
         </div>
       </div>
-      <DocumentInspector>
+      <DocumentInspector v-if="!welcomeVisible || layout.inspectorPanel === 'agent'">
         <template #outline><TocPane /></template>
         <template #agent><AgentPanel /></template>
       </DocumentInspector>
