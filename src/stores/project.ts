@@ -22,6 +22,7 @@ import {
   watchFolder,
   unwatchFolder,
   createWorkspaceEntry,
+  renameWorkspaceEntry,
   copyWorkspaceEntry,
   trashWorkspaceEntry,
   storageResolveProject,
@@ -661,6 +662,7 @@ export const useProjectStore = defineStore('project', () => {
         ? remapPathWithinRoot(source, destination, tab.pathname)
         : null
       if (!mapped) continue
+      if (tab.pathname !== mapped) void prefs.pushRecentFile(mapped)
       tab.pathname = mapped
       tab.filename = basename(mapped)
     }
@@ -687,13 +689,50 @@ export const useProjectStore = defineStore('project', () => {
   }
 
   async function renameEntry(source: string, newName: string) {
-    requireRoot()
-    const destination = `${parentDirOf(source)}/${newName}`
+    const root = requireRoot()
+    let destination = `${parentDirOf(source)}/${newName}`
     const { useNotebookStore } = await import('./notebook')
-    await useNotebookStore().moveWithReferences(source, destination)
-    remapOpenTabs(source, destination)
-    relocateCachedEntry(source, destination)
-    await refreshAfterMutation([source, destination])
+    const notebook = useNotebookStore()
+    if (projectTree.value !== root || notebook.mutating || editor.fileMutationBusy) {
+      throw new Error(t('notes.changed'))
+    }
+
+    let editorMutation = false
+    try {
+      const hasDrafts = editor.tabs.some(tab => !tab.isSaved && tab.pathname && pathIsInsideRoot(root.pathname, tab.pathname))
+      if (hasDrafts) {
+        const { ElMessageBox } = await import('element-plus')
+        await ElMessageBox.confirm(t('tree.renameOnlyPrompt'), t('tree.rename'), {
+          type: 'warning',
+          confirmButtonText: t('tree.renameOnly'),
+          cancelButtonText: t('common.cancel'),
+        })
+        if (projectTree.value !== root || notebook.mutating || editor.fileMutationBusy) {
+          throw new Error(t('notes.changed'))
+        }
+        await editor.beginFileMutation()
+        editorMutation = true
+        if (projectTree.value !== root) throw new Error(t('notes.changed'))
+        if (editor.tabs.some(tab => tab.externalChange && tab.pathname && pathIsInsideRoot(source, tab.pathname))) {
+          throw new Error(t('externalChange.overwriteTitle'))
+        }
+        destination = await renameWorkspaceEntry(root.pathname, source, newName)
+      } else {
+        await notebook.moveWithReferences(source, destination)
+      }
+      // Publish the new path before releasing queued saves and file events.
+      remapOpenTabs(source, destination)
+    } catch (error) {
+      if (error === 'cancel' || error === 'close') return null
+      throw error
+    } finally {
+      if (editorMutation) editor.endFileMutation()
+    }
+
+    if (projectTree.value === root) {
+      relocateCachedEntry(source, destination)
+      await refreshAfterMutation([source, destination])
+    }
     return destination
   }
 

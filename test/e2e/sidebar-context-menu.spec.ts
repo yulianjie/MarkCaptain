@@ -68,3 +68,80 @@ test('Files pane background opens workspace actions from Home', async ({ page })
   await filePrompt.getByRole('button', { name: 'Confirm' }).click()
   await expect(page.getByRole('tab', { name: 'draft.md' })).toHaveAttribute('aria-selected', 'true')
 })
+
+test('renaming a file in a Git workspace can keep its unsaved draft', async ({ page }) => {
+  await page.route('**/src/services/tauri-invoke.ts*', route => route.request().url().includes('git-rename-original')
+    ? route.continue()
+    : route.fulfill({ contentType: 'text/javascript', body: `
+      export * from '/src/services/tauri-invoke.ts?git-rename-original';
+      const workspace = 'C:/git-notes';
+      const disk = new Map([[workspace + '/old.md', '# Original\\n'], [workspace + '/reference.md', '[Original](old.md)\\n']]);
+      export const openFolder = async () => workspace;
+      export const watchFolder = async path => path;
+      export const storageResolveProject = async () => ({ mode: 'git', connection: null });
+      export const listWorkspaceDirectory = async () => [...disk].map(([path, markdown]) => ({
+        path, name: path.split('/').at(-1), isDir: false, isMarkdown: true, size: markdown.length, modifiedMs: 1,
+      }));
+      export const readMarkdown = async path => {
+        if (!disk.has(path)) throw new Error('File not found: ' + path);
+        return { path, markdown: disk.get(path), encoding: 'UTF-8', lineEnding: 'lf', bom: false, hadDecodeErrors: false };
+      };
+      export const renameWorkspaceEntry = async (root, source, name) => {
+        const target = root + '/' + name;
+        if (root !== workspace || !disk.has(source) || disk.has(target)) throw new Error('Invalid rename');
+        disk.set(target, disk.get(source));
+        disk.delete(source);
+        return target;
+      };
+      export const saveMarkdown = async (path, markdown) => { disk.set(path, markdown); };
+    ` }))
+  await page.goto('/')
+  await page.evaluate(async () => {
+    const prefsPath = '/src/stores/preferences.ts'
+    const projectPath = '/src/stores/project.ts'
+    const { usePreferencesStore } = await import(prefsPath)
+    const { useProjectStore } = await import(projectPath)
+    usePreferencesStore().autoSave = false
+    await useProjectStore().openRoot('C:/git-notes')
+  })
+  const pane = page.locator('.tree-pane')
+  const oldFile = pane.getByRole('treeitem', { name: 'old.md' })
+  await oldFile.click()
+  const heading = page.locator('.muya-host h1.ag-paragraph').getByText('Original')
+  await heading.click()
+  await page.keyboard.press('End')
+  await page.keyboard.type(' unsaved draft')
+  const status = page.locator('[data-status="save-state"]')
+  await expect(status).toHaveText('Unsaved')
+
+  const rename = async () => {
+    await oldFile.click({ button: 'right' })
+    await page.locator('.mt-context-menu').getByRole('menuitem', { name: 'Rename', exact: true }).click()
+    const prompt = page.getByRole('dialog', { name: 'Rename', exact: true })
+    await prompt.getByRole('textbox').fill('renamed.md')
+    await prompt.getByRole('button', { name: 'Confirm', exact: true }).click()
+    return prompt.filter({ has: page.getByRole('button', { name: 'Rename only' }) })
+  }
+  const cancelled = await rename()
+  await cancelled.getByRole('button', { name: 'Cancel' }).click()
+  await expect(cancelled).toBeHidden()
+  await expect(oldFile).toBeVisible()
+  await (await rename()).getByRole('button', { name: 'Rename only' }).click()
+
+  await expect(pane.getByRole('treeitem', { name: 'renamed.md' })).toBeVisible()
+  await expect(oldFile).toHaveCount(0)
+  await expect(page.getByRole('tab', { name: 'renamed.md' })).toHaveAttribute('aria-selected', 'true')
+  await expect(page.locator('.muya-host h1.ag-paragraph')).toContainText('Original unsaved draft')
+  await expect(status).toHaveText('Unsaved')
+
+  const readDisk = () => page.evaluate(async () => {
+    const ipcPath = '/src/services/tauri-invoke.ts'
+    const { readMarkdown } = await import(ipcPath)
+    const read = async (name: string) => (await readMarkdown(`C:/git-notes/${name}`)).markdown
+    return { old: await read('old.md').catch(() => null), current: await read('renamed.md'), reference: await read('reference.md') }
+  })
+  expect(await readDisk()).toEqual({ old: null, current: '# Original\n', reference: '[Original](old.md)\n' })
+  await page.keyboard.press('Control+s')
+  await expect(status).toHaveText('Saved')
+  expect(await readDisk()).toEqual({ old: null, current: '# Original unsaved draft\n', reference: '[Original](old.md)\n' })
+})

@@ -180,14 +180,12 @@ export default function renderLeafBlock (parent, block, activeBlocks, matches, u
         selector += `.${CLASS_OR_ID.AG_CONTAINER_PREVIEW}`
         Object.assign(data.attrs, { spellcheck: 'false' })
         if (code === '') {
+          this.mermaidPreviews.delete(block)
           children = '< Empty Mermaid Block >'
           selector += `.${CLASS_OR_ID.AG_EMPTY}`
         } else {
           children = 'Loading...'
-          this.mermaidCache.set(`#${block.key}`, {
-            code,
-            functionType
-          })
+          this.mermaidQueue.set(`#${block.key}`, { block, code })
         }
         break
       }

@@ -194,6 +194,8 @@ export default {
     newFolderPrompt: 'Enter a folder name.',
     rename: 'Rename',
     renamePrompt: 'Enter a new name.',
+    renameOnly: 'Rename only',
+    renameOnlyPrompt: 'This project has unsaved edits. You can rename now and keep your drafts. Links to the old name will need to be updated separately.',
     copy: 'Copy',
     cut: 'Cut',
     paste: 'Paste',

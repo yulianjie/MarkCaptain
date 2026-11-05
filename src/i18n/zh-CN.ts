@@ -192,6 +192,8 @@ export default {
     newFolderPrompt: '请输入文件夹名。',
     rename: '重命名',
     renamePrompt: '请输入新名称。',
+    renameOnly: '仅重命名',
+    renameOnlyPrompt: '项目中有未保存的修改。你可以先重命名并保留草稿，指向旧名称的引用链接需另行更新。',
     copy: '复制',
     cut: '剪切',
     paste: '粘贴',

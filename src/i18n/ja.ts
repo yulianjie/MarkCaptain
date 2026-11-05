@@ -192,6 +192,8 @@ export default {
     newFolderPrompt: 'フォルダー名を入力してください。',
     rename: '名前を変更',
     renamePrompt: '新しい名前を入力してください。',
+    renameOnly: '名前の変更のみ',
+    renameOnlyPrompt: 'プロジェクトに未保存の変更があります。下書きを保持したまま名前を変更できます。旧名へのリンクは別途更新してください。',
     copy: 'コピー',
     cut: '切り取り',
     paste: '貼り付け',

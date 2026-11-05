@@ -39,8 +39,9 @@ async function apply() {
     const next = `${dir}${sep}${name}`
     try {
       const project = useProjectStore()
-      if (project.projectTree && pathIsInsideRoot(project.projectTree.pathname, tab.pathname)) await project.renameEntry(tab.pathname, name)
-      else await editor.renameTab(tab.id, next)
+      if (project.projectTree && pathIsInsideRoot(project.projectTree.pathname, tab.pathname)) {
+        if (await project.renameEntry(tab.pathname, name) === null) return
+      } else await editor.renameTab(tab.id, next)
     } catch (err) {
       notify.pushToast({ type: 'error', title: 'Rename failed', message: err instanceof Error ? err.message : String(err) })
       return

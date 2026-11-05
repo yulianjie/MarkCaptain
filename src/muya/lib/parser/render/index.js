@@ -1,6 +1,6 @@
 import loadRenderer from '../../renderers'
 import { CLASS_OR_ID } from '../../config'
-import { conflict, mixins, camelToSnake } from '../../utils'
+import { conflict, mixins, camelToSnake, getLongUniqueId } from '../../utils'
 import { patch, toVNode, toHTML, h } from './snabbdom'
 import { beginRules } from '../rules'
 import renderInlines from './renderInlines'
@@ -13,7 +13,8 @@ class StateRender {
     this.codeCache = new Map()
     this.loadImageMap = new Map()
     this.loadMathMap = new Map()
-    this.mermaidCache = new Map()
+    this.mermaidQueue = new Map()
+    this.mermaidPreviews = new WeakMap()
     this.diagramCache = new Map()
     this.tokenCache = new Map()
     this.labels = new Map()
@@ -96,30 +97,48 @@ class StateRender {
   }
 
   async renderMermaid () {
-    if (this.mermaidCache.size) {
-      const mermaid = await loadRenderer('mermaid')
-      mermaid.initialize({
-        securityLevel: 'loose',
-        theme: this.muya.options.mermaidTheme
-      })
-      let renderIndex = 0
-      for (const [key, value] of this.mermaidCache.entries()) {
-        const { code } = value
-        const target = document.querySelector(key)
-        if (!target) {
-          continue
-        }
-        try {
-          const renderID = `mermaid-render-${Date.now()}-${renderIndex++}`
-          const { svg } = await mermaid.render(renderID, code)
-          target.innerHTML = svg
-        } catch (err) {
-          target.innerHTML = '< Invalid Mermaid Codes >'
-          target.classList.add(CLASS_OR_ID.AG_MATH_ERROR)
-        }
-      }
+    const theme = this.muya.options.mermaidTheme
+    const pending = []
+    for (const [selector, { block, code }] of this.mermaidQueue) {
+      const target = this.container.querySelector(selector)
+      if (!target) continue
 
-      this.mermaidCache.clear()
+      const cached = this.mermaidPreviews.get(block)
+      if (cached && cached.code === code && cached.theme === theme) {
+        if (cached.svg) {
+          // Restore the diagram before Muya measures the caret and the browser clamps scrollTop.
+          target.innerHTML = cached.svg
+        } else {
+          cached.target = target
+        }
+        continue
+      }
+      const preview = { code, theme, target, svg: null }
+      this.mermaidPreviews.set(block, preview)
+      pending.push([block, preview])
+    }
+    this.mermaidQueue.clear()
+
+    for (const [block, preview] of pending) {
+      try {
+        const mermaid = await loadRenderer('mermaid')
+        if (this.mermaidPreviews.get(block) !== preview) continue
+        mermaid.initialize({ securityLevel: 'loose', theme })
+        const { svg } = await mermaid.render(`mermaid-render-${getLongUniqueId()}`, preview.code)
+        preview.svg = svg
+        if (this.mermaidPreviews.get(block) === preview && preview.target.isConnected) {
+          preview.target.innerHTML = svg
+        }
+      } catch {
+        if (this.mermaidPreviews.get(block) !== preview) continue
+        this.mermaidPreviews.delete(block)
+        if (preview.target.isConnected) {
+          preview.target.textContent = '< Invalid Mermaid Codes >'
+          preview.target.classList.add(CLASS_OR_ID.AG_MATH_ERROR)
+        }
+      } finally {
+        preview.target = null
+      }
     }
   }
 
