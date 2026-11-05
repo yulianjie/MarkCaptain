@@ -18,12 +18,33 @@
 
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
+    io::Write,
     path::{Path, PathBuf},
 };
 use tokio::process::Command;
 
 const GIT: &str = "git";
+
+pub(crate) async fn run_git(root: &Path, args: &[&str]) -> GitResult<std::process::Output> {
+    let mut command = Command::new(GIT);
+    // A Windows GUI process otherwise opens a console for each Git invocation.
+    #[cfg(windows)]
+    {
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    command
+        .arg("-C")
+        .arg(root)
+        .args(args)
+        // Do not let a background sync open a credential prompt. Existing
+        // credential helpers and SSH agents can still answer noninteractively.
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .output()
+        .await
+        .map_err(|_| GitStorageError::Unavailable)
+}
 
 /// Persistable, non-secret connection settings for one Git workspace.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -39,7 +60,6 @@ pub struct GitRepositoryConfig {
 /// directory or a missing remote.
 #[derive(Debug, Clone)]
 pub struct GitStorage {
-    root: PathBuf,
     config: GitRepositoryConfig,
 }
 
@@ -59,6 +79,8 @@ pub enum GitStorageError {
     UnsafeState,
     #[error("git:branchMismatch")]
     BranchMismatch,
+    #[error("git:targetChanged")]
+    TargetChanged,
     #[error("git:noOperation")]
     NoOperation,
     #[error("git:{0}")]
@@ -71,7 +93,7 @@ pub type GitResult<T> = Result<T, GitStorageError>;
 #[serde(rename_all = "camelCase")]
 pub struct GitChangedPath {
     /// The literal two-character porcelain-v1 status code, such as `" M"` or
-    /// `"??"`. It is intentionally not interpreted as a sync instruction.
+    /// `"??"`.
     pub code: String,
     pub path: String,
 }
@@ -97,6 +119,7 @@ pub struct GitConflictFile {
 pub enum GitOperationInProgress {
     Merge,
     Rebase,
+    Other,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -127,8 +150,10 @@ impl GitStorage {
             .map_err(|_| GitStorageError::NotRepository)?;
 
         let probe = Self {
-            root: supplied_root.clone(),
-            config,
+            config: GitRepositoryConfig {
+                repository_path: supplied_root,
+                ..config
+            },
         };
         let top_level = probe
             .command_text(&["rev-parse", "--show-toplevel"], "validate")
@@ -140,7 +165,7 @@ impl GitStorage {
         let git_root = tokio::fs::canonicalize(Path::new(top_level.trim()))
             .await
             .map_err(|_| GitStorageError::NotRepository)?;
-        if supplied_root != git_root {
+        if probe.root() != git_root {
             return Err(GitStorageError::RepositoryRootRequired);
         }
 
@@ -171,13 +196,23 @@ impl GitStorage {
         &self.config
     }
 
+    pub fn root(&self) -> &Path {
+        &self.config.repository_path
+    }
+
     /// Return local worktree/index status plus unmerged index stages. This is
     /// safe during an unfinished merge or rebase and powers manual resolution.
     pub async fn status(&self) -> GitResult<GitRepositoryState> {
         let changes = parse_porcelain(
             &self
                 .command_bytes(
-                    &["status", "--porcelain=v1", "-z", "--untracked-files=all"],
+                    &[
+                        "status",
+                        "--porcelain=v1",
+                        "-z",
+                        "--no-renames",
+                        "--untracked-files=all",
+                    ],
                     "status",
                 )
                 .await?,
@@ -202,7 +237,7 @@ impl GitStorage {
         let (ahead, behind) = self.ahead_behind().await?;
         let clean = changes.is_empty() && conflicts.is_empty() && operation_in_progress.is_none();
         Ok(GitRepositoryState {
-            root: self.root.clone(),
+            root: self.config.repository_path.clone(),
             configured_remote: self.config.remote.clone(),
             configured_branch: self.config.branch.clone(),
             current_branch,
@@ -214,6 +249,84 @@ impl GitStorage {
             operation_in_progress,
             clean,
         })
+    }
+
+    /// Commit the saved contents of the paths explicitly reviewed in the UI.
+    /// If the list has changed, return the current state for another review.
+    pub async fn commit_reviewed_paths(
+        &self,
+        target: &GitRepositoryConfig,
+        reviewed_paths: &[String],
+    ) -> GitResult<GitRepositoryState> {
+        if target != self.config() {
+            return Err(GitStorageError::TargetChanged);
+        }
+        let before = self.status().await?;
+        if before.clean || !before.conflicts.is_empty() || before.operation_in_progress.is_some() {
+            return Ok(before);
+        }
+        if before.current_branch.as_deref() != Some(self.config.branch.as_str()) {
+            return Err(GitStorageError::BranchMismatch);
+        }
+        let reviewed: BTreeSet<&str> = reviewed_paths.iter().map(String::as_str).collect();
+        let current: BTreeSet<&str> = before
+            .changes
+            .iter()
+            .map(|change| change.path.as_str())
+            .collect();
+        if reviewed != current {
+            return Ok(before);
+        }
+        // A path-only commit reads the worktree. Preserve any distinct staged
+        // version by leaving partially staged paths to Git's usual workflow.
+        if current.len() != before.changes.len()
+            || before.changes.iter().any(|change| {
+                change.code != "??"
+                    && change.code.as_bytes()[0] != b' '
+                    && change.code.as_bytes()[1] != b' '
+            })
+        {
+            return Err(GitStorageError::CommandFailed("partialStage"));
+        }
+        let untracked = before
+            .changes
+            .iter()
+            .filter(|change| change.code == "??")
+            .map(|change| change.path.as_str())
+            .collect::<Vec<_>>();
+        if !untracked.is_empty() {
+            // --only accepts paths already known to Git. Mark reviewed new
+            // files without adding their contents to the index before commit.
+            let paths = pathspec_file(untracked)?;
+            self.command_bytes(
+                &[
+                    "--literal-pathspecs",
+                    "add",
+                    "--intent-to-add",
+                    "--pathspec-from-file",
+                    pathspec_filename(&paths)?,
+                    "--pathspec-file-nul",
+                ],
+                "stageChanges",
+            )
+            .await?;
+        }
+        let paths = pathspec_file(current)?;
+        self.command_bytes(
+            &[
+                "--literal-pathspecs",
+                "commit",
+                "--only",
+                "-m",
+                "Sync notes from MarkCaptain",
+                "--pathspec-from-file",
+                pathspec_filename(&paths)?,
+                "--pathspec-file-nul",
+            ],
+            "commitChanges",
+        )
+        .await?;
+        self.status().await
     }
 
     /// Fetch remote refs without touching the worktree. A failed fetch leaves
@@ -339,6 +452,9 @@ impl GitStorage {
                 self.command_bytes(&["rebase", "--abort"], "rebaseAbort")
                     .await?;
             }
+            Some(GitOperationInProgress::Other) => {
+                return Err(GitStorageError::CommandFailed("operationInProgress"));
+            }
             None => return Err(GitStorageError::NoOperation),
         }
         self.status().await
@@ -382,28 +498,24 @@ impl GitStorage {
     }
 
     async fn operation_in_progress(&self) -> GitResult<Option<GitOperationInProgress>> {
-        if self
-            .command_text_optional(&["rev-parse", "-q", "--verify", "MERGE_HEAD"])
-            .await?
-            .is_some()
-        {
-            return Ok(Some(GitOperationInProgress::Merge));
-        }
-        for name in ["rebase-merge", "rebase-apply"] {
-            let path = self
-                .command_text(&["rev-parse", "--git-path", name], "operation")
-                .await?;
-            let path = PathBuf::from(path.trim());
-            let path = if path.is_absolute() {
-                path
-            } else {
-                self.root.join(path)
-            };
-            if tokio::fs::try_exists(path)
+        let directory = self
+            .command_text(&["rev-parse", "--absolute-git-dir"], "operation")
+            .await?;
+        let directory = Path::new(directory.trim_end_matches(['\r', '\n']));
+        for (marker, operation) in [
+            ("MERGE_HEAD", GitOperationInProgress::Merge),
+            ("rebase-merge", GitOperationInProgress::Rebase),
+            ("rebase-apply", GitOperationInProgress::Rebase),
+            ("CHERRY_PICK_HEAD", GitOperationInProgress::Other),
+            ("REVERT_HEAD", GitOperationInProgress::Other),
+            ("sequencer", GitOperationInProgress::Other),
+            ("BISECT_START", GitOperationInProgress::Other),
+        ] {
+            if tokio::fs::try_exists(directory.join(marker))
                 .await
                 .map_err(|_| GitStorageError::InvalidOutput)?
             {
-                return Ok(Some(GitOperationInProgress::Rebase));
+                return Ok(Some(operation));
             }
         }
         Ok(None)
@@ -439,17 +551,26 @@ impl GitStorage {
     }
 
     async fn command(&self, args: &[&str]) -> GitResult<std::process::Output> {
-        Command::new(GIT)
-            .arg("-C")
-            .arg(&self.root)
-            .args(args)
-            // Do not let a background sync open a credential prompt. Existing
-            // credential helpers and SSH agents can still answer noninteractively.
-            .env("GIT_TERMINAL_PROMPT", "0")
-            .output()
-            .await
-            .map_err(|_| GitStorageError::Unavailable)
+        run_git(self.root(), args).await
     }
+}
+
+fn pathspec_file<'a>(
+    paths: impl IntoIterator<Item = &'a str>,
+) -> GitResult<tempfile::NamedTempFile> {
+    let error = |_| GitStorageError::CommandFailed("commitChanges");
+    let mut file = tempfile::NamedTempFile::new().map_err(error)?;
+    for path in paths {
+        file.write_all(path.as_bytes()).map_err(error)?;
+        file.write_all(b"\0").map_err(error)?;
+    }
+    Ok(file)
+}
+
+fn pathspec_filename(file: &tempfile::NamedTempFile) -> GitResult<&str> {
+    file.path()
+        .to_str()
+        .ok_or(GitStorageError::CommandFailed("commitChanges"))
 }
 
 fn validate_config(config: &GitRepositoryConfig) -> GitResult<()> {
@@ -651,6 +772,178 @@ mod tests {
         .await
         .unwrap_err();
         assert_eq!(error, GitStorageError::RepositoryRootRequired);
+    }
+
+    #[tokio::test]
+    async fn commits_and_pushes_only_reviewed_saved_paths() {
+        let (temp, config) = repository();
+        let remote = TempDir::new().unwrap();
+        git(remote.path(), &["init", "--bare"]);
+        git(
+            temp.path(),
+            &[
+                "remote",
+                "set-url",
+                "origin",
+                remote.path().to_str().unwrap(),
+            ],
+        );
+        fs::write(temp.path().join("obsolete.md"), "remove me\n").unwrap();
+        fs::write(temp.path().join("rename.md"), "rename me\n").unwrap();
+        git(temp.path(), &["add", "obsolete.md", "rename.md"]);
+        git(temp.path(), &["commit", "-m", "add more notes"]);
+        git(temp.path(), &["push", "-u", "origin", "main"]);
+        let previous = git_text(temp.path(), &["rev-parse", "HEAD"]);
+
+        fs::write(temp.path().join("note.md"), "edited\n").unwrap();
+        fs::remove_file(temp.path().join("obsolete.md")).unwrap();
+        git(temp.path(), &["mv", "rename.md", "renamed.md"]);
+        fs::write(temp.path().join("[new].md"), "new\n").unwrap();
+        fs::write(temp.path().join("staged.md"), "staged\n").unwrap();
+        git(temp.path(), &["add", "staged.md"]);
+        fs::write(temp.path().join(".git/info/exclude"), "ignored.md\n").unwrap();
+        fs::write(temp.path().join("ignored.md"), "ignored\n").unwrap();
+
+        let storage = GitStorage::open(config).await.unwrap();
+        let review = storage
+            .commit_reviewed_paths(storage.config(), &["note.md".into()])
+            .await
+            .unwrap();
+        assert_eq!(review.changes.len(), 6);
+        assert_eq!(git_text(temp.path(), &["rev-parse", "HEAD"]), previous);
+        let paths = review
+            .changes
+            .into_iter()
+            .map(|change| change.path)
+            .collect::<Vec<_>>();
+        let committed = storage
+            .commit_reviewed_paths(storage.config(), &paths)
+            .await
+            .unwrap();
+        assert!(committed.clean);
+        assert_eq!(committed.ahead, 1);
+        assert!(storage.push().await.unwrap().clean);
+        assert_eq!(
+            git_text(remote.path(), &["ls-tree", "--name-only", "main"]),
+            "[new].md\nnote.md\nrenamed.md\nstaged.md\n",
+        );
+        assert_eq!(git_text(remote.path(), &["show", "main:[new].md"]), "new\n",);
+    }
+
+    #[tokio::test]
+    async fn can_retry_new_file_after_commit_hook_fails() {
+        let (temp, config) = repository();
+        git(temp.path(), &["config", "core.hooksPath", ".git/hooks"]);
+        let hook = temp.path().join(".git/hooks/pre-commit");
+        fs::write(&hook, "#!/bin/sh\nexit 1\n").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&hook, fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        fs::write(temp.path().join("new.md"), "new\n").unwrap();
+        let storage = GitStorage::open(config).await.unwrap();
+        let paths = ["new.md".into()];
+        assert_eq!(
+            storage
+                .commit_reviewed_paths(storage.config(), &paths)
+                .await
+                .unwrap_err(),
+            GitStorageError::CommandFailed("commitChanges"),
+        );
+        assert_eq!(
+            git_text(temp.path(), &["status", "--porcelain=v1"]),
+            " A new.md\n"
+        );
+        assert_eq!(
+            fs::read_to_string(temp.path().join("new.md")).unwrap(),
+            "new\n"
+        );
+        fs::remove_file(hook).unwrap();
+        assert!(
+            storage
+                .commit_reviewed_paths(storage.config(), &paths)
+                .await
+                .unwrap()
+                .clean
+        );
+    }
+
+    #[tokio::test]
+    async fn leaves_partial_index_and_external_operations_untouched() {
+        let (temp, config) = repository();
+        fs::write(temp.path().join("note.md"), "staged\n").unwrap();
+        git(temp.path(), &["add", "note.md"]);
+        fs::write(temp.path().join("note.md"), "worktree\n").unwrap();
+        let storage = GitStorage::open(config).await.unwrap();
+        assert_eq!(
+            storage
+                .commit_reviewed_paths(storage.config(), &["note.md".into()])
+                .await
+                .unwrap_err(),
+            GitStorageError::CommandFailed("partialStage"),
+        );
+        assert_eq!(git_text(temp.path(), &["show", ":note.md"]), "staged\n");
+        assert_eq!(
+            fs::read_to_string(temp.path().join("note.md")).unwrap(),
+            "worktree\n",
+        );
+
+        git(temp.path(), &["update-ref", "CHERRY_PICK_HEAD", "HEAD"]);
+        let state = storage
+            .commit_reviewed_paths(storage.config(), &["note.md".into()])
+            .await
+            .unwrap();
+        assert_eq!(
+            state.operation_in_progress,
+            Some(GitOperationInProgress::Other)
+        );
+        assert_eq!(
+            storage.abort_in_progress().await.unwrap_err(),
+            GitStorageError::CommandFailed("operationInProgress"),
+        );
+    }
+
+    #[tokio::test]
+    async fn refuses_confirmation_from_a_different_git_target_before_writes() {
+        let (temp, config) = repository();
+        fs::write(temp.path().join("new.md"), "new\n").unwrap();
+        let storage = GitStorage::open(config).await.unwrap();
+        let target = storage.config();
+        assert_eq!(
+            target.repository_path,
+            fs::canonicalize(temp.path()).unwrap()
+        );
+        let paths = ["new.md".into()];
+        let head = git_text(temp.path(), &["rev-parse", "HEAD"]);
+
+        for changed in [
+            GitRepositoryConfig {
+                repository_path: target.repository_path.join("other"),
+                ..target.clone()
+            },
+            GitRepositoryConfig {
+                remote: "other".into(),
+                ..target.clone()
+            },
+            GitRepositoryConfig {
+                branch: "other".into(),
+                ..target.clone()
+            },
+        ] {
+            assert_eq!(
+                storage
+                    .commit_reviewed_paths(&changed, &paths)
+                    .await
+                    .unwrap_err(),
+                GitStorageError::TargetChanged,
+            );
+        }
+        assert_eq!(git_text(temp.path(), &["rev-parse", "HEAD"]), head);
+        assert_eq!(
+            git_text(temp.path(), &["status", "--porcelain=v1"]),
+            "?? new.md\n"
+        );
     }
 
     #[tokio::test]

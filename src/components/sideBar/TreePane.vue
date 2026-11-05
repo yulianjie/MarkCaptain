@@ -10,6 +10,7 @@ import { useEditorStore } from '@/stores/editor'
 import { openFolder, openSettings } from '@/services/tauri-invoke'
 import { useNotificationStore } from '@/stores/notification'
 import { useCloudStorageStore } from '@/stores/cloudStorage'
+import { syncWithGitReview } from '@/components/cloud/sync-connection'
 import type { TreeFile } from '@/stores/treeCtrl'
 import {
   CaretRight,
@@ -138,7 +139,13 @@ async function closeProject() {
 async function syncProject() {
   const connection = project.storageConnection
   if (!connection) return
-  const ok = await cloud.sync(connection)
+  const ok = await syncWithGitReview(connection)
+  if (ok === undefined) return
+  const result = cloud.syncResults[connection.id]
+  if (ok && result && 'ahead' in result && ['localChanges', 'diverged', 'mergeReady', 'conflicts'].includes(result.state)) {
+    notify.pushToast({ type: 'warning', message: t(`prefs.cloud.gitState.${result.state}`) })
+    return
+  }
   notify.pushToast({
     type: ok ? 'success' : 'error',
     message: ok ? t('tree.projectSyncComplete') : cloud.lastError ?? t('tree.projectSyncFailed'),

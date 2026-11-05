@@ -5,22 +5,25 @@
 //! to stable codes before they cross IPC.
 
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
+    sync::{Arc, Weak},
 };
 
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
-use tokio::process::Command;
 use uuid::Uuid;
 
 use crate::{
     error::{AppError, AppResult},
     filesystem::atomic_write,
     storage::{
-        git::{GitRepositoryConfig, GitStorage},
+        git::{
+            run_git, GitChangedPath, GitOperationInProgress, GitRepositoryConfig,
+            GitRepositoryState, GitStorage, GitStorageError,
+        },
         plugin::{
             validate_plugin_configuration, PluginAllowlist, PluginProvider, StoragePluginManifest,
         },
@@ -37,6 +40,9 @@ const PLUGIN_DIR: &str = "storage-plugins";
 const MAX_CONNECTIONS_FILE_BYTES: u64 = 1024 * 1024;
 const MAX_PLUGIN_CONFIG_BYTES: usize = 64 * 1024;
 static CONNECTIONS_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
+type GitOperationLock = tokio::sync::Mutex<()>;
+static GIT_OPERATION_LOCKS: Lazy<Mutex<HashMap<PathBuf, Weak<GitOperationLock>>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -169,6 +175,8 @@ struct StorageStatusEvent {
     connection_id: String,
     #[serde(flatten)]
     result: SyncResult,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    git: Option<GitSyncView>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -185,6 +193,9 @@ pub struct GitSyncView {
     ahead: u32,
     behind: u32,
     conflicts: Vec<GitConflictView>,
+    changes: Vec<GitChangedPath>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    target: Option<GitRepositoryConfig>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -717,14 +728,9 @@ fn find_saved(app: &AppHandle, id: &str) -> AppResult<SavedConnection> {
 }
 
 async fn git_text(root: &Path, args: &[&str]) -> AppResult<Option<String>> {
-    let output = Command::new("git")
-        .arg("-C")
-        .arg(root)
-        .args(args)
-        .env("GIT_TERMINAL_PROMPT", "0")
-        .output()
+    let output = run_git(root, args)
         .await
-        .map_err(|_| AppError::Other("git:unavailable".into()))?;
+        .map_err(|error| AppError::Other(error.to_string()))?;
     if !output.status.success() {
         return Ok(None);
     }
@@ -1015,20 +1021,52 @@ pub async fn cmd_storage_sync(app: AppHandle, id: String) -> AppResult<SyncResul
         StorageStatusEvent {
             connection_id: id,
             result: result.clone(),
+            git: None,
         },
     )?;
     Ok(result)
 }
 
-fn git_conflicts(state: &crate::storage::git::GitRepositoryState) -> Vec<GitConflictView> {
-    state
+fn git_sync_view(label: &str, state: GitRepositoryState) -> GitSyncView {
+    let conflicts = state
         .conflicts
-        .iter()
+        .into_iter()
         .map(|conflict| GitConflictView {
-            path: conflict.path.clone(),
+            path: conflict.path,
             stages: conflict.stages.iter().map(|stage| stage.stage).collect(),
         })
-        .collect()
+        .collect();
+    GitSyncView {
+        state: label.into(),
+        ahead: state.ahead,
+        behind: state.behind,
+        conflicts,
+        changes: state.changes,
+        target: (label == "localChanges").then_some(GitRepositoryConfig {
+            repository_path: state.root,
+            remote: state.configured_remote,
+            branch: state.configured_branch,
+        }),
+    }
+}
+
+fn git_sync_blocker(state: &GitRepositoryState) -> AppResult<Option<&'static str>> {
+    if state.operation_in_progress == Some(GitOperationInProgress::Other) {
+        return Err(git_error(GitStorageError::CommandFailed(
+            "operationInProgress",
+        )));
+    }
+    if !state.conflicts.is_empty() || state.operation_in_progress.is_some() {
+        return Ok(Some("conflicts"));
+    }
+    if state.current_branch.as_deref() != Some(state.configured_branch.as_str()) {
+        return Err(git_error(GitStorageError::BranchMismatch));
+    }
+    Ok((!state.clean).then_some("localChanges"))
+}
+
+fn git_error(error: GitStorageError) -> AppError {
+    AppError::Other(error.to_string())
 }
 
 async fn git_for(saved: &SavedConnection) -> AppResult<GitStorage> {
@@ -1041,10 +1079,21 @@ async fn git_for(saved: &SavedConnection) -> AppResult<GitStorage> {
         branch: saved.branch.clone().unwrap_or_else(|| "main".into()),
     })
     .await
-    .map_err(|error| AppError::Other(error.to_string()))
+    .map_err(git_error)
 }
 
-fn emit_git_status(app: &AppHandle, id: &str, view: &GitSyncView) -> AppResult<()> {
+fn git_operation_lock(git: &GitStorage) -> Arc<GitOperationLock> {
+    let mut locks = GIT_OPERATION_LOCKS.lock();
+    if let Some(lock) = locks.get(git.root()).and_then(Weak::upgrade) {
+        return lock;
+    }
+    locks.retain(|_, lock| lock.strong_count() > 0);
+    let lock = Arc::new(GitOperationLock::new(()));
+    locks.insert(git.root().to_path_buf(), Arc::downgrade(&lock));
+    lock
+}
+
+fn emit_git_status(app: &AppHandle, id: &str, view: GitSyncView) -> AppResult<GitSyncView> {
     let conflicts = view
         .conflicts
         .iter()
@@ -1055,7 +1104,7 @@ fn emit_git_status(app: &AppHandle, id: &str, view: &GitSyncView) -> AppResult<(
         .collect::<Vec<_>>();
     let state = match view.state.as_str() {
         "conflicts" => "conflict",
-        "diverged" | "mergeReady" => "pending",
+        "diverged" | "mergeReady" | "localChanges" => "pending",
         _ => "synced",
     };
     app.emit(
@@ -1069,73 +1118,52 @@ fn emit_git_status(app: &AppHandle, id: &str, view: &GitSyncView) -> AppResult<(
                 conflicts,
                 message: None,
             },
+            git: Some(view.clone()),
         },
     )?;
-    Ok(())
+    Ok(view)
 }
 
 #[tauri::command]
-pub async fn cmd_storage_git_sync(app: AppHandle, id: String) -> AppResult<GitSyncView> {
+pub async fn cmd_storage_git_sync(
+    app: AppHandle,
+    id: String,
+    commit_paths: Option<Vec<String>>,
+    commit_target: Option<GitRepositoryConfig>,
+) -> AppResult<GitSyncView> {
     let saved = find_saved(&app, &id)?;
     if saved.kind != ConnectionKind::Git {
         return Err(invalid("not a Git connection"));
     }
     let git = git_for(&saved).await?;
-    let before = git
-        .status()
-        .await
-        .map_err(|error| AppError::Other(error.to_string()))?;
-    if !before.conflicts.is_empty() || before.operation_in_progress.is_some() {
-        let view = GitSyncView {
-            state: "conflicts".into(),
-            ahead: before.ahead,
-            behind: before.behind,
-            conflicts: git_conflicts(&before),
-        };
-        emit_git_status(&app, &id, &view)?;
-        return Ok(view);
+    let _operation = git_operation_lock(&git).lock_owned().await;
+    let before = match commit_paths {
+        Some(paths) => {
+            let target = commit_target
+                .as_ref()
+                .ok_or_else(|| git_error(GitStorageError::TargetChanged))?;
+            git.commit_reviewed_paths(target, &paths).await
+        }
+        None => git.status().await,
     }
-    if !before.clean {
-        return Err(AppError::Other("git:unsafeState".into()));
+    .map_err(git_error)?;
+    if let Some(label) = git_sync_blocker(&before)? {
+        return emit_git_status(&app, &id, git_sync_view(label, before));
     }
-    let fetched = git
-        .fetch()
-        .await
-        .map_err(|error| AppError::Other(error.to_string()))?;
+    let fetched = git.fetch().await.map_err(git_error)?;
+    if let Some(label) = git_sync_blocker(&fetched)? {
+        return emit_git_status(&app, &id, git_sync_view(label, fetched));
+    }
     let (state_label, state) = if fetched.ahead > 0 && fetched.behind > 0 {
-        let view = GitSyncView {
-            state: "diverged".into(),
-            ahead: fetched.ahead,
-            behind: fetched.behind,
-            conflicts: Vec::new(),
-        };
-        emit_git_status(&app, &id, &view)?;
-        return Ok(view);
+        ("diverged", fetched)
     } else if fetched.behind > 0 {
-        (
-            "updated",
-            git.pull_fast_forward()
-                .await
-                .map_err(|error| AppError::Other(error.to_string()))?,
-        )
+        ("updated", git.pull_fast_forward().await.map_err(git_error)?)
     } else if fetched.ahead > 0 {
-        (
-            "pushed",
-            git.push()
-                .await
-                .map_err(|error| AppError::Other(error.to_string()))?,
-        )
+        ("pushed", git.push().await.map_err(git_error)?)
     } else {
         ("upToDate", fetched)
     };
-    let view = GitSyncView {
-        state: state_label.into(),
-        ahead: state.ahead,
-        behind: state.behind,
-        conflicts: git_conflicts(&state),
-    };
-    emit_git_status(&app, &id, &view)?;
-    Ok(view)
+    emit_git_status(&app, &id, git_sync_view(state_label, state))
 }
 
 #[tauri::command]
@@ -1145,23 +1173,14 @@ pub async fn cmd_storage_git_prepare_merge(app: AppHandle, id: String) -> AppRes
         return Err(invalid("not a Git connection"));
     }
     let git = git_for(&saved).await?;
-    let state = git
-        .merge_remote_for_review()
-        .await
-        .map_err(|error| AppError::Other(error.to_string()))?;
-    let view = GitSyncView {
-        state: if state.conflicts.is_empty() {
-            "mergeReady"
-        } else {
-            "conflicts"
-        }
-        .into(),
-        ahead: state.ahead,
-        behind: state.behind,
-        conflicts: git_conflicts(&state),
+    let _operation = git_operation_lock(&git).lock_owned().await;
+    let state = git.merge_remote_for_review().await.map_err(git_error)?;
+    let label = if state.conflicts.is_empty() {
+        "mergeReady"
+    } else {
+        "conflicts"
     };
-    emit_git_status(&app, &id, &view)?;
-    Ok(view)
+    emit_git_status(&app, &id, git_sync_view(label, state))
 }
 
 #[tauri::command]
@@ -1188,11 +1207,9 @@ pub async fn cmd_storage_git_abort(app: AppHandle, id: String) -> AppResult<()> 
     if saved.kind != ConnectionKind::Git {
         return Err(invalid("not a Git connection"));
     }
-    git_for(&saved)
-        .await?
-        .abort_in_progress()
-        .await
-        .map_err(|error| AppError::Other(error.to_string()))?;
+    let git = git_for(&saved).await?;
+    let _operation = git_operation_lock(&git).lock_owned().await;
+    git.abort_in_progress().await.map_err(git_error)?;
     app.emit(
         "mt://storage/status",
         StorageStatusEvent {
@@ -1204,6 +1221,7 @@ pub async fn cmd_storage_git_abort(app: AppHandle, id: String) -> AppResult<()> 
                 conflicts: Vec::new(),
                 message: None,
             },
+            git: None,
         },
     )?;
     Ok(())

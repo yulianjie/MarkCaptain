@@ -36,6 +36,7 @@ import type { HistoryRecord, HistoryMetadata } from './agent-history'
 import type { AgentConfig, AgentDocumentVersion, AgentHeader, AgentRequest, AgentSettings, AgentSkill, AgentSkillDetail, AgentProjectConfig, AgentProjectConfigSnapshot, AgentProjectGrant, AgentDocumentCheckResult } from './agent'
 import type {
   GitSyncResult,
+  GitSyncTarget,
   ProjectStorageResolution,
   RemoteDirectory,
   StorageConnection,
@@ -111,8 +112,8 @@ export const storageUploadFile = (id: string, localPath: string, remoteDirectory
 export const storageSync = (id: string) =>
   invoke<StorageSyncResult>('cmd_storage_sync', { id })
 
-export const storageGitSync = (id: string) =>
-  invoke<GitSyncResult>('cmd_storage_git_sync', { id })
+export const storageGitSync = (id: string, commitPaths?: string[], commitTarget?: GitSyncTarget) =>
+  invoke<GitSyncResult>('cmd_storage_git_sync', { id, commitPaths, commitTarget })
 
 export const storageGitPrepareMerge = (id: string) =>
   invoke<GitSyncResult>('cmd_storage_git_prepare_merge', { id })

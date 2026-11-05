@@ -1,7 +1,9 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
+import { t } from '@/i18n'
 import type {
   GitSyncResult,
+  GitSyncTarget,
   StorageConnection,
   StorageConnectionInput,
   StoragePluginManifest,
@@ -22,7 +24,11 @@ import {
 import { listenTyped } from '@/services/tauri-bridge'
 
 function message(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
+  const detail = error instanceof Error ? error.message : String(error)
+  if (!detail.startsWith('git:')) return detail
+  const key = `prefs.cloud.gitError.${detail.slice(4)}`
+  const localized = t(key)
+  return localized === key ? detail : localized
 }
 
 export const useCloudStorageStore = defineStore('cloudStorage', () => {
@@ -40,7 +46,7 @@ export const useCloudStorageStore = defineStore('cloudStorage', () => {
     if (listenerInstalled) return
     listenerInstalled = true
     void listenTyped('mt://storage/status', event => {
-      syncResults.value[event.connectionId] = {
+      syncResults.value[event.connectionId] = event.git ?? {
         state: event.state,
         uploaded: event.uploaded,
         downloaded: event.downloaded,
@@ -116,12 +122,12 @@ export const useCloudStorageStore = defineStore('cloudStorage', () => {
     }
   }
 
-  async function sync(connection: StorageConnection): Promise<boolean> {
+  async function sync(connection: StorageConnection, commitPaths?: string[], commitTarget?: GitSyncTarget): Promise<boolean> {
     lastError.value = null
     busyId.value = connection.id
     try {
       syncResults.value[connection.id] = connection.kind === 'git'
-        ? await storageGitSync(connection.id)
+        ? await storageGitSync(connection.id, commitPaths, commitTarget)
         : await storageSync(connection.id)
       return true
     } catch (error) {

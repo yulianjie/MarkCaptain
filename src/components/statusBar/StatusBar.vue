@@ -145,7 +145,12 @@ const cloudConnection = computed(() => {
 })
 const cloudState = computed(() => {
   const connection = cloudConnection.value
-  return connection ? cloud.syncResults[connection.id]?.state ?? 'pending' : null
+  if (!connection) return null
+  const result = cloud.syncResults[connection.id]
+  if (!result || !('ahead' in result)) return result?.state ?? 'pending'
+  if (result.state === 'conflicts') return 'conflict'
+  if (['diverged', 'localChanges', 'mergeReady'].includes(result.state)) return 'pending'
+  return 'synced'
 })
 const cloudLabel = computed(() => cloudState.value
   ? copy.value[`cloud${cloudState.value[0].toUpperCase()}${cloudState.value.slice(1)}` as keyof typeof copy.value]

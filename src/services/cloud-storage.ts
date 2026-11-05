@@ -93,6 +93,7 @@ export interface StorageSyncResult {
 
 export interface StorageStatusEvent extends StorageSyncResult {
   connectionId: string
+  git?: GitSyncResult
 }
 
 export interface GitConflictFile {
@@ -100,9 +101,17 @@ export interface GitConflictFile {
   stages: number[]
 }
 
+export interface GitSyncTarget {
+  repositoryPath: string
+  remote: string
+  branch: string
+}
+
 export interface GitSyncResult {
-  state: 'upToDate' | 'updated' | 'pushed' | 'diverged' | 'mergeReady' | 'conflicts'
+  state: 'upToDate' | 'updated' | 'pushed' | 'diverged' | 'mergeReady' | 'conflicts' | 'localChanges'
   ahead: number
   behind: number
   conflicts: GitConflictFile[]
+  changes?: { path: string; code: string }[]
+  target?: GitSyncTarget
 }

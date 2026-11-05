@@ -11,6 +11,7 @@ import type {
 } from '@/services/cloud-storage'
 import { useCloudStorageStore } from '@/stores/cloudStorage'
 import { useI18n } from '@/i18n'
+import { syncWithGitReview } from './sync-connection'
 
 const cloud = useCloudStorageStore()
 const { t } = useI18n()
@@ -114,7 +115,7 @@ function resultText(connection: StorageConnection): string {
   }
   const git = result as GitSyncResult
   return t('prefs.cloud.gitSummary', {
-    state: git.state,
+    state: t(`prefs.cloud.gitState.${git.state}`),
     ahead: git.ahead,
     behind: git.behind,
     conflicts: git.conflicts.length,
@@ -152,7 +153,7 @@ onMounted(() => { void cloud.load() })
           <el-button
             size="small"
             :loading="cloud.busyId === connection.id"
-            @click="cloud.sync(connection)"
+            @click="syncWithGitReview(connection)"
           >
             {{ t('prefs.cloud.syncNow') }}
           </el-button>
