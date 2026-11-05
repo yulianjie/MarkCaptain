@@ -16,17 +16,17 @@ const emit = defineEmits<{ ready: []; failed: [message: string]; printClosed: []
 const frame = ref<HTMLIFrameElement | null>(null)
 const loading = ref(false)
 let generation = 0
-let removeNavigation: (() => void) | undefined
+let removePreviewInteractions: (() => void) | undefined
 
 watch(() => props.html, () => {
   generation += 1
-  removeNavigation?.()
-  removeNavigation = undefined
+  removePreviewInteractions?.()
+  removePreviewInteractions = undefined
   loading.value = Boolean(props.html)
 }, { immediate: true })
 
-function keepPreviewNavigation(document: Document) {
-  removeNavigation?.()
+function installPreviewInteractions(document: Document) {
+  removePreviewInteractions?.()
   const navigate = (event: MouseEvent) => {
     // Nodes belong to the iframe's realm, so instanceof Element in the parent
     // would miss them. Only follow fragments inside this frozen document.
@@ -44,15 +44,18 @@ function keepPreviewNavigation(document: Document) {
     const target = document.getElementById(fragment)
     target?.scrollIntoView({ block: 'start' })
   }
+  const suppressContextMenu = (event: MouseEvent) => event.preventDefault()
   document.addEventListener('click', navigate, true)
   document.addEventListener('auxclick', navigate, true)
-  removeNavigation = () => {
+  document.addEventListener('contextmenu', suppressContextMenu)
+  removePreviewInteractions = () => {
     document.removeEventListener('click', navigate, true)
     document.removeEventListener('auxclick', navigate, true)
+    document.removeEventListener('contextmenu', suppressContextMenu)
   }
 }
 
-onBeforeUnmount(() => removeNavigation?.())
+onBeforeUnmount(() => removePreviewInteractions?.())
 
 async function onLoad() {
   const requestGeneration = generation
@@ -62,7 +65,7 @@ async function onLoad() {
     emit('failed', props.failedMessage)
     return
   }
-  keepPreviewNavigation(document)
+  installPreviewInteractions(document)
   let timeout: ReturnType<typeof setTimeout> | undefined
   try {
     await Promise.race([
@@ -140,7 +143,6 @@ defineExpose({ print })
   position: absolute;
   inset: 0;
   z-index: 1;
-  pointer-events: none;
   display: flex;
   flex-direction: column;
   align-items: center;

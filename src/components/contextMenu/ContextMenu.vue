@@ -90,6 +90,13 @@ function onOutside(ev: MouseEvent) {
   close()
 }
 
+function onScroll(ev: Event) {
+  if (!visible.value) return
+  // The editor's hidden resize sensors scroll during initialization.
+  if (ev.target instanceof Element && getComputedStyle(ev.target).visibility === 'hidden') return
+  close()
+}
+
 function onKey(ev: KeyboardEvent) {
   if (visible.value && ev.key === 'Escape') {
     ev.preventDefault()
@@ -102,7 +109,7 @@ onMounted(() => {
   unsub = bus.on('openContextMenu', open)
   window.addEventListener('mousedown', onOutside, true)
   window.addEventListener('contextmenu', onOutside, true)
-  window.addEventListener('scroll', close, true)
+  window.addEventListener('scroll', onScroll, true)
   window.addEventListener('keydown', onKey)
   window.addEventListener('blur', close)
 })
@@ -112,7 +119,7 @@ onBeforeUnmount(() => {
   unsub?.()
   window.removeEventListener('mousedown', onOutside, true)
   window.removeEventListener('contextmenu', onOutside, true)
-  window.removeEventListener('scroll', close, true)
+  window.removeEventListener('scroll', onScroll, true)
   window.removeEventListener('keydown', onKey)
   window.removeEventListener('blur', close)
 })

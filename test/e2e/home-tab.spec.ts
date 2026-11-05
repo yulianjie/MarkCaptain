@@ -30,6 +30,34 @@ async function start(page: Page) {
   await expect(page.locator('.welcome-panel')).toBeVisible()
 }
 
+test('the New folder prompt on Start keeps a compact width', async ({ page }) => {
+  await page.setViewportSize({ width: 1200, height: 800 })
+  await page.goto('/')
+  await expect(page.locator('.welcome-panel')).toBeVisible()
+  await page.evaluate(async () => {
+    const projectPath = '/src/stores/project.ts'
+    const treePath = '/src/stores/treeCtrl.ts'
+    const { useProjectStore } = await import(projectPath)
+    const { makeFolder } = await import(treePath)
+    useProjectStore().projectTree = makeFolder('C:/notes', false)
+  })
+  await page.getByRole('button', { name: 'New folder', exact: true }).click()
+
+  const prompt = page.getByRole('dialog', { name: 'New folder' })
+  await expect(prompt.getByRole('textbox')).toBeFocused()
+  for (const width of [1200, 400]) {
+    await page.setViewportSize({ width, height: 800 })
+    const bounds = (await prompt.locator('.el-message-box').boundingBox())!
+    expect(bounds.width).toBeLessThanOrEqual(450)
+    expect(bounds.x).toBeGreaterThanOrEqual(10)
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(width - 10)
+  }
+
+  await prompt.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await expect(prompt).toBeHidden()
+  await expect(page.locator('.welcome-panel')).toBeVisible()
+})
+
 for (const sourceMode of [false, true]) {
   test(`Start has its own tab and preserves ${sourceMode ? 'source' : 'WYSIWYG'} edits and undo`, async ({ page }) => {
     await openDocument(page, sourceMode)

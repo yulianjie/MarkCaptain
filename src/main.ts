@@ -23,6 +23,16 @@ import './assets/styles/workbench.css'
 // errors thrown during component initialisation.
 installDebugBridge()
 
+const textInputTypes = new Set(['text', 'search', 'email', 'password', 'tel', 'url', 'number'])
+
+// Let app menus handle the event first and keep native editing for text fields.
+window.addEventListener('contextmenu', event => {
+  const target = event.target
+  if (target instanceof HTMLTextAreaElement && !target.disabled) return
+  if (target instanceof HTMLInputElement && !target.disabled && textInputTypes.has(target.type)) return
+  event.preventDefault()
+})
+
 const app = createApp(App)
 const pinia = createPinia()
 

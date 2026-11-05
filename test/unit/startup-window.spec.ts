@@ -146,9 +146,11 @@ describe('native window startup', () => {
   })
 
   it('mounts in browser development without native window operations', async () => {
-    vi.stubGlobal('window', {})
+    const addEventListener = vi.fn()
+    vi.stubGlobal('window', { addEventListener })
     await boot()
 
+    expect(addEventListener).toHaveBeenCalledWith('contextmenu', expect.any(Function))
     expect(startup.mount).toHaveBeenCalledOnce()
     expect(startup.hide).not.toHaveBeenCalled()
     expect(startup.show).not.toHaveBeenCalled()

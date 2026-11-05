@@ -129,6 +129,18 @@ test('an unsaved document is identified as a buffer and remains available for ex
   await preview(page)
 })
 
+test('the isolated export preview suppresses the browser context menu', async ({ page }) => {
+  await mockIpc(page)
+  await dispatchMenuAction(page, 'file.exportHtml')
+  const frame = await preview(page)
+  await expect(page.getByRole('button', { name: 'Export HTML', exact: true })).toBeEnabled()
+
+  const allowed = await frame.contentFrame().locator('article.markdown-body').evaluate(article =>
+    article.dispatchEvent(new MouseEvent('contextmenu', { button: 2, bubbles: true, cancelable: true })),
+  )
+  expect(allowed).toBe(false)
+})
+
 test('built-in preset selections persist and drive preview options', async ({ page }) => {
   await mockIpc(page)
   await dispatchMenuAction(page, 'file.exportHtml')

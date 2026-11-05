@@ -34,6 +34,23 @@ test.describe('preferences window', () => {
     await page.locator('#prefs-tab-editor').click()
     await expect.poll(() => body.evaluate(element => element.scrollTop)).toBe(0)
   })
+
+  test('suppresses the browser menu on settings chrome and keeps native text editing', async ({ page }) => {
+    await page.goto('/#/preferences')
+    await page.locator('#prefs-tab-editor').click()
+
+    const panel = page.locator('#prefs-panel-editor')
+    const fontSize = panel.getByRole('spinbutton').first()
+    await expect(fontSize).toBeVisible()
+
+    const contextMenuAllowed = (element: Element) => element.dispatchEvent(new MouseEvent('contextmenu', {
+      button: 2, bubbles: true, cancelable: true,
+    }))
+    expect(await panel.evaluate(contextMenuAllowed)).toBe(false)
+    expect(await panel.locator('input[type="checkbox"]').first().evaluate(contextMenuAllowed)).toBe(false)
+    expect(await fontSize.evaluate(contextMenuAllowed)).toBe(true)
+  })
+
   test('localizes every new notebook shortcut label in all three languages', async ({ page }) => {
     await page.goto('/#/preferences'); await page.locator('#prefs-tab-keybindings').click()
     for (const [locale, labels] of [['en', ['Quick open note', "Open today's note", 'Insert document template']], ['zh-CN', ['快速打开笔记', '打开今日笔记', '插入文档模板']], ['ja', ['ノートを素早く開く', '今日のノートを開く', '文書テンプレートを挿入']]] as const) {

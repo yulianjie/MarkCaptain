@@ -22,6 +22,7 @@ import {
   Refresh,
 } from '@element-plus/icons-vue'
 import { t } from '@/i18n'
+import { bus } from '@/bus'
 import TreeRow from './TreeRow.vue'
 
 const project = useProjectStore()
@@ -119,6 +120,24 @@ async function pasteAtRoot() {
   }
 }
 
+function openProjectMenu(event: MouseEvent) {
+  if (event.defaultPrevented || event.target instanceof HTMLInputElement) return
+  event.preventDefault()
+  bus.emit('openContextMenu', {
+    x: event.clientX,
+    y: event.clientY,
+    items: project.projectTree ? [
+      { label: t('tree.newFile'), action: () => createAtRoot('file') },
+      { label: t('tree.newFolder'), action: () => createAtRoot('directory') },
+      { label: t('tree.paste'), disabled: !project.clipboard, action: pasteAtRoot },
+      { divider: true },
+      { label: t('common.refresh'), disabled: refreshing.value, action: refreshProject },
+    ] : [
+      { label: t('sideBar.openFolder'), action: pickFolder },
+    ],
+  })
+}
+
 async function refreshProject() {
   refreshing.value = true
   try {
@@ -154,7 +173,7 @@ async function syncProject() {
 </script>
 
 <template>
-  <div class="tree-pane">
+  <div class="tree-pane" @contextmenu="openProjectMenu">
     <section
       class="section project-section"
       :class="{ 'has-project': project.projectTree }"

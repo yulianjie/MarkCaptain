@@ -125,13 +125,13 @@ html.dark,
 .el-message-box {
   --el-dialog-bg-color: var(--mt-surface-raised);
   --el-messagebox-border-radius: var(--mt-radius-window);
-  max-width: calc(100vw - 32px);
   border: 1px solid var(--mt-border);
   border-radius: var(--mt-radius-window);
   background: var(--mt-surface-raised);
   box-shadow: var(--mt-shadow-panel);
   color: var(--mt-fg);
 }
+.el-dialog { max-width: calc(100vw - 32px); }
 .el-dialog__header { padding-bottom: 16px; }
 .el-dialog__title { font-size: 16px; font-weight: 600; line-height: 1.5; }
 .el-dialog__body { color: var(--mt-fg); min-width: 0; }
@@ -160,8 +160,7 @@ html.dark,
 .el-select-dropdown__item { max-width: calc(100vw - 48px); }
 
 @media (max-width: 600px) {
-  .el-dialog, .el-message-box { max-width: calc(100vw - 20px); }
-  .el-dialog { --el-dialog-padding-primary: 16px; }
+  .el-dialog { --el-dialog-padding-primary: 16px; max-width: calc(100vw - 20px); }
   .el-dialog__title { font-size: 15px; }
   .el-dialog__footer { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
   .el-dialog__footer .el-button + .el-button { margin-left: 0; }
