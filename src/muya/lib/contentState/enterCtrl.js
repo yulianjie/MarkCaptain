@@ -270,6 +270,19 @@ const enterCtrl = ContentState => {
       block.functionType === 'codeContent'
     ) {
       const { text, key } = block
+      const preBlock = this.getParent(parent)
+      const closingFence = preBlock.functionType === 'mermaid' && !event.shiftKey && start.offset === text.length
+        ? /(?:^|\n) {0,3}`{3,}[ \t]*$/.exec(text)
+        : null
+      if (closingFence) {
+        block.text = text.slice(0, closingFence.index)
+        const paragraph = this.createBlockP()
+        this.insertAfter(paragraph, this.getParent(preBlock))
+        const { key } = paragraph.children[0]
+        this.cursor = { start: { key, offset: 0 }, end: { key, offset: 0 } }
+        return this.partialRender()
+      }
+
       const autoIndent = checkAutoIndent(text, start.offset)
       const indent = getIndentSpace(text)
       block.text = text.substring(0, start.offset) +
@@ -495,18 +508,17 @@ const enterCtrl = ContentState => {
       }
     }
 
-    this.codeBlockUpdate(getParagraphBlock(newBlock))
-    // If block is pre block when updated, need to focus it.
+    const newCodeBlock = this.codeBlockUpdate(getParagraphBlock(newBlock))
     const preParagraphBlock = getParagraphBlock(block)
-    const blockNeedFocus = this.codeBlockUpdate(preParagraphBlock)
-    const tableNeedFocus = this.tableBlockUpdate(preParagraphBlock)
-    const htmlNeedFocus = this.updateHtmlBlock(preParagraphBlock)
-    const mathNeedFocus = this.updateMathBlock(preParagraphBlock)
+    const codeNeedFocus = this.codeBlockUpdate(preParagraphBlock)
+    const tableNeedFocus = !codeNeedFocus && this.tableBlockUpdate(preParagraphBlock)
+    const htmlNeedFocus = !codeNeedFocus && this.updateHtmlBlock(preParagraphBlock)
+    const mathNeedFocus = !codeNeedFocus && this.updateMathBlock(preParagraphBlock)
     let cursorBlock
 
     switch (true) {
-      case !!blockNeedFocus:
-        cursorBlock = block
+      case !!codeNeedFocus:
+        cursorBlock = codeNeedFocus
         break
       case !!tableNeedFocus:
         cursorBlock = tableNeedFocus
@@ -518,7 +530,7 @@ const enterCtrl = ContentState => {
         cursorBlock = mathNeedFocus
         break
       default:
-        cursorBlock = newBlock
+        cursorBlock = newCodeBlock || newBlock
         break
     }
 

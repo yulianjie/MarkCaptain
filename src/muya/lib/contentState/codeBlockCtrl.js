@@ -4,6 +4,7 @@ import { escapeHTML } from '../utils'
 import selection from '../selection'
 
 const CODE_UPDATE_REP = /^`{3,}(.*)/
+const isMermaid = lang => /^mermaid(?:\s|$)/i.test(lang.trim())
 
 const codeBlockCtrl = ContentState => {
   /**
@@ -75,13 +76,22 @@ const codeBlockCtrl = ContentState => {
       lang = ''
     }
 
-    // Prevent possible XSS on language input when using lang attribute later on. The input is also sanitized before rendering.
-    lang = escapeHTML(lang)
-    if (lang !== '') {
-      this.loadAndRehighlightLanguage(lang)
+    if (block.functionType === 'languageInput' && isMermaid(lang)) {
+      const preBlock = this.getParent(block)
+      const source = this.getNextSibling(block).children[0].text
+      delete preBlock.lang
+      const codeContent = this.initContainerBlock('mermaid', preBlock)
+      codeContent.text = source
+      const { key } = codeContent
+      this.cursor = { start: { key, offset: 0 }, end: { key, offset: 0 } }
+      return this.partialRender()
     }
 
+    // Prevent possible XSS on language input when using lang attribute later on. The input is also sanitized before rendering.
+    lang = escapeHTML(lang)
+
     if (block.functionType === 'languageInput') {
+      if (lang) this.loadAndRehighlightLanguage(lang)
       const preBlock = this.getParent(block)
       const nextSibling = this.getNextSibling(block)
 
@@ -109,7 +119,7 @@ const codeBlockCtrl = ContentState => {
   }
 
   /**
-   * [codeBlockUpdate if block updated to `pre` return true, else return false]
+   * Convert an opening fence and return the editable block to focus.
    */
   ContentState.prototype.codeBlockUpdate = function (block, code = '', lang) {
     if (block.type === 'span') {
@@ -124,6 +134,14 @@ const codeBlockCtrl = ContentState => {
     const match = CODE_UPDATE_REP.exec(text)
     if (match || lang) {
       const language = lang || (match ? match[1] : '')
+      if (isMermaid(language)) {
+        const codeContent = this.initContainerBlock('mermaid', block)
+        codeContent.text = code
+        const { key } = codeContent
+        const offset = code.length
+        this.cursor = { start: { key, offset }, end: { key, offset } }
+        return codeContent
+      }
       const codeBlock = this.createBlock('code', {
         lang: language
       })
@@ -157,7 +175,7 @@ const codeBlockCtrl = ContentState => {
         start: { key, offset },
         end: { key, offset }
       }
-      return true
+      return inputBlock
     }
     return false
   }

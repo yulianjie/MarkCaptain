@@ -6,6 +6,11 @@ import notes from './notes-zh-CN'
 export default {
   notes,
   agent,
+  mermaid: {
+    emptySource: '输入 Mermaid 源码以预览图表',
+    invalidSource: 'Mermaid 语法有误',
+    doneEditing: '完成编辑',
+  },
   quickInsert: {
     hint: '输入 @ 插入内容',
     noResults: '没有匹配的内容',

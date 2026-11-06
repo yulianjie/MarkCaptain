@@ -207,6 +207,14 @@ class ClickEvent {
         return event.stopPropagation()
       }
 
+      const doneButton = target.closest('.ag-mermaid-done')
+      if (doneButton) {
+        event.preventDefault()
+        event.stopPropagation()
+        contentState.finishMermaidEditing(contentState.getBlock(doneButton.closest('figure').id))
+        return
+      }
+
       if (target.closest('div.ag-container-preview') || target.closest('div.ag-html-preview')) {
         event.stopPropagation()
         if (target.closest('div.ag-container-preview')) {

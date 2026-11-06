@@ -85,8 +85,8 @@ const containerCtrl = ContentState => {
 
   ContentState.prototype.handleContainerBlockClick = function (figureEle) {
     const { id } = figureEle
-    const mathBlock = this.getBlock(id)
-    const preBlock = mathBlock.children[0]
+    const figure = this.getBlock(id)
+    const preBlock = figure.children[0]
     const firstLine = preBlock.children[0].children[0]
 
     const { key } = firstLine
@@ -96,6 +96,27 @@ const containerCtrl = ContentState => {
       end: { key, offset }
     }
     this.partialRender()
+    if (figure.functionType === 'mermaid') {
+      document.getElementById(preBlock.key)?.scrollIntoView({ block: 'start', inline: 'nearest' })
+    }
+  }
+
+  ContentState.prototype.finishMermaidEditing = function (figure) {
+    const previous = this.findPreBlockInLocation(figure)
+    const next = this.findNextBlockInLocation(figure)
+    const isParagraph = block => block?.functionType === 'paragraphContent' || block?.functionType === 'atxLine'
+    let target = isParagraph(previous) ? previous : isParagraph(next) ? next : null
+    if (!target) {
+      const paragraph = this.createBlockP()
+      this.insertAfter(paragraph, figure)
+      target = paragraph.children[0]
+    }
+    const { key } = target
+    const offset = target === previous ? target.text.length : 0
+    this.cursor = { start: { key, offset }, end: { key, offset } }
+    this.partialRender()
+    document.getElementById(key)?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    this.muya.dispatchChange()
   }
 
   ContentState.prototype.updateMathBlock = function (block) {

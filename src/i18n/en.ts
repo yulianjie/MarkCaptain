@@ -8,6 +8,11 @@ import notes from './notes-en'
 export default {
   notes,
   agent,
+  mermaid: {
+    emptySource: 'Enter Mermaid source to preview the diagram',
+    invalidSource: 'Invalid Mermaid syntax',
+    doneEditing: 'Done editing',
+  },
   quickInsert: {
     hint: 'Type @ to insert',
     noResults: 'No results',

@@ -152,6 +152,11 @@ export default function renderContainerBlock (parent, block, activeBlocks, match
       Object.assign(data.dataset, { role: functionType.toUpperCase() })
       if (functionType === 'table' && activeBlocks[0] && activeBlocks[0].functionType === 'cellContent') {
         children.unshift(renderTableTools(activeBlocks))
+      } else if (functionType === 'mermaid' && activeBlocks.includes(block)) {
+        const label = this.muya.options.translate?.('mermaid.doneEditing') || 'Done editing'
+        children.splice(1, 0, h('button.ag-mermaid-done', {
+          attrs: { type: 'button', contenteditable: 'false', 'aria-keyshortcuts': 'Escape' }
+        }, label))
       } else if (functionType !== 'footnote') {
         children.unshift(renderEditIcon())
       } else {

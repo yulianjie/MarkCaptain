@@ -172,7 +172,8 @@ const importRegister = ContentState => {
           const { codeBlockStyle, text, lang: infostring = '' } = token
 
           // GH#697, markedjs#1387
-          const lang = (infostring || '').match(/\S*/)[0]
+          const language = (infostring || '').match(/\S*/)[0]
+          const lang = /^mermaid$/i.test(language) ? 'mermaid' : language
 
           value = text
           // Fix: #1265.
@@ -180,7 +181,7 @@ const importRegister = ContentState => {
             value = value.replace(/\n+$/, '')
               .replace(/^\n+/, '')
           }
-          if (/mermaid|flowchart|vega-lite|sequence|plantuml/.test(lang)) {
+          if (/^(mermaid|flowchart|vega-lite|sequence|plantuml)$/.test(lang)) {
             block = this.createContainerBlock(lang, value)
             this.appendChild(parentList[0], block)
           } else {

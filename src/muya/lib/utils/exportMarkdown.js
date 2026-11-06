@@ -250,14 +250,9 @@ class ExportMarkdown {
 
   // `mermaid` `flowchart` `sequence` `plantuml` `vega-lite`
   normalizeContainer (block, indent) {
-    const result = []
-    const diagramType = block.children[0].functionType
-    result.push('```' + diagramType + '\n')
-    for (const line of block.children[0].children[0].children) {
-      result.push(`${line.text}\n`)
-    }
-    result.push('```\n')
-    return result.join('')
+    const [pre] = block.children
+    const source = pre.children[0].children.flatMap(line => line.text.split('\n'))
+    return ['```' + pre.functionType, ...source, '```'].map(line => `${indent}${line}\n`).join('')
   }
 
   normalizeCodeBlock (block, indent) {

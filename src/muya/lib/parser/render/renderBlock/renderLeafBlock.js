@@ -179,9 +179,9 @@ export default function renderLeafBlock (parent, block, activeBlocks, matches, u
       case 'mermaid': {
         selector += `.${CLASS_OR_ID.AG_CONTAINER_PREVIEW}`
         Object.assign(data.attrs, { spellcheck: 'false' })
-        if (code === '') {
+        if (!code?.trim()) {
           this.mermaidPreviews.delete(block)
-          children = '< Empty Mermaid Block >'
+          children = this.muya.options.translate?.('mermaid.emptySource') || 'Enter Mermaid source to preview the diagram'
           selector += `.${CLASS_OR_ID.AG_EMPTY}`
         } else {
           children = 'Loading...'

@@ -6,6 +6,11 @@ import notes from './notes-ja'
 export default {
   notes,
   agent,
+  mermaid: {
+    emptySource: 'Mermaid のソースを入力すると図が表示されます',
+    invalidSource: 'Mermaid の構文エラー',
+    doneEditing: '編集を完了',
+  },
   quickInsert: {
     hint: '@ を入力して挿入',
     noResults: '一致する項目がありません',

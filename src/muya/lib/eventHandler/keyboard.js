@@ -129,6 +129,9 @@ class Keyboard {
     }
 
     const handler = event => {
+      // Let Enter and Space activate the native button when it has focus.
+      if (event.key !== EVENT_KEYS.Escape && event.target.closest('.ag-mermaid-done')) return
+
       if (event.metaKey || event.ctrlKey) {
         container.classList.add('ag-meta-or-ctrl')
       }
@@ -166,6 +169,17 @@ class Keyboard {
         return
       }
       switch (event.key) {
+        case EVENT_KEYS.Escape: {
+          if (this.isComposed || event.isComposing) break
+          const { start, end } = contentState.cursor
+          const figure = contentState.closest(contentState.getBlock(start.key), 'figure')
+          if (start.key === end.key && figure?.functionType === 'mermaid') {
+            event.preventDefault()
+            event.stopPropagation()
+            contentState.finishMermaidEditing(figure)
+          }
+          break
+        }
         case EVENT_KEYS.Backspace:
           contentState.backspaceHandler(event)
           break

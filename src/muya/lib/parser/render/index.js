@@ -104,39 +104,52 @@ class StateRender {
       if (!target) continue
 
       const cached = this.mermaidPreviews.get(block)
-      if (cached && cached.code === code && cached.theme === theme) {
-        if (cached.svg) {
-          // Restore the diagram before Muya measures the caret and the browser clamps scrollTop.
-          target.innerHTML = cached.svg
-        } else {
-          cached.target = target
+      const sameTheme = cached && cached.theme === theme
+      const svg = sameTheme ? cached.svg : null
+      if (svg) {
+        // Keep the current diagram in the layout while its replacement is rendering.
+        target.innerHTML = svg
+      }
+      if (sameTheme && cached.code === code) {
+        if (cached.error) {
+          target.textContent = cached.error
+          target.classList.add(CLASS_OR_ID.AG_MATH_ERROR)
         }
+        if (cached.target) cached.target = target
         continue
       }
-      const preview = { code, theme, target, svg: null }
+      const preview = { code, theme, target, svg, error: null }
       this.mermaidPreviews.set(block, preview)
       pending.push([block, preview])
     }
     this.mermaidQueue.clear()
 
     for (const [block, preview] of pending) {
+      let scratch
       try {
         const mermaid = await loadRenderer('mermaid')
         if (this.mermaidPreviews.get(block) !== preview) continue
         mermaid.initialize({ securityLevel: 'loose', theme })
-        const { svg } = await mermaid.render(`mermaid-render-${getLongUniqueId()}`, preview.code)
+        // Mermaid needs live layout to measure labels and can leave error SVGs behind.
+        scratch = document.createElement('div')
+        scratch.inert = true
+        scratch.style.cssText = 'position: fixed; inset: 0; opacity: 0;'
+        document.body.append(scratch)
+        const { svg } = await mermaid.render(`mermaid-render-${getLongUniqueId()}`, preview.code, scratch)
         preview.svg = svg
         if (this.mermaidPreviews.get(block) === preview && preview.target.isConnected) {
           preview.target.innerHTML = svg
         }
       } catch {
         if (this.mermaidPreviews.get(block) !== preview) continue
-        this.mermaidPreviews.delete(block)
+        preview.svg = null
+        preview.error = this.muya.options.translate?.('mermaid.invalidSource') || 'Invalid Mermaid syntax'
         if (preview.target.isConnected) {
-          preview.target.textContent = '< Invalid Mermaid Codes >'
+          preview.target.textContent = preview.error
           preview.target.classList.add(CLASS_OR_ID.AG_MATH_ERROR)
         }
       } finally {
+        scratch?.remove()
         preview.target = null
       }
     }

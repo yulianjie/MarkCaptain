@@ -962,7 +962,7 @@ figure.ag-container-block div.ag-container-preview > svg {
   width: 100%;
 }
 
-figure.ag-active.ag-container-block > div.ag-container-preview {
+figure.ag-active.ag-container-block:not([data-role="MERMAID"]) > div.ag-container-preview {
   position: absolute;
   top: calc(100% + 20px);
   left: 50%;
@@ -975,6 +975,39 @@ figure.ag-active.ag-container-block > div.ag-container-preview {
   border: 1px solid var(--floatBorderColor);
   border-radius: 4px;
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, .1);
+}
+
+figure.ag-active[data-role="MERMAID"] > pre {
+  position: relative;
+  margin-top: 1.5rem;
+  scroll-margin-top: 1.5rem;
+}
+
+figure.ag-active[data-role="MERMAID"] > div.ag-container-preview {
+  box-sizing: border-box;
+  padding: .5rem;
+  border: 1px solid var(--floatBorderColor);
+  border-radius: 4px;
+}
+
+.ag-mermaid-done {
+  position: sticky;
+  top: .5rem;
+  z-index: 2;
+  display: block;
+  margin: 1.5rem 0 .5rem auto;
+  padding: .25rem .65rem;
+  color: var(--editorColor);
+  background: var(--floatBgColor);
+  border: 1px solid var(--floatBorderColor);
+  border-radius: 4px;
+  font: inherit;
+  font-size: .875em;
+  cursor: pointer;
+}
+
+.ag-mermaid-done:hover {
+  border-color: var(--themeColor);
 }
 
 div.ag-html-preview {
